@@ -94,5 +94,6 @@
       Evidence (2026-09-17): in a clone with the hooks installed, a 120-character subject was rejected by `commit-msg`; the same
       subject committed with `core.hooksPath=/dev/null` and squash-merged as `(#999)` rebuilt as a `pull-request`
       change with `sessions.status: undeclared` and an `undeclared-session` gap.
-- [ ] 4.7 Tag `v0.1.0` and record the tag in this file; it is the phase one release the second phase builds on.
-      (Left for the maintainer: tag after this change is reviewed, merged, and archived.)
+- [x] 4.7 Tag `v0.1.0` and record the tag in this file; it is the phase one release the second phase builds on.
+      Evidence (2026-09-17): `v0.1.0` is an annotated tag on `a75c192`, the merge commit of pull request #3, after
+      pull requests #1, #2, and #3 (one per spec) merged into `main`.

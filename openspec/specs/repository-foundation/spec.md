@@ -2,7 +2,8 @@
 
 ## Purpose
 
-The repository provides a small, deterministic starting point for spec-driven Nx projects.
+The repository provides a small, deterministic starting point for spec-driven Nx projects, whose first
+domain packages are `capture` and `flow`.
 
 ## Requirements
 
@@ -21,44 +22,44 @@ to produce a standard consumable package.
 
 #### Scenario: A package's exports map only names conditions that actually resolve
 
-- **GIVEN** `packages/hello` or `packages/greeter`'s `package.json`
+- **GIVEN** `packages/capture` or `packages/flow`'s `package.json`
 - **WHEN** a contributor inspects its `exports` map
 - **THEN** every entry resolves to a real path produced by that package's own `build` target or its source
   tree
 - **AND** no entry names a path the build does not produce
 
-### Requirement: Example logic has a direct contract
+### Requirement: Capture validates its inputs
 
-The example MUST expose a typed function with explicit behavior for valid and invalid input.
+The `capture` package MUST expose typed functions with explicit behavior for valid and invalid input:
+`validateSessionFile` returns an empty list for a valid session file and names every violated field
+otherwise, and `validateMessage` returns an empty list for a commit message whose subject and trailers
+satisfy the configuration and names every violation otherwise.
 
-#### Scenario: Greeting a named person
+#### Scenario: Validating a session file
 
-- **WHEN** `greet` receives a non-empty name
-- **THEN** it returns a greeting containing the trimmed name
+- **WHEN** `validateSessionFile` receives a well-formed session file and the repository configuration
+- **THEN** it returns an empty list
 
-#### Scenario: Rejecting empty input
+#### Scenario: Rejecting a malformed session file
 
-- **WHEN** `greet` receives only whitespace
-- **THEN** it throws an error rather than returning an ambiguous result
+- **WHEN** `validateSessionFile` receives a session file with a negative token count
+- **THEN** it returns a list naming that field rather than an ambiguous result
 
-### Requirement: A second package demonstrates inter-package dependency
+### Requirement: Flow depends on capture through the workspace
 
-The repository MUST provide a second library that depends on the `hello` library's typed export, so
-project-boundary and dependency-sequencing conventions are demonstrated in working code rather than
-described only in prose.
+The repository MUST provide the `flow` package, which depends on the `capture` package's typed exports
+(trailer parsing, the session schema, the configuration reader), declared as both an npm workspace
+dependency and an Nx implicit dependency, so project-boundary and dependency-sequencing conventions are
+demonstrated in working code rather than described only in prose.
 
 #### Scenario: Composing a dependent package
 
-- **WHEN** `packages/greeter`'s `announce` function receives a non-empty name and occasion
-- **THEN** it returns a message built from `hello`'s `greet` output plus the occasion
-
-#### Scenario: Dependent package adds its own validation
-
-- **WHEN** `announce` receives only whitespace for `occasion`
-- **THEN** it throws an error rather than returning an ambiguous result
+- **WHEN** `flow` rebuilds a projection from a mirror
+- **THEN** it reads trailers and session files through `capture`'s exports resolved by the
+  `@dev-ledger/source` condition, with no build step
 
 #### Scenario: Verifying the workspace covers both packages
 
 - **WHEN** a contributor runs the documented verification commands after `npm ci`
-- **THEN** both `hello` and `greeter` build, typecheck, lint, and test successfully without network access
+- **THEN** both `capture` and `flow` build, typecheck, lint, and test successfully without network access
   or credentials
