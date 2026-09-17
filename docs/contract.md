@@ -88,7 +88,9 @@ Thresholds: `waitTimeP50Seconds`, `cycleTimeP50Seconds`, `queueAgeSeconds`, `bat
 `telemetry rebuild` and byte-identical on any machine whose mirrors hold the same ref tips. The header
 names `schemaVersion`, `sessionSchemaVersion`, `registrySchemaVersion`, and `configSchemaVersion`. Each
 repository carries `refTips` (the refs the mirror held), `changes`, `sessions`, `unmerged`, `releases`,
-`unreleased`, `movedTags`, and `signals`, or `reachable: false` with a reason.
+`unreleased`, `movedTags`, and `signals`, or `reachable: false` with a reason. `signals` carries the flow reads,
+`dora` (deployment frequency, lead time to release with its merge-to-tag part, change failure rate, time to fix,
+each with its approximation note), `trends.weekly`, `costClasses`, and `coverage`.
 
 Each change carries its identity (the last commit on the default branch), `kind`, `commits`,
 `association` (`pullRequest`, `method`: `subject`, `pull-head`, or `patch-identity`, and `classification`:

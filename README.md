@@ -66,7 +66,8 @@ Per repository and across the registry: cycle time and wait time (from the pull 
 squash does not erase them), the unmerged queue with each pull request's age and spend, batch size, merge
 frequency, rework, escapes after the newest release, local check outcomes, spend per change, per unmerged
 pull request, per spec, provider, model, and per unit of effort,
-with every figure naming its trust classes, its excluded count, and the changes behind it. The dashboard is one
+the four DORA keys approximated to the release tag with the approximation named on each card, spend over time
+and by cost class, with every figure naming its trust classes, its excluded count, and the changes behind it. The dashboard is one
 self-contained HTML page with inline SVG charts, no script, and no loaded resource, readable from a file URL, in light and
 dark. Every cited commit shows the change's subject beside its abbreviated hash and links to the commit on GitHub when the
 registry URL is a GitHub remote; with any other remote the same citations render unlinked. Undeclared and
