@@ -6,24 +6,25 @@ contract.
 
 ## Milestone Tracking
 
-| Phase                                        | Governing changes                                             | Status   |
-| -------------------------------------------- | ------------------------------------------------------------- | -------- |
-| Repository evolution conventions             | `add-repository-evolution-markers`                            | Complete |
-| Executable PR and dependency governance      | `add-executable-pr-and-dependency-governance`                 | Complete |
-| Foundation                                   | None                                                          | Complete |
-| Agent harness and MCP governance             | `improve-agentic-boiler-governance`                           | Complete |
-| Template and example expansion               | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
-| Fork rename automation                       | `add-project-rename-tooling`                                  | Complete |
-| Flow observability (phase one)               | `add-flow-observability`                                      | Complete |
-| Board dashboard (phase one addendum)         | `add-board-dashboard`                                         | Complete |
-| Board presentation (phase one addendum)      | `improve-board-presentation`                                  | Complete |
-| Per pull request spend (phase one addendum)  | `add-per-pull-request-spend`                                  | Complete |
-| DORA signals (phase one addendum)            | `add-dora-signals`                                            | Complete |
-| Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
-| Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
-| Session figures (telemetry capture)          | `add-session-figures-from-transcript`                         | Complete |
-| Review fixes (session figures, Board links)  | `fix-transcript-figures-and-board-links`                      | Complete |
-| Change audit (phase two)                     | `add-change-audit`                                            | Blocked  |
+| Phase                                             | Governing changes                                             | Status   |
+| ------------------------------------------------- | ------------------------------------------------------------- | -------- |
+| Repository evolution conventions                  | `add-repository-evolution-markers`                            | Complete |
+| Executable PR and dependency governance           | `add-executable-pr-and-dependency-governance`                 | Complete |
+| Foundation                                        | None                                                          | Complete |
+| Agent harness and MCP governance                  | `improve-agentic-boiler-governance`                           | Complete |
+| Template and example expansion                    | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
+| Fork rename automation                            | `add-project-rename-tooling`                                  | Complete |
+| Flow observability (phase one)                    | `add-flow-observability`                                      | Complete |
+| Board dashboard (phase one addendum)              | `add-board-dashboard`                                         | Complete |
+| Board presentation (phase one addendum)           | `improve-board-presentation`                                  | Complete |
+| Per pull request spend (phase one addendum)       | `add-per-pull-request-spend`                                  | Complete |
+| DORA signals (phase one addendum)                 | `add-dora-signals`                                            | Complete |
+| Pull request telemetry (workflow governance)      | `add-telemetry-in-pull-request-body`                          | Complete |
+| Capture git environment (defect)                  | `fix-capture-git-environment`                                 | Complete |
+| Session figures (telemetry capture)               | `add-session-figures-from-transcript`                         | Complete |
+| Review fixes (session figures, Board links)       | `fix-transcript-figures-and-board-links`                      | Complete |
+| Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
+| Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -82,6 +83,13 @@ The review fixes row corrects five defects a review of the four rows above it fo
 message kept its first usage record instead of its last, a transcript-filled record kept a source written
 before the sum, an SSH host alias derived a dead link for every citation, a pipe could end a table cell in
 the pull request body, and two template skill files carried another project's boundary text.
+
+The flow efficiency and work mix row is the last phase one addendum: the reads the flow frameworks ask for
+after DORA (flow efficiency, work mix, iterations, abandonment), the product read git can see exactly for a
+repository that follows the OpenSpec loop (spec lead time), and the cost figures a preparer asks for once
+token counts are real. It follows the DORA signals row for the weekly buckets and the review fixes row for
+the figures, and it is drafted rather than started. Every read that needs a review, a check run, a
+deployment, or an incident stays in the change audit row.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

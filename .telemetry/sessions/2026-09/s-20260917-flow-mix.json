@@ -1,0 +1,26 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "openspec/flow-efficiency-and-work-mix",
+  "cachedTokens": 133092244,
+  "commits": [
+    "aea8e97a53b33926af1fca7ae4569e1300731bb0"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T01:25:00Z",
+  "figuresSource": "summed from 245 messages in the session transcript",
+  "inputTokens": 6676,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 509874,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260917-flow-mix",
+  "spec": "add-flow-efficiency-and-work-mix",
+  "startedAt": "2026-09-18T01:05:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 1200
+}
