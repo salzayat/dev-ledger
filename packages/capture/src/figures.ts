@@ -25,19 +25,15 @@ function whole(value: unknown): number {
 
 /**
  * Sums a transcript's usage records. A streaming transcript writes a record every time a message grows,
- * each carrying that message's cumulative usage, so records are deduplicated by message identifier: summing
- * rows would count the same tokens several times over. A record with no identifier counts once on its own.
- * Returns null when no usage record is present, so the caller records the session as missing figures
- * rather than as zeros.
+ * each carrying that message's cumulative usage, so records are deduplicated by message identifier and the
+ * last record for an identifier wins: it is the one that saw the whole message, and summing the rows would
+ * count the same tokens several times over. A record with no identifier counts once on its own. Returns
+ * null when no usage record is present, so the caller records the session as missing figures rather than
+ * as zeros.
  */
 export function sumTranscriptUsage(text: string): Figures | null {
-  const seen = new Set<string>();
-  const figures: Figures = {
-    inputTokens: 0,
-    outputTokens: 0,
-    cachedTokens: 0,
-    messages: 0,
-  };
+  const byId = new Map<string, Usage>();
+  const anonymous: Usage[] = [];
   for (const line of text.split('\n')) {
     if (line.trim().length === 0) {
       continue;
@@ -54,12 +50,19 @@ export function sumTranscriptUsage(text: string): Figures | null {
       continue;
     }
     const id = typeof message?.id === 'string' ? message.id : null;
-    if (id !== null) {
-      if (seen.has(id)) {
-        continue;
-      }
-      seen.add(id);
+    if (id === null) {
+      anonymous.push(usage);
+    } else {
+      byId.set(id, usage);
     }
+  }
+  const figures: Figures = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cachedTokens: 0,
+    messages: 0,
+  };
+  for (const usage of [...byId.values(), ...anonymous]) {
     figures.inputTokens += whole(usage.input_tokens);
     figures.outputTokens += whole(usage.output_tokens);
     figures.cachedTokens +=
