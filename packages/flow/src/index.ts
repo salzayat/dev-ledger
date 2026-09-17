@@ -1,4 +1,4 @@
-export { REGISTRY_SCHEMA_VERSION, parseRegistry } from './registry.ts';
+export { REGISTRY_SCHEMA_VERSION, parseRegistry, webUrl } from './registry.ts';
 export type { Registry, RegistryEntry, Thresholds } from './registry.ts';
 export {
   REFSPECS,

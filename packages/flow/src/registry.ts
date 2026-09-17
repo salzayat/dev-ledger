@@ -116,3 +116,38 @@ export function parseRegistry(text: string): {
     errors,
   };
 }
+
+/**
+ * The browsable web URL for a registry URL, when that URL is a GitHub remote: `git@host:owner/repo.git`,
+ * `ssh://git@host/owner/repo.git`, or `https://host/owner/repo`. A local path, a non-GitHub host, or any
+ * other form yields null, and The Board then renders hashes with no link. Never returns a local path, so a
+ * projection built from a local mirror stays machine-independent.
+ */
+export function webUrl(url: string): string | null {
+  const trimmed = url.trim();
+  const scheme = /^(?<scheme>[A-Za-z][A-Za-z0-9+.-]*):\/\//.exec(trimmed);
+  let match: RegExpExecArray | null;
+  if (scheme) {
+    if (!['ssh', 'git', 'http', 'https'].includes(scheme.groups!.scheme)) {
+      return null;
+    }
+    match = /^(?:[^@/]+@)?(?<host>[^/:]+)(?::\d+)?\/(?<path>.+)$/.exec(
+      trimmed.slice(scheme[0].length),
+    );
+  } else {
+    match = /^(?:[^@/]+@)?(?<host>[^/:]+):(?<path>.+)$/.exec(trimmed);
+  }
+  const host = match?.groups?.host;
+  const path = match?.groups?.path;
+  if (!host || !path) {
+    return null;
+  }
+  if (host !== 'github.com' && !host.startsWith('github.')) {
+    return null;
+  }
+  const repository = path.replace(/\.git$/, '').replace(/^\/+|\/+$/g, '');
+  if (!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repository)) {
+    return null;
+  }
+  return `https://${host}/${repository}`;
+}

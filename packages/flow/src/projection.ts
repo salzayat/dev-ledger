@@ -17,6 +17,7 @@ import {
 } from './history.ts';
 import {
   REGISTRY_SCHEMA_VERSION,
+  webUrl,
   type Registry,
   type RegistryEntry,
 } from './registry.ts';
@@ -30,12 +31,14 @@ import {
 import { mirrorPath, refTips } from './sync.ts';
 import { timingFor } from './timing.ts';
 
-export const PROJECTION_SCHEMA_VERSION = 1;
+export const PROJECTION_SCHEMA_VERSION = 2;
 export const CONFIG_PATH = 'telemetry.config.json';
 
 export type RepositoryProjection = {
   name: string;
   defaultBranch: string;
+  /** The remote's browsable web URL, or null when the registry URL is not a hosting remote. */
+  webUrl: string | null;
   reachable: boolean;
   reason: string | null;
   asOf: string | null;
@@ -137,6 +140,7 @@ export function buildRepositoryProjection(
     return {
       name: entry.name,
       defaultBranch: branch,
+      webUrl: webUrl(entry.url),
       reachable: false,
       reason: existsSync(dir)
         ? `default branch ${branch} is not present in the mirror`
@@ -243,6 +247,7 @@ export function buildRepositoryProjection(
   return {
     name: entry.name,
     defaultBranch: branch,
+    webUrl: webUrl(entry.url),
     reachable: true,
     reason: null,
     asOf,

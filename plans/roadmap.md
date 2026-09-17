@@ -16,6 +16,7 @@ contract.
 | Fork rename automation                  | `add-project-rename-tooling`                                  | Complete |
 | Flow observability (phase one)          | `add-flow-observability`                                      | Complete |
 | Board dashboard (phase one addendum)    | `add-board-dashboard`                                         | Complete |
+| Board presentation (phase one addendum) | `improve-board-presentation`                                  | Complete |
 | Change audit (phase two)                | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -46,6 +47,11 @@ repository and ends by tagging `v0.1.0`. Change audit adds the `audit` package (
 findings, decisions, evidence packs, the git-only baseline, the optional collector) and a governance view on
 the same Board; phase one is archived and tagged `v0.1.0`, so it is dependency-ready. The R&D cost allocation export, the `regulated`
 level's first real case, and further standard packs are later rows.
+
+The Board presentation milestone follows the Board dashboard milestone because it edits the page that one
+introduced: it gives every cited commit its change's subject and a link to the commit on the hosting
+platform, and adds the charts the first dashboard left as bare figures. It changes no record, only the
+projection's derived repository web URL and the page rendered from it.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
