@@ -81,6 +81,13 @@ and records that URL in the projection. A local path or any other remote resolve
 ever written into the projection, and the same citations then render with the subject and the hash and no
 link. A link is navigation, not a resource: the page still opens from a file URL and loads nothing.
 
+## A pull request shows its own records
+
+`scripts/pr.sh` puts the branch's session records into the description it opens, built by
+`telemetry session summary` from git and the session files alone. The reviewer sees what the branch
+recorded before deciding whether to merge it, and a record with no figures is named as missing there too.
+The projection is not read: the pull request does not exist yet when its description is written.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It

@@ -65,6 +65,14 @@ Every pull request should state:
 Use `.github/pull_request_template.md` and `./scripts/pr.sh` for guarded PR automation after explicit
 authorization.
 
+`./scripts/pr.sh` adds one generated block to every description it creates, between
+`<!-- telemetry:begin -->` and `<!-- telemetry:end -->`: the session records the branch adds, with each
+record's session identifier, provider and model, figures, and local check outcome, followed by the record
+itself. It lands inside `## Data / generated output` when the body has that heading, and as its own
+section otherwise. A body passed with `--body-file` is never rewritten — the block is appended within the
+section, and the `Spec:` and `Session:` trailers are appended after it so the merge commit carries them.
+A record whose harness supplied no figures is named as missing, never rendered as a zero.
+
 ## Review Standard
 
 Review for behavioral correctness, clear boundaries, reproducibility, documentation freshness, and

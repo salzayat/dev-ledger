@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { DEFAULT_CONFIG, parseConfig, type TelemetryConfig } from './config.ts';
 import {
+  SESSIONS_PATH,
   buildSessionFile,
   sessionFilePath,
   validateSessionFile,
@@ -87,6 +88,75 @@ function sessionFiles(root: string, paths: string[]): string[] {
     .map((path) => join(root, path));
 }
 
+/**
+ * The Markdown section describing every session record added between two refs: a table to scan and each
+ * record's own content beneath it. Built from git and the session files alone, so it holds wherever a
+ * repository records sessions, with or without the flow package.
+ */
+export function sessionSummary(
+  root: string,
+  base: string,
+  head: string,
+): string {
+  const range = `${base}..${head}`;
+  const added = git(root, [
+    'diff',
+    '--name-only',
+    '--diff-filter=AM',
+    range,
+    '--',
+    `${SESSIONS_PATH}/`,
+  ])
+    .split('\n')
+    .map((path) => path.trim())
+    .filter((path) => path.endsWith('.json'))
+    .sort();
+  if (added.length === 0) {
+    return `### Session records on this branch\n\nThis branch adds no session record.\n`;
+  }
+  const rows: string[] = [];
+  const bodies: string[] = [];
+  for (const path of added) {
+    let record: Record<string, unknown>;
+    try {
+      record = JSON.parse(git(root, ['show', `${head}:${path}`])) as Record<
+        string,
+        unknown
+      >;
+    } catch {
+      rows.push(`| \`${path}\` | — | — | unreadable | — |`);
+      continue;
+    }
+    const figures = record.figuresMissing
+      ? 'figures missing'
+      : `${Number(record.inputTokens ?? 0).toLocaleString('en-US')} in · ` +
+        `${Number(record.outputTokens ?? 0).toLocaleString('en-US')} out · ` +
+        `${Number(record.cachedTokens ?? 0).toLocaleString('en-US')} cached · ` +
+        `$${Number(record.costUsd ?? 0).toFixed(2)}`;
+    const check = (record.localCheck as { outcome?: string } | undefined)
+      ?.outcome;
+    rows.push(
+      `| \`${path}\` | \`${record.sessionId}\` | ${record.provider} / ${record.model} | ${figures} | ${check ?? '—'} |`,
+    );
+    bodies.push(
+      `<details><summary><code>${record.sessionId}</code></summary>\n\n\`\`\`json\n${canonicalJson(record).trimEnd()}\n\`\`\`\n\n</details>`,
+    );
+  }
+  return [
+    '### Session records on this branch',
+    '',
+    '| record | session | provider / model | figures | check |',
+    '| --- | --- | --- | --- | --- |',
+    ...rows,
+    '',
+    'A record whose harness supplied no figures reads `figures missing`: it is excluded from every total',
+    'and counted, never read as zero.',
+    '',
+    ...bodies,
+    '',
+  ].join('\n');
+}
+
 export function captureMain(argv: string[]): number {
   const [command, ...args] = argv;
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']).trim();
@@ -152,8 +222,14 @@ export function captureMain(argv: string[]): number {
         process.stdout.write(`${relative}\n`);
         return 0;
       }
+      if (args[0] === 'summary') {
+        const base = option(args, '--base') ?? 'main';
+        const head = option(args, '--head') ?? 'HEAD';
+        process.stdout.write(sessionSummary(root, base, head));
+        return 0;
+      }
       fail(
-        'usage: telemetry session start --id <id> | telemetry session end --payload <file|->',
+        'usage: telemetry session start --id <id> | telemetry session end --payload <file|-> | telemetry session summary [--base <ref>] [--head <ref>]',
       );
       break;
     }

@@ -267,9 +267,29 @@ if [ -z "$pr_body" ]; then
     skipped_line="./scripts/check.sh (--skip-checks passed; document why in this PR before merging)"
   fi
 
-  pr_body=$(printf '## Summary\n\n- %s\n\n## OpenSpec\n\n<!-- Which OpenSpec requirement or change under openspec/changes/ this supports. -->\n\n## Verification\n\n- %s\n\n## Skipped checks\n\n- %s\n\n## Data / reports\n\n<!-- Note if this PR changes data, reports, or experiment outputs, and where. -->\n' \
+  pr_body=$(printf '## Summary\n\n- %s\n\n## OpenSpec\n\n<!-- Which OpenSpec requirement or change under openspec/changes/ this supports. -->\n\n## Verification\n\n- %s\n\n## Skipped checks\n\n- %s\n\n## Data / generated output\n\n<!-- Note if this PR changes data, reports, or generated output, and where. -->\n' \
     "$summary" "$verification_line" "$skipped_line")
 fi
+
+# The branch's session records, rendered by the capture package (git and the session files only) and
+# spliced into the body's data section. Supplied body text is never rewritten: the block is appended
+# inside that section, between markers, or as its own section when the body has no data section.
+telemetry_section=$(node --conditions=@dev-ledger/source --experimental-strip-types \
+  "$repo_root/packages/capture/src/cli.ts" session summary --base "$base_branch" --head "$pr_branch" \
+  2>/dev/null || printf '### Session records on this branch\n\nThe summary could not be built.\n')
+
+body_source=$(mktemp)
+if [ -n "$body_file" ]; then
+  cat "$body_file" >"$body_source"
+else
+  printf '%s\n' "$pr_body" >"$body_source"
+fi
+block_source=$(mktemp)
+printf '%s' "$telemetry_section" >"$block_source"
+merged_body=$(mktemp)
+./scripts/merge-pr-body.sh "$body_source" "$block_source" >"$merged_body"
+body_file=$merged_body
+rm -f "$body_source" "$block_source"
 
 # Trailers at the end of the description, so the recommended "title and description" merge message
 # setting carries them onto the squash or merge commit. Distinct Session: values come from the branch.
@@ -287,14 +307,13 @@ fi
 points_value=$(git config --get "branch.$pr_branch.telemetry-story-points" 2>/dev/null || true)
 [ -n "$points_value" ] && trailer_block="${trailer_block}Story-Points: ${points_value}
 "
-if [ -n "$trailer_block" ] && [ -z "$body_file" ]; then
-  pr_body=$(printf '%s\n\n%s' "$pr_body" "$trailer_block")
+# The trailers belong to the pull request, not to how its description was authored, so they are appended
+# whether the body came from a file or was generated here.
+if [ -n "$trailer_block" ]; then
+  printf '\n%s' "$trailer_block" >>"$body_file"
 fi
 
-if [ -n "$body_file" ]; then
-  pr_url=$(gh pr create --base "$base_branch" --head "$pr_branch" --title "$pr_title" --body-file "$body_file")
-else
-  pr_url=$(gh pr create --base "$base_branch" --head "$pr_branch" --title "$pr_title" --body "$pr_body")
-fi
+pr_url=$(gh pr create --base "$base_branch" --head "$pr_branch" --title "$pr_title" --body-file "$body_file")
+rm -f "$merged_body"
 require_branch "$pr_branch"
 printf '%s\n' "$pr_url"
