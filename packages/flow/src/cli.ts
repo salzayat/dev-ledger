@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { renderBoard } from './board.ts';
+import { renderBoardHtml } from './board-html.ts';
 import { advanceCursor, readCursor, writeCursor } from './cursor.ts';
 import { git } from './git.ts';
 import {
@@ -21,7 +22,7 @@ const USAGE = `Usage: telemetry <command> [options]
   sync                                     Mirror-fetch every registered repository over SSH
   rebuild                                  Rebuild the projection from the mirrors and print its hash
   cursor <consumer> [--repo <name>]        Replay changes since the consumer's cursor and advance it
-  board                                    Render The Board from the projection
+  board [--html [path]]                    Render The Board in the terminal, or as a static HTML page (default .telemetry/board.html)
 `;
 
 function repoRoot(): string {
@@ -116,7 +117,19 @@ export function main(argv: string[]): number {
       return 0;
     }
     case 'board': {
-      process.stdout.write(renderBoard(readProjection(stateRoot(root))) + '\n');
+      const projection = readProjection(stateRoot(root));
+      const htmlIndex = args.indexOf('--html');
+      if (htmlIndex >= 0) {
+        const target = resolve(
+          root,
+          args[htmlIndex + 1] ?? join('.telemetry', 'board.html'),
+        );
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, renderBoardHtml(projection));
+        process.stdout.write(`${target}\n`);
+        return 0;
+      }
+      process.stdout.write(renderBoard(projection) + '\n');
       return 0;
     }
     case 'hash': {

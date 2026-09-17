@@ -15,6 +15,7 @@ contract.
 | Template and example expansion          | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
 | Fork rename automation                  | `add-project-rename-tooling`                                  | Complete |
 | Flow observability (phase one)          | `add-flow-observability`                                      | Complete |
+| Board dashboard (phase one addendum)    | `add-board-dashboard`                                         | Complete |
 | Change audit (phase two)                | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
