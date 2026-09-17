@@ -36,6 +36,14 @@ zero. The pull head ref keeps the original commits with their author dates, so:
 The merge time is the merging party's clock, and the projection says so. A change with no pull head ref
 has both figures absent with a reason, never zero.
 
+## Typical, nine in ten, slowest
+
+The Board never shows an average, because one very slow change would drag it. Each timing panel shows
+three figures instead. Typical is the median: half the changes were faster than it, half slower. Nine in
+ten is the value nine out of ten changes came in under, which is where a slow tail shows. Slowest is the
+single worst change, always cited so it can be looked at. In the projection file these are `p50`, `p90`,
+and `max`.
+
 ## Undeclared, unreported, human-only
 
 A change with no `Session:` trailer anywhere is `undeclared` (an `undeclared-session` gap). A change that

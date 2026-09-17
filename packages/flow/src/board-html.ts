@@ -76,9 +76,9 @@ function excludedNote(excluded: Record<string, number>): string {
 
 function bars(distribution: Distribution): string {
   const rows: [string, number | null][] = [
-    ['p50', distribution.p50],
-    ['p90', distribution.p90],
-    ['max', distribution.max],
+    ['typical', distribution.p50],
+    ['9 in 10', distribution.p90],
+    ['slowest', distribution.max],
   ];
   const scale = Math.max(1, ...rows.map(([, value]) => value ?? 0));
   const height = 22;
@@ -87,10 +87,10 @@ function bars(distribution: Distribution): string {
       const width =
         value === null ? 0 : Math.max(2, Math.round((value / scale) * 220));
       const y = index * height;
-      return `<text x="0" y="${y + 15}" class="bar-label">${label}</text><rect x="36" y="${y + 4}" width="${width}" height="14" rx="3" class="bar"></rect><text x="${40 + width}" y="${y + 15}" class="bar-value">${escapeHtml(seconds(value))}</text>`;
+      return `<text x="0" y="${y + 15}" class="bar-label">${label}</text><rect x="56" y="${y + 4}" width="${width}" height="14" rx="3" class="bar"></rect><text x="${60 + width}" y="${y + 15}" class="bar-value">${escapeHtml(seconds(value))}</text>`;
     })
     .join('');
-  return `<svg viewBox="0 0 340 ${height * rows.length}" width="100%" height="${height * rows.length}" role="img" aria-label="p50, p90, and max">${svgRows}</svg>`;
+  return `<svg viewBox="0 0 360 ${height * rows.length}" width="100%" height="${height * rows.length}" role="img" aria-label="typical, nine in ten, and slowest">${svgRows}</svg><p class="help">Typical is the median: half the changes were faster, half slower. Nine in ten changes came in under the second bar. The third is the slowest one.</p>`;
 }
 
 function panel(
@@ -228,8 +228,8 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
   );
   const excluded = signals.spend.excluded;
   const summary = [
-    ['wait p50', seconds(signals.waitTime.p50), 'observed'],
-    ['cycle p50', seconds(signals.cycleTime.p50), 'observed'],
+    ['typical wait', seconds(signals.waitTime.p50), 'observed'],
+    ['typical cycle', seconds(signals.cycleTime.p50), 'observed'],
     ['queue', `${signals.queue.count}`, 'observed'],
     ['merges / day', `${signals.mergeFrequency.perDay ?? 'n/a'}`, 'observed'],
     ['spend', `$${signals.spend.total.costUsd.toFixed(2)}`, 'reported'],

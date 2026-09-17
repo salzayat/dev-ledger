@@ -10,8 +10,11 @@ import type { Timing } from './timing.ts';
 
 export type Distribution = {
   count: number;
+  /** The median: half the changes were faster, half slower. */
   p50: number | null;
+  /** Nine in ten changes came in under this. */
   p90: number | null;
+  /** The slowest change. */
   max: number | null;
   excluded: Record<string, number>;
   trust: string[];
