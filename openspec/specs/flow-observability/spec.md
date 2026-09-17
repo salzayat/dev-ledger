@@ -13,11 +13,12 @@ platform timestamps are out of scope here and belong to phase two.
 ### Requirement: A registry of repositories synced over SSH
 
 The system SHALL keep a version-controlled registry (`registry.json`) listing each repository with a name,
-its SSH URL, its default branch, its release tag pattern, and its signal thresholds. `telemetry sync` SHALL
-fetch each registered repository into a local mirror, including tags and `refs/pull/*/head`, using the
-operator's own git access and nothing else, and SHALL record the ref tips it fetched. A repository that
-cannot be fetched SHALL be recorded as unreachable with the reason, and every read covering it SHALL name
-it as unreachable rather than omitting it silently.
+its SSH URL, its default branch, its release tag pattern, its signal thresholds, and optionally an explicit
+browsable web URL, which SHALL be an https URL or a registry error. `telemetry sync` SHALL fetch each
+registered repository into a local mirror, including tags and `refs/pull/*/head`, using the operator's own
+git access and nothing else, and SHALL record the ref tips it fetched. A repository that cannot be fetched
+SHALL be recorded as unreachable with the reason, and every read covering it SHALL name it as unreachable
+rather than omitting it silently.
 
 #### Scenario: Sync fetches pull head refs
 
@@ -37,6 +38,12 @@ it as unreachable rather than omitting it silently.
 - GIVEN a working copy with no platform API token configured
 - WHEN `telemetry sync` runs
 - THEN it MUST complete using git over SSH alone
+
+#### Scenario: An explicit web URL must be browsable
+
+- GIVEN a registry entry whose `webUrl` is a `file:` URL
+- WHEN the registry is parsed
+- THEN the entry MUST be reported as an error naming the field
 
 ### Requirement: A change is identified for every merge method
 
@@ -311,8 +318,10 @@ topological order and reading commit messages and trailers, session files, tags,
 projection SHALL be written as canonical JSON with sorted keys and a schema version, SHALL record the ref
 tips it was built from, and SHALL be byte-identical on any machine whose mirrors hold the same ref tips.
 It SHALL order events by the commit graph and never by author timestamp, and SHALL be deletable and
-rebuildable with no loss. The projection SHALL record, per repository, the web URL of its remote when the
-registry URL is a recognizable hosting remote, and SHALL record no local filesystem path.
+rebuildable with no loss. The projection SHALL record, per repository, the registry entry's explicit web
+URL when one is given, otherwise the web URL derived from its remote when that remote is `github.com` or a
+GitHub Enterprise host, and SHALL record no local filesystem path. A remote whose host is an SSH alias SHALL
+derive no web URL.
 
 #### Scenario: Two machines rebuild identically
 
@@ -338,6 +347,14 @@ registry URL is a recognizable hosting remote, and SHALL record no local filesys
 - WHEN the projection is rebuilt
 - THEN the repository's web URL MUST be null
 - AND the projection MUST NOT contain that path
+
+#### Scenario: An SSH alias derives no link, and the entry may supply one
+
+- GIVEN a registry entry whose URL is `git@github.com-work:owner/repo.git`
+- WHEN the projection is rebuilt without an explicit `webUrl`
+- THEN the repository's web URL MUST be null
+- AND WHEN the entry names `webUrl` as `https://github.com/owner/repo`
+- THEN the projection MUST record that URL
 
 ### Requirement: Cursor-based consumers
 

@@ -16,6 +16,8 @@ export type RegistryEntry = {
   defaultBranch: string;
   releaseTagPattern: string;
   thresholds: Thresholds;
+  /** An explicit browsable URL, for a remote whose host is an SSH alias the derivation cannot read. */
+  webUrl: string | null;
 };
 
 export type Registry = {
@@ -103,12 +105,26 @@ export function parseRegistry(text: string): {
         errors.push(`${label}.thresholds.${key} must be a non-negative number`);
       }
     }
+    let explicitWebUrl: string | null = null;
+    if (record.webUrl !== undefined) {
+      if (
+        typeof record.webUrl === 'string' &&
+        /^https:\/\/[^/\s]+\/[^\s]+$/.test(record.webUrl)
+      ) {
+        explicitWebUrl = record.webUrl.replace(/\/+$/, '');
+      } else {
+        errors.push(
+          `${label}.webUrl must be an https URL naming the repository`,
+        );
+      }
+    }
     repositories.push({
       name,
       url,
       defaultBranch,
       releaseTagPattern,
       thresholds,
+      webUrl: explicitWebUrl,
     });
   });
   return {
@@ -121,7 +137,8 @@ export function parseRegistry(text: string): {
  * The browsable web URL for a registry URL, when that URL is a GitHub remote: `git@host:owner/repo.git`,
  * `ssh://git@host/owner/repo.git`, or `https://host/owner/repo`. A local path, a non-GitHub host, or any
  * other form yields null, and The Board then renders hashes with no link. Never returns a local path, so a
- * projection built from a local mirror stays machine-independent.
+ * projection built from a local mirror stays machine-independent. A registry entry whose remote host is an
+ * SSH alias (`git@github.com-work:owner/repo.git`) names its browsable URL explicitly in `webUrl` instead.
  */
 export function webUrl(url: string): string | null {
   const trimmed = url.trim();
@@ -142,7 +159,10 @@ export function webUrl(url: string): string | null {
   if (!host || !path) {
     return null;
   }
-  if (host !== 'github.com' && !host.startsWith('github.')) {
+  // A GitHub host: github.com or a GitHub Enterprise host under it, ending in a plain top-level label. An
+  // SSH alias such as github.com-work is a key selector in the operator's SSH configuration, not a host
+  // anyone can browse, so it derives nothing and the registry entry names its web URL instead.
+  if (!/^github\.(?:[a-z0-9-]+\.)*[a-z]+$/i.test(host)) {
     return null;
   }
   const repository = path.replace(/\.git$/, '').replace(/^\/+|\/+$/g, '');

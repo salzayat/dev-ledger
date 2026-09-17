@@ -140,7 +140,7 @@ export function buildRepositoryProjection(
     return {
       name: entry.name,
       defaultBranch: branch,
-      webUrl: webUrl(entry.url),
+      webUrl: entry.webUrl ?? webUrl(entry.url),
       reachable: false,
       reason: existsSync(dir)
         ? `default branch ${branch} is not present in the mirror`
@@ -256,7 +256,7 @@ export function buildRepositoryProjection(
   return {
     name: entry.name,
     defaultBranch: branch,
-    webUrl: webUrl(entry.url),
+    webUrl: entry.webUrl ?? webUrl(entry.url),
     reachable: true,
     reason: null,
     asOf,

@@ -39,9 +39,11 @@ rejected.
 Figures reach a record in one of two ways, both `reported`: the harness states them in the payload, or
 `session end --transcript <file>` sums them from a local transcript — a JSONL file whose records carry a
 `usage` object in the wire format of the model API. A transcript fills only the figures the payload omits,
-records are deduplicated by message identifier (a streaming transcript repeats a message as it grows),
-`cachedTokens` is cache reads plus cache writes, and cost is never derived from a price table. A transcript
-with no usage record leaves the session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
+and when it filled any, `figuresSource` names the transcript and the number of messages summed. Records
+are deduplicated by message identifier and the last record for an identifier wins (a streaming transcript
+repeats a message as it grows, each record carrying its usage so far), `cachedTokens` is cache reads plus
+cache writes, and cost is never derived from a price table. A transcript with no usage record leaves the
+session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
 
 ## Trailer vocabulary (version 1)
 
@@ -80,7 +82,8 @@ as absent.
 ```
 
 Thresholds: `waitTimeP50Seconds`, `cycleTimeP50Seconds`, `queueAgeSeconds`, `batchSizeLines`,
-`reworkWindowDays`.
+`reworkWindowDays`. An optional `webUrl` (https only) names the browsable repository when the remote's host
+is an SSH alias the derivation cannot read; it is recorded in the projection in place of the derived URL.
 
 ## Projection (schema version 1)
 

@@ -127,6 +127,11 @@ function sessionFiles(root: string, paths: string[]): string[] {
  * record's own content beneath it. Built from git and the session files alone, so it holds wherever a
  * repository records sessions, with or without the flow package.
  */
+/** A value placed in a Markdown table cell: a pipe would end the cell, so it is escaped. */
+function cell(value: unknown): string {
+  return String(value).replace(/\|/g, '\\|');
+}
+
 export function sessionSummary(
   root: string,
   base: string,
@@ -170,7 +175,7 @@ export function sessionSummary(
     const check = (record.localCheck as { outcome?: string } | undefined)
       ?.outcome;
     rows.push(
-      `| \`${path}\` | \`${record.sessionId}\` | ${record.provider} / ${record.model} | ${figures} | ${check ?? '—'} |`,
+      `| \`${path}\` | \`${cell(record.sessionId)}\` | ${cell(record.provider)} / ${cell(record.model)} | ${figures} | ${cell(check ?? '—')} |`,
     );
     bodies.push(
       `<details><summary><code>${record.sessionId}</code></summary>\n\n\`\`\`json\n${canonicalJson(record).trimEnd()}\n\`\`\`\n\n</details>`,
@@ -250,16 +255,23 @@ export function captureMain(argv: string[]): number {
         const config = loadConfig(root);
         const input = JSON.parse(text) as SessionInput;
         // A transcript fills only what the payload left out: a harness that knows its own figures keeps
-        // them, and a transcript with no usage record leaves the record missing figures as before.
+        // them, and a transcript with no usage record leaves the record missing figures as before. When
+        // the transcript supplied any figure, the source says so, whatever the payload's source said:
+        // a payload written before the sum can only describe figures it did not have.
         const transcript = option(args, '--transcript');
         if (transcript !== undefined) {
           const figures = readTranscriptFigures(root, transcript);
           if (figures) {
+            const filled =
+              input.inputTokens === undefined ||
+              input.outputTokens === undefined ||
+              input.cachedTokens === undefined;
             input.inputTokens ??= figures.inputTokens;
             input.outputTokens ??= figures.outputTokens;
             input.cachedTokens ??= figures.cachedTokens;
-            input.figuresSource =
-              input.figuresSource || transcriptFiguresSource(figures);
+            if (filled) {
+              input.figuresSource = transcriptFiguresSource(figures);
+            }
           }
         }
         if (config.costAllocation.enabled && input.operatorId === undefined) {

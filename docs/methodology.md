@@ -79,7 +79,9 @@ The link target comes from the registry: `rebuild` resolves each repository's `u
 a GitHub remote (`git@github.com:owner/repo.git`, `ssh://`, or HTTPS, including a GitHub Enterprise host)
 and records that URL in the projection. A local path or any other remote resolves to null, no local path is
 ever written into the projection, and the same citations then render with the subject and the hash and no
-link. A link is navigation, not a resource: the page still opens from a file URL and loads nothing.
+link. A remote whose host is an SSH alias (`git@github.com-work:owner/repo.git`) is not a host anyone can
+browse, so it resolves to null as well; the entry names its browsable URL in `webUrl` instead, and that URL
+is recorded in place of the derivation. A link is navigation, not a resource: the page still opens from a file URL and loads nothing.
 
 ## Spend on work that has not shipped
 
