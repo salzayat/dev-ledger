@@ -47,6 +47,11 @@ export function readCommits(
   dir: string,
   revisions: string[],
 ): Map<string, Commit> {
+  // With nothing on stdin, `git log --stdin` falls back to HEAD, which a bare mirror whose default
+  // branch is not `master` does not have; asking for no commits must read none.
+  if (revisions.length === 0) {
+    return new Map();
+  }
   const format = ['%H', '%P', '%aI', '%cI', '%s', '%B'].join(FIELD) + RECORD;
   const output = git(
     dir,
