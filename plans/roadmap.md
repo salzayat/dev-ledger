@@ -22,6 +22,7 @@ contract.
 | Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
 | Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
 | Session figures (telemetry capture)          | `add-session-figures-from-transcript`                         | Complete |
+| Review fixes (session figures, Board links)  | `fix-transcript-figures-and-board-links`                      | Complete |
 | Change audit (phase two)                     | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -76,6 +77,11 @@ The session figures row closes the gap that made every spend figure on The Board
 the schema always accepted token counts and nothing produced them. It comes after the capture git
 environment fix because its end-to-end test runs a capture command as a child process against a fixture
 repository.
+
+The review fixes row corrects five defects a review of the four rows above it found: a transcript's repeated
+message kept its first usage record instead of its last, a transcript-filled record kept a source written
+before the sum, an SSH host alias derived a dead link for every citation, a pipe could end a table cell in
+the pull request body, and two template skill files carried another project's boundary text.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

@@ -9,13 +9,14 @@ metadata:
 
 # Next.js Best Practices
 
-Use this skill when working on a Next.js dashboard or any future Next.js app in this repository.
+Use this skill only if a Next.js app is ever added under `apps/`. This repository has none: The Board is a
+static page rendered by `packages/flow`, with no script and no loaded resource, and that stays the default.
 
 ## Repository Boundary
 
-- Dashboards may consume immutable reports and generated artifacts.
-- Do not put strategy decision logic, parameter optimization, or execution simulation inside Next.js routes or components.
-- Keep research behavior governed by OpenSpec and research packages.
+- An app may render the projection and the session records; it may not compute a figure the projection does not hold.
+- No signal, threshold, association, or timing logic inside routes or components; those belong to `packages/flow` and `packages/capture`, governed by OpenSpec.
+- No credentials, no network access at build or run time, and nothing keyed to a person.
 
 ## File Conventions
 
@@ -42,18 +43,18 @@ Use this skill when working on a Next.js dashboard or any future Next.js app in 
 
 - Default to the Node.js runtime.
 - Use the Edge runtime only when the route benefits from edge locality and its dependency/runtime constraints are acceptable.
-- Keep heavy data processing and research workloads out of request handlers.
+- Keep projection rebuilds and other heavy work out of request handlers; they run from the command line.
 
 ## Directives
 
 - Use `'use client'` only at the smallest boundary that needs browser APIs, state, effects, or event handlers.
 - Use `'use server'` for server functions and server actions when needed.
-- Use cache directives only when their invalidation behavior is explicit and safe for research outputs.
+- Use cache directives only when their invalidation behavior is explicit and safe for a projection that is rebuilt from git.
 
 ## Data Patterns
 
 - Prefer Server Components for read-only dashboard data loaded on navigation.
-- Use Server Actions for mutations that belong to app interaction, not for research simulation behavior.
+- Use Server Actions for mutations that belong to app interaction, never to write a session record or a projection.
 - Use Route Handlers for API-shaped integration points.
 - Keep client-side fetching for interactive or browser-specific data.
 - Label and render development, validation, and final holdout outputs distinctly.
@@ -92,4 +93,4 @@ Use this skill when working on a Next.js dashboard or any future Next.js app in 
 ## Verification
 
 - Run the relevant Nx or package-manager targets for lint, typecheck, test, and build.
-- For this repository, also run the root research checks when frontend changes affect workflow, docs, or generated outputs.
+- For this repository, also run `npm run check` when frontend changes affect workflow, docs, or generated outputs.

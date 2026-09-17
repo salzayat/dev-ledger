@@ -175,7 +175,35 @@ test('a web URL is derived from a GitHub remote and from nothing else', () => {
     'https://github.example.com/acme/repo',
   );
   assert.equal(webUrl('/tmp/dev-ledger-fixture'), null);
+  // An SSH host alias is how a machine picks a key; it is not a host the derivation can read.
+  assert.equal(webUrl('git@github.com-work:salzayat/dev-ledger.git'), null);
   assert.equal(webUrl('git@gitlab.com:acme/repo.git'), null);
+});
+
+test('a registry entry may name its web URL explicitly, and a bad one is an error', () => {
+  const parsed = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [
+        {
+          name: 'aliased',
+          url: 'git@github.com-work:salzayat/dev-ledger.git',
+          webUrl: 'https://github.com/salzayat/dev-ledger/',
+        },
+        { name: 'plain', url: 'git@github.com:salzayat/dev-ledger.git' },
+        { name: 'bad', url: '/tmp/repo', webUrl: 'file:///tmp/repo' },
+      ],
+    }),
+  );
+  assert.equal(
+    parsed.registry.repositories[0].webUrl,
+    'https://github.com/salzayat/dev-ledger',
+  );
+  assert.equal(parsed.registry.repositories[1].webUrl, null);
+  assert.match(
+    parsed.errors.join('\n'),
+    /repositories\[2\]\.webUrl must be an https URL/,
+  );
 });
 
 test('the projection records the derived web URL, never the registry path', () => {
