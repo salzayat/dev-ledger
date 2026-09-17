@@ -6,16 +6,16 @@ contract.
 
 ## Milestone Tracking
 
-| Phase                                   | Governing changes                                             | Status      |
-| --------------------------------------- | ------------------------------------------------------------- | ----------- |
-| Repository evolution conventions        | `add-repository-evolution-markers`                            | Complete    |
-| Executable PR and dependency governance | `add-executable-pr-and-dependency-governance`                 | Complete    |
-| Foundation                              | None                                                          | Complete    |
-| Agent harness and MCP governance        | `improve-agentic-boiler-governance`                           | Complete    |
-| Template and example expansion          | `add-second-example-package`, `add-template-onboarding-guide` | Complete    |
-| Fork rename automation                  | `add-project-rename-tooling`                                  | Complete    |
-| Flow observability (phase one)          | `add-flow-observability`                                      | In progress |
-| Change audit (phase two)                | `add-change-audit`                                            | Blocked     |
+| Phase                                   | Governing changes                                             | Status   |
+| --------------------------------------- | ------------------------------------------------------------- | -------- |
+| Repository evolution conventions        | `add-repository-evolution-markers`                            | Complete |
+| Executable PR and dependency governance | `add-executable-pr-and-dependency-governance`                 | Complete |
+| Foundation                              | None                                                          | Complete |
+| Agent harness and MCP governance        | `improve-agentic-boiler-governance`                           | Complete |
+| Template and example expansion          | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
+| Fork rename automation                  | `add-project-rename-tooling`                                  | Complete |
+| Flow observability (phase one)          | `add-flow-observability`                                      | Complete |
+| Change audit (phase two)                | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -43,7 +43,7 @@ replaces the template's teaching examples with the `capture` package (hooks, tra
 the `flow` package (registry, SSH sync, projection, signals, The Board); it has no dependency inside this
 repository and ends by tagging `v0.1.0`. Change audit adds the `audit` package (rules, levels and packs,
 findings, decisions, evidence packs, the git-only baseline, the optional collector) and a governance view on
-the same Board; it is `Blocked` until phase one archives. The R&D cost allocation export, the `regulated`
+the same Board; phase one is archived and tagged `v0.1.0`, so it is dependency-ready. The R&D cost allocation export, the `regulated`
 level's first real case, and further standard packs are later rows.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later

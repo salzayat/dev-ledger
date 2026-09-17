@@ -61,6 +61,8 @@ Open the single governing spec for your task instead of scanning them all. Each 
 | Capability                      | Scope                                                                            |
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | `repository-foundation`         | The small, deterministic Nx starting point: the `capture` and `flow` packages.   |
+| `telemetry-capture`             | Session files, trailers, hooks, and the telemetry configuration (phase one).     |
+| `flow-observability`            | Registry, SSH sync, projection, signals, releases, cursors, and The Board.       |
 | `repository-documentation`      | Repository intent, authority boundaries, `AGENTS.md`, and orientation guidance.  |
 | `repository-planning`           | Roadmap sequencing, OpenSpec dependency declarations, and readiness evidence.    |
 | `workflow-governance`           | Executable PR automation and pre-merge dependency-readiness checks.              |
