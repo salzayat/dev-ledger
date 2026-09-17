@@ -4,10 +4,10 @@
   "branch": "openspec/archive-flow-observability",
   "cachedTokens": 0,
   "commits": [
-    "a75c192efc571b980becf00556464b779055b311"
+    "6f67bcc06afbc66918ed31e790afa7f26fc34311"
   ],
   "costUsd": 0,
-  "endedAt": "2026-09-17T21:20:00Z",
+  "endedAt": "2026-09-17T21:25:00Z",
   "figuresMissing": true,
   "figuresSource": "agent session; the harness did not expose token or cost figures",
   "inputTokens": 0,
@@ -23,5 +23,5 @@
   "spec": "add-flow-observability",
   "startedAt": "2026-09-17T21:05:00Z",
   "subscriptionId": "claude-max",
-  "wallClockSeconds": 900
+  "wallClockSeconds": 1200
 }
