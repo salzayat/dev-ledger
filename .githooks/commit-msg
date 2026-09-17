@@ -23,3 +23,9 @@ if [ ${#subject} -gt 100 ]; then
   printf '%s\n' "Commit subject should be 100 characters or fewer" >&2
   exit 1
 fi
+
+# Trailer validation against telemetry.config.json (Spec: pattern, Session:, Change:, effort units,
+# Cost-Class:). Skipped only when the toolchain is not installed, so a fresh clone can still commit.
+if [ -d node_modules ]; then
+  ./scripts/telemetry.sh validate-message "$message_file"
+fi

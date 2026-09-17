@@ -1,0 +1,30 @@
+#!/bin/sh
+# Refuses a push while a finished session file is sitting uncommitted, so the record travels with the
+# work it describes. Skipping this hook (--no-verify) surfaces later as an unreported session.
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+pending=$(git status --porcelain --untracked-files=all -- .telemetry/sessions 2>/dev/null | grep '\.json$' || true)
+[ -n "$pending" ] || exit 0
+
+finished=""
+old_ifs=$IFS
+IFS='
+'
+for line in $pending; do
+  path=$(printf '%s' "$line" | cut -c4-)
+  if [ -f "$path" ] && grep -q '"endedAt"' "$path"; then
+    finished="${finished}${path}
+"
+  fi
+done
+IFS=$old_ifs
+
+if [ -n "$finished" ]; then
+  printf '%s\n' "Refusing to push: finished session files are not committed:" >&2
+  printf '%s' "$finished" >&2
+  printf '%s\n' "Commit them (./scripts/telemetry.sh session end does this) or remove them, then push again." >&2
+  exit 1
+fi

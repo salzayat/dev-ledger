@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "specPattern": "^[a-z0-9][a-z0-9-]*$",
+  "effort": {
+    "storyPoints": { "enabled": true },
+    "workHours": { "enabled": false },
+    "derivedComplexity": { "enabled": false, "algorithm": "diff-lines-v1" }
+  },
+  "costAllocation": {
+    "enabled": false,
+    "idleCapSeconds": 900,
+    "operators": [],
+    "costClasses": ["rd", "production"]
+  }
+}
