@@ -1,4 +1,4 @@
-name: spec-loop
+name: dev-ledger
 version: 1
 schema: spec-driven
 artifact_dir: changes

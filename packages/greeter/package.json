@@ -1,14 +1,14 @@
 {
-  "name": "@spec-loop/greeter",
+  "name": "@dev-ledger/greeter",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": {
-      "@spec-loop/source": "./src/index.ts"
+      "@dev-ledger/source": "./src/index.ts"
     }
   },
   "dependencies": {
-    "@spec-loop/hello": "*"
+    "@dev-ledger/hello": "*"
   }
 }

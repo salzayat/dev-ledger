@@ -1,6 +1,6 @@
 # Contributing
 
-Spec Loop is a learning repository. Contributions should improve the foundation, demonstrate a
+Dev Ledger is a learning repository. Contributions should improve the foundation, demonstrate a
 repeatable practice, or make an existing boundary clearer. Avoid adding framework-specific or provider-
 specific machinery unless it supports a documented teaching goal.
 

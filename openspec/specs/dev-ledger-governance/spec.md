@@ -1,4 +1,4 @@
-# spec-loop-governance Specification
+# dev-ledger-governance Specification
 
 ## Purpose
 

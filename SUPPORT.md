@@ -1,12 +1,12 @@
 # Support
 
-Spec Loop is a teaching-oriented foundation rather than a hosted service.
+Dev Ledger is a teaching-oriented foundation rather than a hosted service.
 
 ## Where To Ask
 
-- Use [Discussions](https://github.com/salzayat/spec-loop/discussions) for questions and learning help.
-- Use the [bug report template](https://github.com/salzayat/spec-loop/issues/new?template=bug_report.md) for reproducible defects.
-- Use the [feature request template](https://github.com/salzayat/spec-loop/issues/new?template=feature_request.md) for proposed improvements.
+- Use [Discussions](https://github.com/salzayat/dev-ledger/discussions) for questions and learning help.
+- Use the [bug report template](https://github.com/salzayat/dev-ledger/issues/new?template=bug_report.md) for reproducible defects.
+- Use the [feature request template](https://github.com/salzayat/dev-ledger/issues/new?template=feature_request.md) for proposed improvements.
 - Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
 
 Do not include credentials, private data, or security-sensitive details in issues or discussions.
