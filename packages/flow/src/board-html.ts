@@ -60,6 +60,7 @@ type Links = {
   web: string | null;
   branch: string;
   subjects: Map<string, string>;
+  records: Map<string, string>;
 };
 
 function linksFor(repository: RepositoryProjection): Links {
@@ -70,11 +71,34 @@ function linksFor(repository: RepositoryProjection): Links {
   }[]) {
     subjects.set(change.id, change.subject);
   }
+  const records = new Map<string, string>();
+  for (const session of repository.sessions as {
+    sessionId: string;
+    path: string;
+  }[]) {
+    records.set(session.sessionId, session.path);
+  }
   return {
     web: repository.webUrl,
     branch: repository.defaultBranch,
     subjects,
+    records,
   };
+}
+
+/** A session identifier, linked to its record file when the projection holds one. */
+function sessionRef(id: string, links: Links): string {
+  const path = links.records.get(id);
+  return path === undefined
+    ? `<code>${escapeHtml(id)}</code>`
+    : href(links, `blob/${links.branch}/${path}`, id);
+}
+
+/** A spend cell: the figure when the records carry one, and otherwise what the records actually say. */
+function spendCell(spend: Spend | undefined, absent: string): string {
+  return spend && spend.sessions > 0
+    ? `$${spend.costUsd.toFixed(2)} <span class="dim">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')} tok</span>`
+    : `<span class="dim">${escapeHtml(absent)}</span>`;
 }
 
 function href(links: Links, path: string, text: string, extra = ''): string {
@@ -347,26 +371,40 @@ type ChangeRow = {
   files: number;
 };
 
-function changesTable(changes: ChangeRow[], links: Links): string {
+function changesTable(
+  changes: ChangeRow[],
+  byChange: Record<string, Spend>,
+  links: Links,
+): string {
   const recent = [...changes].reverse().slice(0, 15);
   const rows = recent
     .map((change) => {
       const sessions =
         change.sessions.status === 'declared'
           ? change.sessions.sessions.length
-            ? escapeHtml(change.sessions.sessions.join(', '))
+            ? change.sessions.sessions
+                .map((id) => sessionRef(id, links))
+                .join(' ')
             : `<span class="warn">unreported</span>`
           : `<span class="${change.sessions.status === 'undeclared' ? 'warn' : 'dim'}">${escapeHtml(change.sessions.status)}</span>`;
+      // No entry in byChange is never zero: it is whatever the records failed to say.
+      const absent =
+        change.sessions.status !== 'declared'
+          ? change.sessions.status
+          : change.sessions.sessions.length === 0
+            ? 'unreported'
+            : 'figures missing';
+      const spend = spendCell(byChange[change.id], absent);
       const gaps = change.gaps
         .map((gap) => `<span class="gap">${escapeHtml(gap.type)}</span>`)
         .join(' ');
-      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject">${href(links, `commit/${change.id}`, change.id.slice(0, 10))} <span class="cite-title">${escapeHtml(change.subject)}</span></td><td>${pullRef(change.association.pullRequest, links)} <span class="dim">${escapeHtml(change.association.method ?? '')}</span></td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num nowrap"><span class="added">+${change.insertions}</span> <span class="removed">−${change.deletions}</span></td><td>${sessions}</td><td>${gaps || '<span class="dim">none</span>'}</td></tr>`;
+      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject">${href(links, `commit/${change.id}`, change.id.slice(0, 10))} <span class="cite-title">${escapeHtml(change.subject)}</span></td><td>${pullRef(change.association.pullRequest, links)} <span class="dim">${escapeHtml(change.association.method ?? '')}</span></td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num nowrap"><span class="added">+${change.insertions}</span> <span class="removed">−${change.deletions}</span></td><td class="num nowrap">${spend}</td><td>${sessions}</td><td>${gaps || '<span class="dim">none</span>'}</td></tr>`;
     })
     .join('');
   return panel(
     'Recent changes',
-    `<div class="scroll tall"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">lines</th><th>sessions</th><th>gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
-    `${trustBadges(['observed'])} the newest ${recent.length} of ${changes.length} changes on the default branch; wait and cycle come from the pull head ref, sessions from the harness`,
+    `<div class="scroll tall"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">lines</th><th class="num">spend</th><th>sessions</th><th>gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    `${trustBadges(['observed', 'reported'])} the newest ${recent.length} of ${changes.length} changes on the default branch; wait and cycle come from the pull head ref, sessions and spend from the harness`,
     'span-all',
   );
 }
@@ -481,10 +519,20 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
       )
     : '';
   const queueRows = queueEntries
-    .map(
-      (entry) =>
-        `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td></tr>`,
-    )
+    .map((entry) => {
+      const perPull =
+        signals.spend.perUnmergedPullRequest[String(entry.number)];
+      const absent =
+        perPull === undefined
+          ? 'no session record'
+          : perPull.missingFigures > 0
+            ? 'figures missing'
+            : 'no figures';
+      const records = perPull
+        ? cites('records', perPull.cites, links)
+        : '<span class="dim">none</span>';
+      return `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="num nowrap">${spendCell(perPull?.spend, absent)}</td><td class="num">${perPull?.spend.sessions ?? 0}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td><td>${records}</td></tr>`;
+    })
     .join('');
   const excludedLine = `${excluded.undeclared} undeclared, ${excluded.unreported} unreported, ${excluded.humanOnly} human-only, ${excluded.invalidSession} invalid, ${excluded.missingFigures} with figures missing`;
   const effortRows = Object.values(signals.spend.perEffortUnit)
@@ -497,6 +545,8 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
     .map(([outcome, value]) => `${value} ${escapeHtml(outcome)}`)
     .join(', ');
   const recentDiffs = [...changes].slice(-24);
+  const unmergedExcluded = signals.spend.unmergedPullRequests.excluded;
+  const excludedUnmerged = `${unmergedExcluded.missingFigures} with figures missing, ${unmergedExcluded.invalidSession} unreadable`;
   return `${open}${heading}
 <p class="asof">Measured as of ${escapeHtml(dateOnly(repository.asOf))}, the newest commit the mirror holds. Merge times are the merging party's clock.</p>
 <dl class="stats">${summary}</dl>
@@ -518,10 +568,10 @@ ${panel(
   'Unmerged queue',
   `${figure(String(signals.queue.count), `pull requests, oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`)}${queueChart}${
     queueRows
-      ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th>oldest commit</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
+      ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th class="num">spend</th><th class="num">sessions</th><th>oldest commit</th><th>records</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
       : '<p class="empty">Nothing waiting.</p>'
   }`,
-  `${trustBadges(signals.queue.trust)} ${escapeHtml(signals.queue.note)}`,
+  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report`,
 )}
 ${panel(
   'Rework',
@@ -557,7 +607,7 @@ ${panel(
   trustBadges(['observed']),
 )}
 </div>
-${changesTable(changes, links)}
+${changesTable(changes, signals.spend.byChange, links)}
 <div class="grid wide">
 ${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, links)}
 ${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links)}
@@ -570,11 +620,14 @@ ${panel(
   `${trustBadges(['reported'])} excluded changes lack the unit or a complete session record`,
 )}
 ${
-  signals.spend.unmergedPullRequests.sessions > 0
+  Object.keys(signals.spend.perUnmergedPullRequest).length > 0
     ? panel(
         'Spend on unmerged pull requests',
-        `${figure(`$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`, `over ${count(signals.spend.unmergedPullRequests.sessions, 'session')}`)}${cites('records', signals.spend.unmergedPullRequests.cites, links)}`,
-        trustBadges(['reported']),
+        `${figure(
+          `$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`,
+          `over ${count(signals.spend.unmergedPullRequests.sessions, 'session')} with figures, across ${count(Object.keys(signals.spend.perUnmergedPullRequest).length, 'pull request')}`,
+        )}${cites('records', signals.spend.unmergedPullRequests.cites, links)}`,
+        `${trustBadges(['reported'])} excluded: ${escapeHtml(excludedUnmerged)} (counted, never zeroed)`,
       )
     : ''
 }

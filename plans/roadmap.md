@@ -17,6 +17,7 @@ contract.
 | Flow observability (phase one)               | `add-flow-observability`                                      | Complete |
 | Board dashboard (phase one addendum)         | `add-board-dashboard`                                         | Complete |
 | Board presentation (phase one addendum)      | `improve-board-presentation`                                  | Complete |
+| Per pull request spend (phase one addendum)  | `add-per-pull-request-spend`                                  | Complete |
 | Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
 | Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
 | Session figures (telemetry capture)          | `add-session-figures-from-transcript`                         | Complete |
@@ -55,6 +56,11 @@ The Board presentation milestone follows the Board dashboard milestone because i
 introduced: it gives every cited commit its change's subject and a link to the commit on the hosting
 platform, and adds the charts the first dashboard left as bare figures. It changes no record, only the
 projection's derived repository web URL and the page rendered from it.
+
+The per-pull-request spend milestone follows the Board presentation milestone because it adds columns to
+the tables that one introduced. It also corrects a defect the presentation work exposed: spend on unmerged
+pull requests counted a record with missing figures as a real zero, while the merged path excluded and
+counted it. Its rule is the accepted one either way — counted, never zeroed.
 
 The pull request telemetry milestone belongs to workflow governance rather than to the product phases: it
 puts the records a branch produces into the description a reviewer reads, and corrects two defects in the

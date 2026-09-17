@@ -1,0 +1,27 @@
+{
+  "agentRunSeconds": 1500,
+  "billingKind": "subscription",
+  "branch": "flow/per-pull-request-spend",
+  "cachedTokens": 0,
+  "commits": [
+    "2df1c616722aef8920e258c602ae619bef0f30c4"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-17T22:23:10Z",
+  "figuresMissing": true,
+  "figuresSource": "agent session; the harness did not expose token or cost figures",
+  "inputTokens": 0,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-opus-5",
+  "outputTokens": 0,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260917-pr-spend",
+  "spec": "add-per-pull-request-spend",
+  "startedAt": "2026-09-17T22:15:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 490
+}
