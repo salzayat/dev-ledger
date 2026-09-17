@@ -123,7 +123,9 @@ the tree at its last commit SHALL be marked `unreported` and listed as a `missin
 SHALL be excluded from every cost and token figure with their counts stated, and neither SHALL be counted as
 zero. A change whose commits carry `Session: none` SHALL be neither. Sessions found on an unmerged pull head
 ref's tree SHALL be recorded as sessions of an unmerged pull request, so work that never ships keeps its
-cost.
+cost. A session record carrying `figuresMissing` SHALL be excluded from every cost and token figure and
+counted as excluded, on unmerged pull requests exactly as on merged changes, and SHALL NOT be counted as
+zero in either.
 
 #### Scenario: A change naming a session with no file
 
@@ -144,6 +146,14 @@ cost.
 - GIVEN a pull head ref carrying two session files whose commits never reached the default branch
 - WHEN the projection is rebuilt
 - THEN both sessions MUST be recorded as `reported` sessions of an unmerged pull request
+
+#### Scenario: A record with missing figures on an unmerged pull request is not zeroed
+
+- GIVEN an unmerged pull request whose only session record carries `figuresMissing`
+- WHEN spend on unmerged pull requests is requested
+- THEN that record MUST contribute no cost, no tokens, and no counted session
+- AND the figure MUST report it in its excluded count
+- AND no panel MUST present that pull request's cost as zero
 
 ### Requirement: Timing is read from the pull head ref
 
@@ -176,12 +186,13 @@ The projection SHALL provide reads for cycle time and wait time distributions, t
 and age), batch size (files, lines, and commits per change), merge frequency per day, rework (a change
 touching files a change within the configured window also touched), escapes (a revert, or a change carrying
 `fix` in its subject that touches files of a change in the most recent release, after that release's tag),
-local check outcomes per change, and spend (tokens and cost) per change, per spec reference, per provider,
-and per model, computed separately for each enabled effort unit where a unit applies. Each read SHALL be
-available per repository and across the registry, SHALL state the trust classes it included and the number
-of changes excluded for lacking what it needs, and SHALL raise a signal when a registered threshold is
-exceeded, naming the threshold and the changes behind it. No read SHALL be keyed to a person, and the
-projection SHALL NOT offer a person as a dimension.
+local check outcomes per change, and spend (tokens and cost) per change, per unmerged pull request, per
+spec reference, per provider, and per model, computed separately for each enabled effort unit where a unit
+applies. Each read SHALL be available per repository and across the registry, SHALL state the trust classes
+it included and the number of changes excluded for lacking what it needs, and SHALL raise a signal when a
+registered threshold is exceeded, naming the threshold and the changes behind it. Spend per unmerged pull
+request SHALL cite every session record of that pull request, including the records excluded from its
+figures. No read SHALL be keyed to a person, and the projection SHALL NOT offer a person as a dimension.
 
 #### Scenario: A wait-time threshold raises a signal
 
@@ -203,6 +214,15 @@ projection SHALL NOT offer a person as a dimension.
 - WHEN cost per provider is requested
 - THEN each provider's tokens and cost MUST be reported separately
 - AND their sum MUST equal the total reported cost
+
+#### Scenario: Spend is attributable to one unmerged pull request
+
+- GIVEN an unmerged pull request with two session records, one carrying figures and one carrying
+  `figuresMissing`
+- WHEN spend per unmerged pull request is requested
+- THEN that pull request's figures MUST be computed from the first record only
+- AND it MUST report one record excluded for missing figures
+- AND it MUST cite both records
 
 #### Scenario: No signal is keyed to a person
 
@@ -313,7 +333,7 @@ commit SHALL render as its abbreviated hash beside the change's subject, and SHA
 hosting platform when the repository's web URL is recorded; a cited pull request SHALL link to that pull
 request and a cited session record to that file on the default branch. A hyperlink to the hosting platform is
 navigation and SHALL NOT be treated as an external resource; when no web URL is recorded the same text SHALL
-render with no hyperlink.
+render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show each pull request's spend beside its age, and the recent-changes table SHALL show each change's spend, each rendering what the records say rather than a zero when figures are missing, with every session record cited.
 
 #### Scenario: The Board with an empty projection
 
@@ -361,6 +381,26 @@ render with no hyperlink.
 - WHEN the dashboard is rendered
 - THEN its citations MUST still show the abbreviated hash and the change's subject
 - AND the page MUST contain no hyperlink for that repository
+
+#### Scenario: The queue shows what each pull request has cost
+
+- GIVEN an unmerged pull request with a session record carrying figures
+- WHEN an operator opens the dashboard
+- THEN that pull request's row MUST show its cost, tokens, and session count
+- AND the row MUST cite the session records behind them
+
+#### Scenario: A pull request whose records carry no figures shows no cost
+
+- GIVEN an unmerged pull request whose every session record carries `figuresMissing`
+- WHEN an operator opens the dashboard
+- THEN that pull request's row MUST say its figures are missing rather than showing a currency figure
+- AND it MUST still cite those records
+
+#### Scenario: A change with no declared session shows why, not a zero
+
+- GIVEN a change on the default branch carrying no `Session:` trailer
+- WHEN an operator opens the dashboard
+- THEN that change's row in the recent-changes table MUST read `undeclared` in place of a spend figure
 
 ### Requirement: Scripts and hooks
 
