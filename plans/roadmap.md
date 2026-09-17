@@ -14,6 +14,8 @@ contract.
 | Agent harness and MCP governance        | `improve-agentic-boiler-governance`                           | Complete |
 | Template and example expansion          | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
 | Fork rename automation                  | `add-project-rename-tooling`                                  | Complete |
+| Flow observability (phase one)          | `add-flow-observability`                                      | Pending  |
+| Change audit (phase two)                | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -32,9 +34,17 @@ needed to finish this milestone.
 
 The fork rename automation milestone turns `TEMPLATE.md`'s manual identity-rename table into a single
 command (`npm run rename`), because the manual table was already missing several tracked locations (the
-npm scope, `tsconfig.base.json`, `openspec/config.yaml`, the `spec-loop-governance` spec directory)
+npm scope, `tsconfig.base.json`, `openspec/config.yaml`, the `dev-ledger-governance` spec directory)
 that a fork owner following it verbatim would leave inconsistent. It comes after the template and example
 expansion milestone because it renames the packages that milestone introduced.
+
+The two product milestones are the two phases of this repository, built one week apart. Flow observability
+replaces the template's teaching examples with the `capture` package (hooks, trailers, session files) and
+the `flow` package (registry, SSH sync, projection, signals, The Board); it has no dependency inside this
+repository and ends by tagging `v0.1.0`. Change audit adds the `audit` package (rules, levels and packs,
+findings, decisions, evidence packs, the git-only baseline, the optional collector) and a governance view on
+the same Board; it is `Blocked` until phase one archives. The R&D cost allocation export, the `regulated`
+level's first real case, and further standard packs are later rows.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

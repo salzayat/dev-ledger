@@ -1,21 +1,21 @@
 {
-  "name": "spec-loop",
+  "name": "dev-ledger",
   "version": "0.1.0",
   "license": "MIT",
   "packageManager": "npm@11.5.2",
-  "description": "A teaching-oriented Nx foundation for agentic, spec-driven software projects.",
+  "description": "SDLC observability from git alone, with compliance as a second phase over the same records: session files, trailers, a rebuildable projection, flow signals, rules, and evidence packs.",
   "author": {
     "name": "Shady Alzayat",
     "url": "https://github.com/salzayat"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/salzayat/spec-loop.git"
+    "url": "git+https://github.com/salzayat/dev-ledger.git"
   },
   "bugs": {
-    "url": "https://github.com/salzayat/spec-loop/issues"
+    "url": "https://github.com/salzayat/dev-ledger/issues"
   },
-  "homepage": "https://github.com/salzayat/spec-loop#readme",
+  "homepage": "https://github.com/salzayat/dev-ledger#readme",
   "keywords": [
     "agents",
     "monorepo",

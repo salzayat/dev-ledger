@@ -1,5 +1,5 @@
 // TEMPLATE:REPLACE this composition example with the second domain capability after cloning or forking.
-import { greet } from '@spec-loop/hello';
+import { greet } from '@dev-ledger/hello';
 
 export type Announcement = {
   message: string;

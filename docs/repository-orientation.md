@@ -60,7 +60,7 @@ Open the single governing spec for your task instead of scanning them all. Each 
 | `repository-documentation`      | Repository intent, authority boundaries, `AGENTS.md`, and orientation guidance.  |
 | `repository-planning`           | Roadmap sequencing, OpenSpec dependency declarations, and readiness evidence.    |
 | `workflow-governance`           | Executable PR automation and pre-merge dependency-readiness checks.              |
-| `spec-loop-governance`          | Canonical agent harness layout, bounded MCP access, CI parity, and roadmap sync. |
+| `dev-ledger-governance`         | Canonical agent harness layout, bounded MCP access, CI parity, and roadmap sync. |
 | `ci-governance`                 | How Dependabot updates pass quality gates without weakening human-change checks. |
 | `agent-attribution`             | Neutral role labels and no provider or marketing branding in produced content.   |
 | `public-repository-maintenance` | Public metadata, ownership, support, security, and publication safeguards.       |
@@ -97,12 +97,12 @@ project rather than contributing to this one; it is a one-time rename/replace/ve
 the agent loop below.
 
 `packages/greeter` is the worked example of a dependent package. It imports `hello`'s typed export via
-`@spec-loop/hello`, declared as both an npm workspace dependency and an Nx `implicitDependencies`
-entry. That import resolves at typecheck and test time through the `@spec-loop/source` package export
+`@dev-ledger/hello`, declared as both an npm workspace dependency and an Nx `implicitDependencies`
+entry. That import resolves at typecheck and test time through the `@dev-ledger/source` package export
 condition, so no build step is required.
 
 When adding a new package that depends on another, follow the same shape: a `package.json` with a matching
-`exports` map, a `project.json` with `implicitDependencies`, and a `node --conditions=@spec-loop/source`
+`exports` map, a `project.json` with `implicitDependencies`, and a `node --conditions=@dev-ledger/source`
 test target.
 
 Use [`docs/dependency-patterns.md`](dependency-patterns.md) when adding roadmap entries, declaring OpenSpec

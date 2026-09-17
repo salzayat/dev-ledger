@@ -32,7 +32,7 @@ or run arbitrary network operations.
 
 Keep provider credentials, personal filesystem paths, unrestricted shell servers, and arbitrary network
 servers out of repository configuration. The accepted governance spec under
-`openspec/specs/spec-loop-governance/` records the durable requirements.
+`openspec/specs/dev-ledger-governance/` records the durable requirements.
 
 `opencode.json` is the OpenCode adapter configuration. Its `$schema` declaration enables editor validation;
 the configured Nx MCP server remains local and bounded by the repository governance policy.

@@ -1,11 +1,22 @@
-# Spec Loop
+# Dev Ledger
 
-Spec Loop is a small, public Nx monorepo built to teach one thing: how to run agentic software work with
-the same discipline a well-run engineering team already uses. Specs come before code. Ownership boundaries
-stay clear. Evidence beats trust. `hello` is a tiny deterministic library that makes the structure and
-feedback loop visible; it isn't pretending to be a real product. `greeter` depends on `hello` and exists for
-one reason: to show a second package actually working, with dependency resolution and sequencing happening
-in running code instead of a diagram.
+Dev Ledger turns the commit histories of the repositories a team runs into the signals an engineer needs
+to find where work waits, and then, as a second phase, into evidence someone outside the team can read. It
+reads every repository over the SSH access a developer already has, fetches what the remote already
+advertises (tags and pull head refs included), and rebuilds a projection that is byte-identical on any
+machine that fetched the same ref tips. No platform API, no token, no workflow, no service.
+
+Phase one, `openspec/changes/add-flow-observability/`, is observability: capture hooks and session files,
+a registry of repositories, the projection, the flow signals (cycle time, wait time, the unmerged queue,
+batch size, rework, escapes, spend per change), and The Board. Phase two,
+`openspec/changes/add-change-audit/`, is compliance as a layer over the same records: rules, levels and
+packs, findings you can quote by identifier, decisions you cannot quietly edit, evidence packs that hash
+the same on any machine, and a governance view added to the same Board. Its baseline needs nothing but
+git and says plainly which controls git alone cannot see; an optional collector, running in this
+repository's own continuous integration with one read-only credential, adds reviews, checks, protection,
+and deployments for the repositories that turn it on. It never claims compliance and never aggregates by
+person. Until phase one lands, this repository is the spec-loop template it was forked from, and the
+sections below describe that template.
 
 Forking this to start your own project? Read [`TEMPLATE.md`](TEMPLATE.md) first. For the thinking behind
 it, read [Building Agentic Software Without Losing Discipline](https://binarylogic.live/blog/building-agentic-software-without-losing-discipline).
@@ -134,7 +145,7 @@ Project targets are intentionally explicit:
 
 `hello` and `greeter` are source-only: `build` emits `.d.ts` files for editor and downstream typecheck
 support, not runnable `.js`. Other packages in this workspace import them directly by source through the
-`@spec-loop/source` package export condition (see `packages/greeter/src/index.ts`), so no build step is
+`@dev-ledger/source` package export condition (see `packages/greeter/src/index.ts`), so no build step is
 required to consume them within this workspace. Use Nx targets rather than invoking project tooling
 directly. As the workspace grows, applications should compose reusable libraries instead of stuffing
 domain logic into presentation projects.

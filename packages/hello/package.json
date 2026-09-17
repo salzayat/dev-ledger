@@ -1,11 +1,11 @@
 {
-  "name": "@spec-loop/hello",
+  "name": "@dev-ledger/hello",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": {
-      "@spec-loop/source": "./src/index.ts"
+      "@dev-ledger/source": "./src/index.ts"
     }
   }
 }

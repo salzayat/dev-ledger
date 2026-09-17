@@ -70,7 +70,7 @@ To keep pulling improvements from this template after you've renamed and started
 as a second remote:
 
 ```bash
-git remote add upstream https://github.com/salzayat/spec-loop.git
+git remote add upstream https://github.com/salzayat/dev-ledger.git
 git fetch upstream
 git merge upstream/main
 ```

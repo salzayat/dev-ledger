@@ -28,7 +28,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node --conditions=@spec-loop/source --experimental-strip-types --test packages/greeter/src/index.test.ts"
+        "command": "node --conditions=@dev-ledger/source --experimental-strip-types --test packages/greeter/src/index.test.ts"
       }
     }
   }
