@@ -31,7 +31,7 @@ import {
 import { mirrorPath, refTips } from './sync.ts';
 import { timingFor } from './timing.ts';
 
-export const PROJECTION_SCHEMA_VERSION = 2;
+export const PROJECTION_SCHEMA_VERSION = 3;
 export const CONFIG_PATH = 'telemetry.config.json';
 
 export type RepositoryProjection = {

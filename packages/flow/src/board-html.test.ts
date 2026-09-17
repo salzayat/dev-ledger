@@ -40,10 +40,48 @@ function fixtureProjection() {
     'Spec: add-one\nSession: s-1\nStory-Points: 2',
   );
   tag(fixture, 'v0.1.0');
+  // A merged change that declares no session at all: spend must read `undeclared`, never zero.
+  const bare = openPullRequest(fixture, 'bare', [
+    ['feat(bare): no trailers at all', { 'bare.txt': 'b' }],
+  ]);
+  mergeSquash(fixture, bare, 'feat(bare): no trailers at all');
+  // One unmerged pull request with a record carrying figures and one carrying none.
   openPullRequest(fixture, 'open', [
     [
       trailered('feat(open): waiting', { Session: 'none', Change: 'c-o' }),
-      { 'open.txt': 'o' },
+      {
+        'open.txt': 'o',
+        '.telemetry/sessions/2026-09/s-open.json': sessionJson('s-open'),
+        '.telemetry/sessions/2026-09/s-open-blind.json': sessionJson(
+          's-open-blind',
+          {
+            figuresMissing: true,
+            inputTokens: 0,
+            outputTokens: 0,
+            cachedTokens: 0,
+            costUsd: 0,
+          },
+        ),
+      },
+    ],
+  ]);
+  // An unmerged pull request whose only record carries no figures at all.
+  openPullRequest(fixture, 'blind', [
+    [
+      trailered('feat(blind): unmeasured', {
+        Session: 's-blind',
+        Change: 'c-b',
+      }),
+      {
+        'blind.txt': 'b',
+        '.telemetry/sessions/2026-09/s-blind.json': sessionJson('s-blind', {
+          figuresMissing: true,
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedTokens: 0,
+          costUsd: 0,
+        }),
+      },
     ],
   ]);
   const registry = parseRegistry(
@@ -144,7 +182,7 @@ test('the projection records the derived web URL, never the registry path', () =
   const projection = fixtureProjection();
   assert.equal(projection.repositories.fixture.webUrl, null);
   assert.equal(projection.repositories.gone.webUrl, null);
-  assert.equal(projection.schemaVersion, 2);
+  assert.equal(projection.schemaVersion, 3);
 });
 
 test('every panel carries trust classes, excluded counts, and citations', () => {
@@ -197,4 +235,54 @@ test('text from the repository is escaped and no person dimension appears', () =
     '&lt;a href=&quot;x&quot;&gt;&amp;&#39;',
   );
   assert.doesNotMatch(html, /operator|author/i);
+});
+
+test('spend on an unmerged pull request excludes a record with no figures rather than zeroing it', () => {
+  const spend = fixtureProjection().repositories.fixture.signals!.spend;
+  assert.equal(spend.unmergedPullRequests.sessions, 1);
+  assert.equal(spend.unmergedPullRequests.costUsd, 0.5);
+  assert.equal(spend.unmergedPullRequests.excluded.missingFigures, 2);
+  assert.equal(spend.unmergedPullRequests.excluded.invalidSession, 0);
+});
+
+test('spend is attributable to one unmerged pull request, citing every record', () => {
+  const spend = fixtureProjection().repositories.fixture.signals!.spend;
+  const mixed = Object.values(spend.perUnmergedPullRequest).find(
+    (entry) => entry.cites.length === 2,
+  )!;
+  assert.equal(mixed.spend.sessions, 1);
+  assert.equal(mixed.spend.costUsd, 0.5);
+  assert.equal(mixed.missingFigures, 1);
+  assert.equal(mixed.invalidSession, 0);
+  assert.equal(
+    mixed.cites.filter((path) => path.endsWith('s-open-blind.json')).length,
+    1,
+  );
+  const blind = Object.values(spend.perUnmergedPullRequest).find(
+    (entry) => entry.cites.length === 1,
+  )!;
+  assert.equal(blind.spend.sessions, 0);
+  assert.equal(blind.spend.costUsd, 0);
+  assert.equal(blind.missingFigures, 1);
+});
+
+test('the queue and changes tables show spend, or say why there is none', () => {
+  const projection = fixtureProjection();
+  const html = renderBoardHtml(projection);
+  const rows = html.match(/<tr>(?:(?!<\/tr>)[\s\S])*<\/tr>/g) ?? [];
+  const queueRow = rows.find(
+    (row) => row.includes('#3') && row.includes('$0.50'),
+  );
+  assert.ok(queueRow, 'the mixed pull request shows its cost');
+  const blindRow = rows.find(
+    (row) => row.includes('#4') && row.includes('figures missing'),
+  );
+  assert.ok(blindRow, 'a pull request with no figures says so');
+  assert.doesNotMatch(blindRow!, /\$0\.00/);
+  const undeclaredRow = rows.find((row) => row.includes('no trailers at all'));
+  assert.ok(undeclaredRow, 'the undeclared change has a row');
+  assert.match(undeclaredRow!, /undeclared/);
+  assert.doesNotMatch(undeclaredRow!, /\$0\.00/);
+  const declaredRow = rows.find((row) => row.includes('feat(one)'));
+  assert.match(declaredRow!, /\$0\.50/);
 });

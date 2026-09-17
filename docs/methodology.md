@@ -81,6 +81,18 @@ and records that URL in the projection. A local path or any other remote resolve
 ever written into the projection, and the same citations then render with the subject and the hash and no
 link. A link is navigation, not a resource: the page still opens from a file URL and loads nothing.
 
+## Spend on work that has not shipped
+
+A session record found on an unmerged pull head ref is kept and attributed to that pull request, so work
+that never ships keeps its cost. The unmerged queue shows each pull request's cost, tokens, and session
+count beside its age, and the changes table shows the same per merged change.
+
+Both obey one rule: a record whose harness supplied no figures is excluded and counted, never read as
+zero. A pull request whose records all carry `figuresMissing` reads "figures missing" in its spend cell,
+and a change that declared no session reads `undeclared` — neither is `$0.00`, because nobody measured
+them. Every such row still cites the records behind it, including the ones excluded from its figures: the
+record that says the figures are missing is the evidence for the claim.
+
 ## A pull request shows its own records
 
 `scripts/pr.sh` puts the branch's session records into the description it opens, built by
