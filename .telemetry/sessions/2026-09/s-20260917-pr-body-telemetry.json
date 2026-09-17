@@ -1,13 +1,14 @@
 {
-  "agentRunSeconds": 1600,
+  "agentRunSeconds": 2000,
   "billingKind": "subscription",
   "branch": "governance/pr-body-telemetry",
   "cachedTokens": 0,
   "commits": [
-    "7131eee935b3edf4f46849e2356a2db1c98433f7"
+    "7131eee935b3edf4f46849e2356a2db1c98433f7",
+    "b46893dc506b2ca338ef04fc5b6af12c9a721b9b"
   ],
   "costUsd": 0,
-  "endedAt": "2026-09-17T22:34:20Z",
+  "endedAt": "2026-09-17T22:38:43Z",
   "figuresMissing": true,
   "figuresSource": "agent session; the harness did not expose token or cost figures",
   "inputTokens": 0,
@@ -23,5 +24,5 @@
   "spec": "add-telemetry-in-pull-request-body",
   "startedAt": "2026-09-17T22:30:00Z",
   "subscriptionId": "claude-max",
-  "wallClockSeconds": 260
+  "wallClockSeconds": 523
 }
