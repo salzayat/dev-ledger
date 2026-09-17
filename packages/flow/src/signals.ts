@@ -93,7 +93,19 @@ export type RepositorySignals = {
       invalidSession: number;
       missingFigures: number;
     };
-    unmergedPullRequests: Spend;
+    unmergedPullRequests: Spend & {
+      excluded: { invalidSession: number; missingFigures: number };
+    };
+    perUnmergedPullRequest: Record<
+      string,
+      {
+        pullRequest: number;
+        spend: Spend;
+        missingFigures: number;
+        invalidSession: number;
+        cites: string[];
+      }
+    >;
   };
   signals: Signal[];
 };
@@ -137,14 +149,23 @@ function emptySpend(): Spend {
   };
 }
 
-function add(into: Spend, record: SessionRecord): void {
-  const file = record.file!;
+/**
+ * Adds a record's figures to a total, and reports whether it did. A record carrying `figuresMissing` is
+ * refused here rather than at each call site: the caller decides which excluded counter to raise, never
+ * whether the rule applies.
+ */
+function add(into: Spend, record: SessionRecord): boolean {
+  const file = record.file;
+  if (!file || file.figuresMissing) {
+    return false;
+  }
   into.inputTokens += file.inputTokens;
   into.outputTokens += file.outputTokens;
   into.cachedTokens += file.cachedTokens;
   into.costUsd = Math.round((into.costUsd + file.costUsd) * 1e6) / 1e6;
   into.sessions += 1;
   into.cites.push(record.path);
+  return true;
 }
 
 function distribution(
@@ -307,7 +328,11 @@ export function computeSignals(
       invalidSession: 0,
       missingFigures: 0,
     },
-    unmergedPullRequests: emptySpend(),
+    unmergedPullRequests: {
+      ...emptySpend(),
+      excluded: { invalidSession: 0, missingFigures: 0 },
+    },
+    perUnmergedPullRequest: {},
   };
   const effortAccumulators: Record<
     string,
@@ -413,10 +438,32 @@ export function computeSignals(
       cites: accumulator.cites,
     };
   }
+  // Unmerged work is totalled under the same rule as merged work: a record with no figures is counted as
+  // excluded, never as a zero, both for the pull request and for the aggregate.
   for (const record of sessions.values()) {
-    if (record.attribution.unmergedPullRequest !== null && record.file) {
-      add(spend.unmergedPullRequests, record);
+    const number = record.attribution.unmergedPullRequest;
+    if (number === null) {
+      continue;
     }
+    const entry = (spend.perUnmergedPullRequest[String(number)] ??= {
+      pullRequest: number,
+      spend: emptySpend(),
+      missingFigures: 0,
+      invalidSession: 0,
+      cites: [],
+    });
+    entry.cites.push(record.path);
+    if (!record.file) {
+      entry.invalidSession += 1;
+      spend.unmergedPullRequests.excluded.invalidSession += 1;
+      continue;
+    }
+    if (!add(entry.spend, record)) {
+      entry.missingFigures += 1;
+      spend.unmergedPullRequests.excluded.missingFigures += 1;
+      continue;
+    }
+    add(spend.unmergedPullRequests, record);
   }
 
   const signals: Signal[] = [];

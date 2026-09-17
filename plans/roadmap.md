@@ -6,18 +6,19 @@ contract.
 
 ## Milestone Tracking
 
-| Phase                                   | Governing changes                                             | Status   |
-| --------------------------------------- | ------------------------------------------------------------- | -------- |
-| Repository evolution conventions        | `add-repository-evolution-markers`                            | Complete |
-| Executable PR and dependency governance | `add-executable-pr-and-dependency-governance`                 | Complete |
-| Foundation                              | None                                                          | Complete |
-| Agent harness and MCP governance        | `improve-agentic-boiler-governance`                           | Complete |
-| Template and example expansion          | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
-| Fork rename automation                  | `add-project-rename-tooling`                                  | Complete |
-| Flow observability (phase one)          | `add-flow-observability`                                      | Complete |
-| Board dashboard (phase one addendum)    | `add-board-dashboard`                                         | Complete |
-| Board presentation (phase one addendum) | `improve-board-presentation`                                  | Complete |
-| Change audit (phase two)                | `add-change-audit`                                            | Blocked  |
+| Phase                                       | Governing changes                                             | Status   |
+| ------------------------------------------- | ------------------------------------------------------------- | -------- |
+| Repository evolution conventions            | `add-repository-evolution-markers`                            | Complete |
+| Executable PR and dependency governance     | `add-executable-pr-and-dependency-governance`                 | Complete |
+| Foundation                                  | None                                                          | Complete |
+| Agent harness and MCP governance            | `improve-agentic-boiler-governance`                           | Complete |
+| Template and example expansion              | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
+| Fork rename automation                      | `add-project-rename-tooling`                                  | Complete |
+| Flow observability (phase one)              | `add-flow-observability`                                      | Complete |
+| Board dashboard (phase one addendum)        | `add-board-dashboard`                                         | Complete |
+| Board presentation (phase one addendum)     | `improve-board-presentation`                                  | Complete |
+| Per pull request spend (phase one addendum) | `add-per-pull-request-spend`                                  | Complete |
+| Change audit (phase two)                    | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -52,6 +53,11 @@ The Board presentation milestone follows the Board dashboard milestone because i
 introduced: it gives every cited commit its change's subject and a link to the commit on the hosting
 platform, and adds the charts the first dashboard left as bare figures. It changes no record, only the
 projection's derived repository web URL and the page rendered from it.
+
+The per-pull-request spend milestone follows the Board presentation milestone because it adds columns to
+the tables that one introduced. It also corrects a defect the presentation work exposed: spend on unmerged
+pull requests counted a record with missing figures as a real zero, while the merged path excluded and
+counted it. Its rule is the accepted one either way — counted, never zeroed.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
