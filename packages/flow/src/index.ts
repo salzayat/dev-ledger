@@ -50,4 +50,9 @@ export {
 } from './cursor.ts';
 export type { CursorFile, CursorRun } from './cursor.ts';
 export { renderBoard, renderRepository } from './board.ts';
+export {
+  escapeHtml,
+  renderBoardHtml,
+  renderRepositoryHtml,
+} from './board-html.ts';
 export { main } from './cli.ts';

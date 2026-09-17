@@ -50,6 +50,12 @@ Git observed the commit graph and its dates: `observed`. The harness reported wh
 `reported`. Every figure names the classes it was computed from, and no read promotes a reported figure
 to observed. There is no third class here; platform facts belong to phase two's optional collector.
 
+## The Board is a page rendered from the projection
+
+`telemetry board --html` writes one self-contained HTML page from the projection: inline styles, inline
+SVG bars for the distributions, no script, no external resource. Nothing on the page can compute a figure
+the projection does not hold, so the citation rule holds for the page as well as for the data.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It

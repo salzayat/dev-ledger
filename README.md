@@ -35,7 +35,8 @@ pattern, thresholds), then:
 ```bash
 ./scripts/telemetry.sh sync      # mirror-fetch every registered repository over SSH
 ./scripts/telemetry.sh rebuild   # rebuild .telemetry/projection.json and print its hash
-./scripts/telemetry.sh board     # render The Board
+./scripts/telemetry.sh board     # render The Board in the terminal
+./scripts/telemetry.sh board --html   # write .telemetry/board.html, the dashboard, and open it from a file URL
 ```
 
 `sync` is the only step that touches the network, and it uses `git fetch` and nothing else. `rebuild`
@@ -64,7 +65,8 @@ records the identifier the commit hook writes as `Session:`.
 Per repository and across the registry: cycle time and wait time (from the pull head ref, so a rebase or
 squash does not erase them), the unmerged queue and its age, batch size, merge frequency, rework, escapes
 after the newest release, local check outcomes, spend by spec, provider, model, and per unit of effort,
-with every figure naming its trust classes, its excluded count, and the changes behind it. Undeclared and
+with every figure naming its trust classes, its excluded count, and the changes behind it. The dashboard is one
+self-contained HTML page with no script and no external resource, readable from a file URL, in light and dark. Undeclared and
 unreported changes are counted, never read as zero. Nothing is keyed to a person.
 [`docs/methodology.md`](docs/methodology.md) explains each figure.
 
