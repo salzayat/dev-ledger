@@ -30,6 +30,9 @@
 ## Verification
 
 - [x] 3.1 `npm run check` passes (2026-09-17, on this branch, and again through the pre-commit hook).
+      CI on the pull request failed on Ubuntu's git: `readCommits` with no release commits ran
+      `git log --stdin` with empty input, which falls back to an unborn HEAD in the mirror; it now returns
+      an empty map without calling git (2026-09-18).
 - [x] 3.2 End to end: rebuild over this repository and confirm the DORA strip, the weekly charts, and the
       cost-class panel render with citations, and that every approximation note is present.
       Evidence (2026-09-17): over this repository's `main` the terminal render reported one release, lead time
