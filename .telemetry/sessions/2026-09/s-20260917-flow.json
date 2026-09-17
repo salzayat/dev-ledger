@@ -1,0 +1,27 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "flow/flow-observability",
+  "cachedTokens": 0,
+  "commits": [
+    "1e09fe48ec11f4cc4b1924d8ac50b00c72f4f9f5"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-17T20:45:00Z",
+  "figuresMissing": true,
+  "figuresSource": "agent session; the harness did not expose token or cost figures",
+  "inputTokens": 0,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 0,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260917-flow",
+  "spec": "add-flow-observability",
+  "startedAt": "2026-09-17T20:18:30Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 1590
+}
