@@ -36,6 +36,14 @@ zero. The pull head ref keeps the original commits with their author dates, so:
 The merge time is the merging party's clock, and the projection says so. A change with no pull head ref
 has both figures absent with a reason, never zero.
 
+## Typical, nine in ten, slowest
+
+The Board never shows an average, because one very slow change would drag it. Each timing panel shows
+three figures instead. Typical is the median: half the changes were faster than it, half slower. Nine in
+ten is the value nine out of ten changes came in under, which is where a slow tail shows. Slowest is the
+single worst change, always cited so it can be looked at. In the projection file these are `p50`, `p90`,
+and `max`.
+
 ## Undeclared, unreported, human-only
 
 A change with no `Session:` trailer anywhere is `undeclared` (an `undeclared-session` gap). A change that
@@ -54,7 +62,7 @@ to observed. There is no third class here; platform facts belong to phase two's 
 
 `telemetry board --html` writes one self-contained HTML page from the projection: inline styles, inline
 SVG bars for the distributions, no script, no external resource. Each repository opens with a summary strip
-(wait and cycle p50, queue, merges per day, spend, out-of-band), then the panels, then a table of the newest
+(typical wait and cycle, queue, merges per day, spend, out-of-band), then the panels, then a table of the newest
 changes with each one's pull request, wait, cycle, lines, session status, and gaps. Nothing on the page can compute a figure
 the projection does not hold, so the citation rule holds for the page as well as for the data.
 

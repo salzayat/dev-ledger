@@ -29,7 +29,7 @@ function distributionLine(label: string, distribution: Distribution): string[] {
     .map(([reason, count]) => `${count} ${reason}`)
     .join(', ');
   return [
-    `${label}: p50 ${seconds(distribution.p50)}, p90 ${seconds(distribution.p90)}, max ${seconds(distribution.max)} over ${distribution.count} changes [${distribution.trust.join(', ')}]${excluded ? `; excluded: ${excluded}` : ''}`,
+    `${label}: typical (median) ${seconds(distribution.p50)}, 9 in 10 within ${seconds(distribution.p90)}, slowest ${seconds(distribution.max)} over ${distribution.count} changes [${distribution.trust.join(', ')}]${excluded ? `; excluded: ${excluded}` : ''}`,
     `  cites: ${distribution.cites.map(short).join(' ') || '(none)'}`,
   ];
 }
