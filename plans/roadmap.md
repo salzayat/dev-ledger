@@ -19,6 +19,7 @@ contract.
 | Board presentation (phase one addendum)      | `improve-board-presentation`                                  | Complete |
 | Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
 | Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
+| Session figures (telemetry capture)          | `add-session-figures-from-transcript`                         | Complete |
 | Change audit (phase two)                     | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -63,6 +64,11 @@ were dropped whenever a body file was supplied.
 The capture git environment row is a defect fix, not a capability: the flow package already refuses to let
 a git child inherit the caller's index, and the capture package — the one whose commands run inside hooks —
 did not, which corrupted this repository's index once during the pull request telemetry work.
+
+The session figures row closes the gap that made every spend figure on The Board read "figures missing":
+the schema always accepted token counts and nothing produced them. It comes after the capture git
+environment fix because its end-to-end test runs a capture command as a child process against a fixture
+repository.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

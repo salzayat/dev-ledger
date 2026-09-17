@@ -10,6 +10,11 @@ import {
   type SessionInput,
 } from './session.ts';
 import { validateMessage } from './trailers.ts';
+import {
+  sumTranscriptUsage,
+  transcriptFiguresSource,
+  type Figures,
+} from './figures.ts';
 
 // The capture command line: what the hooks and the harness call. It needs nothing but git and this
 // package, so a repository can record sessions before the flow package exists.
@@ -186,6 +191,20 @@ export function sessionSummary(
   ].join('\n');
 }
 
+function readTranscriptFigures(
+  root: string,
+  path: string | undefined,
+): Figures | null {
+  if (!path) {
+    fail('--transcript requires a file path');
+  }
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute)) {
+    return null;
+  }
+  return sumTranscriptUsage(readFileSync(absolute, 'utf8'));
+}
+
 export function captureMain(argv: string[]): number {
   const [command, ...args] = argv;
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']).trim();
@@ -202,6 +221,26 @@ export function captureMain(argv: string[]): number {
         );
         return 0;
       }
+      if (args[0] === 'figures') {
+        const figures = readTranscriptFigures(
+          root,
+          option(args, '--transcript'),
+        );
+        if (!figures) {
+          fail(
+            'no usage record in the transcript; record the session without figures',
+          );
+        }
+        process.stdout.write(
+          canonicalJson({
+            cachedTokens: figures.cachedTokens,
+            figuresSource: transcriptFiguresSource(figures),
+            inputTokens: figures.inputTokens,
+            outputTokens: figures.outputTokens,
+          }),
+        );
+        return 0;
+      }
       if (args[0] === 'end') {
         const payloadPath = option(args, '--payload') ?? '-';
         const text =
@@ -210,6 +249,19 @@ export function captureMain(argv: string[]): number {
             : readFileSync(resolve(root, payloadPath), 'utf8');
         const config = loadConfig(root);
         const input = JSON.parse(text) as SessionInput;
+        // A transcript fills only what the payload left out: a harness that knows its own figures keeps
+        // them, and a transcript with no usage record leaves the record missing figures as before.
+        const transcript = option(args, '--transcript');
+        if (transcript !== undefined) {
+          const figures = readTranscriptFigures(root, transcript);
+          if (figures) {
+            input.inputTokens ??= figures.inputTokens;
+            input.outputTokens ??= figures.outputTokens;
+            input.cachedTokens ??= figures.cachedTokens;
+            input.figuresSource =
+              input.figuresSource || transcriptFiguresSource(figures);
+          }
+        }
         if (config.costAllocation.enabled && input.operatorId === undefined) {
           try {
             input.operatorId = git(root, [
@@ -258,7 +310,7 @@ export function captureMain(argv: string[]): number {
         return 0;
       }
       fail(
-        'usage: telemetry session start --id <id> | telemetry session end --payload <file|-> | telemetry session summary [--base <ref>] [--head <ref>]',
+        'usage: telemetry session start --id <id> | telemetry session end --payload <file|-> [--transcript <file>] | telemetry session figures --transcript <file> | telemetry session summary [--base <ref>] [--head <ref>]',
       );
       break;
     }

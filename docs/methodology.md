@@ -88,6 +88,13 @@ link. A link is navigation, not a resource: the page still opens from a file URL
 recorded before deciding whether to merge it, and a record with no figures is named as missing there too.
 The projection is not read: the pull request does not exist yet when its description is written.
 
+## Where the token figures come from
+
+Nothing here asks a provider what a session cost. A figure is either stated by the harness or summed from
+the session's own transcript on this machine, and either way it is `reported`, never `observed`. Cost is
+not derived: on a subscription the contract fixes `costUsd` at zero, so a subscription session reports real
+token counts and no dollar figure, and that is the honest reading rather than a price guess.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It
