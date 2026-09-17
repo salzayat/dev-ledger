@@ -22,6 +22,8 @@ contract.
 | Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
 | Session figures (telemetry capture)          | `add-session-figures-from-transcript`                         | Complete |
 | Change audit (phase two)                     | `add-change-audit`                                            | Blocked  |
+| Subscription and operator spend (phase one)  | `add-subscription-and-operator-spend`                         | Pending  |
+| Board publication (phase one)                | `add-board-publication`                                       | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -75,6 +77,20 @@ The session figures row closes the gap that made every spend figure on The Board
 the schema always accepted token counts and nothing produced them. It comes after the capture git
 environment fix because its end-to-end test runs a capture command as a child process against a fixture
 repository.
+
+The subscription and operator spend milestone comes before board publication because every currency figure
+The Board renders is `$0.00` today: validation requires a subscription session to record no marginal cost,
+and every recorded session is a subscription session, so the cost of a plan is a fact no record holds. It
+adds a subscription cost record per billing period, allocates that amount across the period's sessions in
+proportion to agent run seconds, and admits the operator as a dimension covering agents and humans alike —
+agents in currency, humans in hours, never summed and never priced. It supersedes the accepted prohibition
+on operator-keyed figures; pseudonymity stays enforced where it always was, in the record schema.
+
+The board publication milestone follows it because a published page should not lead with a spend panel
+reading zero over the repository's whole history. It builds The Board on every pull request as a run
+artifact and a job summary, and deploys it to Pages from the default branch only, gated on the repository
+being public — the repository is private until the first release, so the gate lives in the workflow rather
+than in a sequencing note. It is `Blocked` until `add-subscription-and-operator-spend` is archived.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
