@@ -9,8 +9,10 @@ import {
 } from './session.ts';
 import { formatTrailers, parseTrailers, validateMessage } from './trailers.ts';
 import { gitEnvironment, sessionSummary } from './cli.ts';
+import { sumTranscriptUsage } from './figures.ts';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -354,4 +356,166 @@ test('a git child never inherits the caller index or repository', () => {
     delete process.env.GIT_INDEX_FILE;
     delete process.env.GIT_DIR;
   }
+});
+
+const transcriptLine = (
+  id: string | null,
+  usage: Record<string, number>,
+  extra: Record<string, unknown> = {},
+) =>
+  JSON.stringify({
+    type: 'assistant',
+    message: { ...(id === null ? {} : { id }), usage, ...extra },
+  });
+
+test('a message repeated across transcript records is counted once', () => {
+  const transcript = [
+    transcriptLine('msg-1', { input_tokens: 10, output_tokens: 5 }),
+    transcriptLine('msg-1', { input_tokens: 10, output_tokens: 40 }),
+    transcriptLine('msg-1', { input_tokens: 10, output_tokens: 90 }),
+    transcriptLine('msg-2', { input_tokens: 3, output_tokens: 7 }),
+    transcriptLine(null, { input_tokens: 1, output_tokens: 1 }),
+  ].join('\n');
+  const figures = sumTranscriptUsage(transcript)!;
+  assert.equal(figures.messages, 3);
+  assert.equal(figures.inputTokens, 14);
+  assert.equal(figures.outputTokens, 13);
+});
+
+test('cached tokens are reads plus writes, and input counts neither', () => {
+  const figures = sumTranscriptUsage(
+    transcriptLine('msg-1', {
+      input_tokens: 12,
+      output_tokens: 4,
+      cache_read_input_tokens: 900,
+      cache_creation_input_tokens: 100,
+    }),
+  )!;
+  assert.equal(figures.inputTokens, 12);
+  assert.equal(figures.cachedTokens, 1000);
+  assert.equal(figures.outputTokens, 4);
+});
+
+test('a transcript with nothing to sum yields no figures at all', () => {
+  assert.equal(sumTranscriptUsage(''), null);
+  assert.equal(sumTranscriptUsage('not json\n{"message":{"id":"a"}}\n'), null);
+  assert.equal(
+    sumTranscriptUsage('{"message":{"id":"a","usage":{}}}')!.messages,
+    1,
+  );
+  // A record with no figures must still be written as missing, never as measured zeros.
+  const file = buildSessionFile(
+    {
+      sessionId: 's-none',
+      provider: 'provider-a',
+      model: 'model-x',
+      figuresSource: 'transcript carried no usage record',
+      startedAt: '2026-09-01T09:00:00Z',
+      endedAt: '2026-09-01T10:00:00Z',
+      billingKind: 'subscription',
+      subscriptionId: 'plan',
+      branch: 'work',
+      commits: [],
+      localCheck: { outcome: 'passed', command: 'npm run check' },
+    },
+    DEFAULT_CONFIG,
+  );
+  assert.equal(file.figuresMissing, true);
+});
+
+test('a session recorded with a transcript carries its figures, and a stated figure wins', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const runCli = (dir: string, args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+    );
+  const payload = (extra: Record<string, unknown>) =>
+    JSON.stringify({
+      sessionId: 's-figures',
+      provider: 'provider-a',
+      model: 'model-x',
+      figuresSource: '',
+      startedAt: '2026-09-01T09:00:00Z',
+      endedAt: '2026-09-01T10:00:00Z',
+      billingKind: 'subscription',
+      subscriptionId: 'plan',
+      branch: 'work',
+      commits: [],
+      localCheck: { outcome: 'passed', command: 'npm run check' },
+      ...extra,
+    });
+
+  const dir = summaryRepo();
+  writeFileSync(
+    join(dir, 'transcript.jsonl'),
+    [
+      transcriptLine('msg-1', {
+        input_tokens: 20,
+        output_tokens: 30,
+        cache_read_input_tokens: 40,
+      }),
+      transcriptLine('msg-1', { input_tokens: 20, output_tokens: 30 }),
+    ].join('\n'),
+  );
+  writeFileSync(join(dir, 'payload.json'), payload({}));
+  runCli(dir, [
+    'session',
+    'end',
+    '--payload',
+    'payload.json',
+    '--transcript',
+    'transcript.jsonl',
+  ]);
+  const summed = JSON.parse(
+    readFileSync(
+      join(dir, '.telemetry/sessions/2026-09/s-figures.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(summed.figuresMissing, undefined);
+  assert.deepEqual(
+    [summed.inputTokens, summed.outputTokens, summed.cachedTokens],
+    [20, 30, 40],
+  );
+  assert.match(summed.figuresSource, /summed from 1 messages/);
+
+  const stated = summaryRepo();
+  writeFileSync(
+    join(stated, 'transcript.jsonl'),
+    readFileSync(join(dir, 'transcript.jsonl')),
+  );
+  writeFileSync(
+    join(stated, 'payload.json'),
+    payload({
+      inputTokens: 5,
+      outputTokens: 6,
+      cachedTokens: 7,
+      figuresSource: 'harness',
+    }),
+  );
+  runCli(stated, [
+    'session',
+    'end',
+    '--payload',
+    'payload.json',
+    '--transcript',
+    'transcript.jsonl',
+  ]);
+  const kept = JSON.parse(
+    readFileSync(
+      join(stated, '.telemetry/sessions/2026-09/s-figures.json'),
+      'utf8',
+    ),
+  );
+  assert.deepEqual(
+    [
+      kept.inputTokens,
+      kept.outputTokens,
+      kept.cachedTokens,
+      kept.figuresSource,
+    ],
+    [5, 6, 7, 'harness'],
+  );
 });

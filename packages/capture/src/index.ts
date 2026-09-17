@@ -38,3 +38,8 @@ export {
   loadConfig,
   sessionSummary,
 } from './cli.ts';
+export {
+  sumTranscriptUsage,
+  transcriptFiguresSource,
+  type Figures,
+} from './figures.ts';

@@ -93,6 +93,7 @@ repository turns it on, every control that needs them reads as not observable.
 | `./scripts/telemetry.sh validate`          | Validate session files against the schema.                                                                        |
 | `./scripts/telemetry.sh session`           | Record a session start, or write and commit a session file at session end.                                        |
 | `./scripts/telemetry.sh session summary`   | Print the session records this branch adds, as the Markdown the PR helper embeds.                                 |
+| `./scripts/telemetry.sh session figures`   | Sum a session transcript's token figures, to pass to `session end`.                                               |
 | `npm exec nx run capture:test`             | Run the capture package's tests.                                                                                  |
 | `npm exec nx run flow:test`                | Run the flow package's tests over fixture repositories built in a temporary directory.                            |
 | `./scripts/spec-status.sh`                 | Report each capability with an active OpenSpec change and its task completion.                                    |

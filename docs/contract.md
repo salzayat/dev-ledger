@@ -34,7 +34,14 @@ the one it corrects in `corrects`). The path is marked `linguist-generated`.
 | `corrects`                                    | string, optional                            | The session this file corrects                                                                                                                          |
 
 A file carrying `name`, `operatorName`, `email`, `hourlyRate`, `rate`, `salary`, or `compensation` is
-rejected. Every session record in the projection carries `producer: harness` and `trust: reported`.
+rejected.
+
+Figures reach a record in one of two ways, both `reported`: the harness states them in the payload, or
+`session end --transcript <file>` sums them from a local transcript — a JSONL file whose records carry a
+`usage` object in the wire format of the model API. A transcript fills only the figures the payload omits,
+records are deduplicated by message identifier (a streaming transcript repeats a message as it grows),
+`cachedTokens` is cache reads plus cache writes, and cost is never derived from a price table. A transcript
+with no usage record leaves the session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
 
 ## Trailer vocabulary (version 1)
 
