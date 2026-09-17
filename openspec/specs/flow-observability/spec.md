@@ -246,7 +246,8 @@ topological order and reading commit messages and trailers, session files, tags,
 projection SHALL be written as canonical JSON with sorted keys and a schema version, SHALL record the ref
 tips it was built from, and SHALL be byte-identical on any machine whose mirrors hold the same ref tips.
 It SHALL order events by the commit graph and never by author timestamp, and SHALL be deletable and
-rebuildable with no loss.
+rebuildable with no loss. The projection SHALL record, per repository, the web URL of its remote when the
+registry URL is a recognizable hosting remote, and SHALL record no local filesystem path.
 
 #### Scenario: Two machines rebuild identically
 
@@ -265,6 +266,13 @@ rebuildable with no loss.
 - GIVEN a materialized projection
 - WHEN it is deleted and rebuilt from the same mirrors
 - THEN the rebuilt projection MUST be byte-identical to the deleted one
+
+#### Scenario: A local registry URL records no path
+
+- GIVEN a registry entry whose URL is a local filesystem path
+- WHEN the projection is rebuilt
+- THEN the repository's web URL MUST be null
+- AND the projection MUST NOT contain that path
 
 ### Requirement: Cursor-based consumers
 
@@ -298,9 +306,14 @@ count, and SHALL be traceable to the changes and records it was computed from. T
 any figure keyed to an operator identifier, SHALL read only from the projection, and SHALL render an explicit
 empty state when the projection has no records. The Board SHALL be available as a terminal render and as a
 static HTML dashboard written by `telemetry board --html`: one self-contained page with inline styles and
-inline SVG, no script, and no external resource, readable from a file URL, laid out per repository with each
-figure's trust classes and excluded count beside it and its citations expandable beneath it, working in light
-and dark color schemes and at phone width.
+inline SVG, containing no script element and loading no external resource, readable from a file URL, laid out
+per repository with each figure's trust classes and excluded count beside it and its citations expandable
+beneath it, working in light and dark color schemes and at phone width. On the HTML dashboard every cited
+commit SHALL render as its abbreviated hash beside the change's subject, and SHALL link to that commit on the
+hosting platform when the repository's web URL is recorded; a cited pull request SHALL link to that pull
+request and a cited session record to that file on the default branch. A hyperlink to the hosting platform is
+navigation and SHALL NOT be treated as an external resource; when no web URL is recorded the same text SHALL
+render with no hyperlink.
 
 #### Scenario: The Board with an empty projection
 
@@ -324,15 +337,30 @@ and dark color schemes and at phone width.
 
 - GIVEN a projection with records
 - WHEN `telemetry board --html` runs
-- THEN it MUST write one HTML file that contains no script element and references no external resource
+- THEN it MUST write one HTML file that contains no script element, no stylesheet or resource reference, and
+  no style rule loading a resource
 - AND opening that file from a file URL MUST show every panel with its trust classes, excluded count, and
-  citations
+  citations without a network request
 
 #### Scenario: The dashboard renders in both color schemes and at phone width
 
 - GIVEN the written page
 - WHEN it is viewed with a dark color scheme, or in a viewport 400 pixels wide
 - THEN every panel MUST remain readable with its figures and citations visible
+
+#### Scenario: A cited commit names its change and reaches the platform
+
+- GIVEN a repository whose registry URL is a GitHub remote and a panel citing a change
+- WHEN an operator expands that panel's citations
+- THEN each citation MUST show the abbreviated hash and that change's subject
+- AND the hash MUST link to that commit under the repository's web URL
+
+#### Scenario: A repository with no web URL renders the same citations unlinked
+
+- GIVEN a repository whose registry URL is a local path
+- WHEN the dashboard is rendered
+- THEN its citations MUST still show the abbreviated hash and the change's subject
+- AND the page MUST contain no hyperlink for that repository
 
 ### Requirement: Scripts and hooks
 

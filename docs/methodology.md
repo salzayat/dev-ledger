@@ -61,10 +61,25 @@ to observed. There is no third class here; platform facts belong to phase two's 
 ## The Board is a page rendered from the projection
 
 `telemetry board --html` writes one self-contained HTML page from the projection: inline styles, inline
-SVG bars for the distributions, no script, no external resource. Each repository opens with a summary strip
-(typical wait and cycle, queue, merges per day, spend, out-of-band), then the panels, then a table of the newest
-changes with each one's pull request, wait, cycle, lines, session status, and gaps. Nothing on the page can compute a figure
-the projection does not hold, so the citation rule holds for the page as well as for the data.
+SVG charts, no script, and no loaded resource. Each repository opens with a summary strip (typical wait and
+cycle, queue, merges per day, spend, out-of-band), then the panels, then a table of the newest changes with
+each one's pull request, wait, cycle, lines, session status, and gaps. The charts — merges per day over the
+measured window, the distribution bars, lines added and removed per recent change, queue age per pull
+request, the most-reworked files, and the spend bars — are folds over the same records, computed when the
+page is rendered. Nothing on the page can compute a figure the projection does not hold, so the citation
+rule holds for the page as well as for the data.
+
+## A citation names its change and reaches the commit
+
+Every cited commit renders as its abbreviated hash beside that change's subject, so a citation reads as a
+change rather than as ten hexadecimal characters. The hash links to the commit on the hosting platform,
+a cited pull request to the pull request, and a cited session record to that file on the default branch.
+
+The link target comes from the registry: `rebuild` resolves each repository's `url` to a web URL when it is
+a GitHub remote (`git@github.com:owner/repo.git`, `ssh://`, or HTTPS, including a GitHub Enterprise host)
+and records that URL in the projection. A local path or any other remote resolves to null, no local path is
+ever written into the projection, and the same citations then render with the subject and the hash and no
+link. A link is navigation, not a resource: the page still opens from a file URL and loads nothing.
 
 ## Signals, not findings
 

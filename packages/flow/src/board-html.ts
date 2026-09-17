@@ -1,9 +1,11 @@
 import type { Projection, RepositoryProjection } from './projection.ts';
 import type { Distribution, Spend } from './signals.ts';
 
-// The Board as one self-contained HTML page: inline styles, inline SVG, no script, no external resource.
+// The Board as one self-contained HTML page: inline styles, inline SVG, no script, no loaded resource.
 // Same figures as the terminal render, laid out per repository, with trust classes and excluded counts
-// beside every figure and its citations expandable beneath it.
+// beside every figure and its citations expandable beneath it. Every cited commit shows the change's
+// subject beside its abbreviated hash and links to the hosting platform when the repository records a
+// web URL; with no web URL the same text renders unlinked, so the page still opens from a file URL.
 
 export function escapeHtml(value: unknown): string {
   return String(value)
@@ -30,13 +32,6 @@ function seconds(value: number | null): string {
   return `${(value / 86_400).toFixed(1)} d`;
 }
 
-function short(id: string): string {
-  return id
-    .split('<-')
-    .map((part) => (/^[0-9a-f]{40}$/.test(part) ? part.slice(0, 10) : part))
-    .join(' ← ');
-}
-
 function dateOnly(value: string | null): string {
   return value ? value.slice(0, 10) : 'unknown';
 }
@@ -48,6 +43,89 @@ function ageFrom(asOf: string | null, from: string | null): number | null {
   return Math.max(0, Math.round((Date.parse(asOf) - Date.parse(from)) / 1000));
 }
 
+function count(
+  value: number,
+  singular: string,
+  plural = `${singular}s`,
+): string {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
+// --- Citations -------------------------------------------------------------------------------------
+
+const HASH = /^[0-9a-f]{40}$/;
+
+/** What the page needs to turn a cite string into a titled, linked citation. */
+type Links = {
+  web: string | null;
+  branch: string;
+  subjects: Map<string, string>;
+};
+
+function linksFor(repository: RepositoryProjection): Links {
+  const subjects = new Map<string, string>();
+  for (const change of repository.changes as {
+    id: string;
+    subject: string;
+  }[]) {
+    subjects.set(change.id, change.subject);
+  }
+  return {
+    web: repository.webUrl,
+    branch: repository.defaultBranch,
+    subjects,
+  };
+}
+
+function href(links: Links, path: string, text: string, extra = ''): string {
+  const inner = `<code>${escapeHtml(text)}</code>`;
+  return links.web === null
+    ? inner
+    : `<a class="ref"${extra} href="${escapeHtml(`${links.web}/${path}`)}">${inner}</a>`;
+}
+
+/** One cite string: a change id, `pull/<number>`, a session record path, or `<later><-<earlier>`. */
+function cite(id: string, links: Links): string {
+  return id
+    .split('<-')
+    .map((part) => citePart(part, links))
+    .join('<span class="cite-join">←</span>');
+}
+
+function citePart(part: string, links: Links): string {
+  if (HASH.test(part)) {
+    const subject = links.subjects.get(part);
+    const hash = href(links, `commit/${part}`, part.slice(0, 10));
+    return subject
+      ? `${hash} <span class="cite-title">${escapeHtml(subject)}</span>`
+      : hash;
+  }
+  const pull = /^pull\/(\d+)$/.exec(part);
+  if (pull) {
+    return href(links, `pull/${pull[1]}`, `#${pull[1]}`);
+  }
+  if (part.includes('/') && !part.includes(' ')) {
+    return href(links, `blob/${links.branch}/${part}`, part);
+  }
+  return `<code>${escapeHtml(part)}</code>`;
+}
+
+function pullRef(number: number | null, links: Links): string {
+  return number === null
+    ? `<span class="warn">out-of-band</span>`
+    : href(links, `pull/${number}`, `#${number}`);
+}
+
+function cites(label: string, ids: string[], links: Links): string {
+  if (ids.length === 0) {
+    return `<p class="cites-empty">cites: none</p>`;
+  }
+  const items = ids.map((id) => `<li>${cite(id, links)}</li>`).join('');
+  return `<details class="cites"><summary>${escapeHtml(label)}: ${ids.length}</summary><ul>${items}</ul></details>`;
+}
+
+// --- Chrome ----------------------------------------------------------------------------------------
+
 function trustBadges(trust: string[]): string {
   return trust
     .map(
@@ -57,40 +135,11 @@ function trustBadges(trust: string[]): string {
     .join(' ');
 }
 
-function cites(label: string, ids: string[]): string {
-  if (ids.length === 0) {
-    return `<p class="cites-empty">cites: none</p>`;
-  }
-  const items = ids
-    .map((id) => `<li><code>${escapeHtml(short(id))}</code></li>`)
-    .join('');
-  return `<details class="cites"><summary>${escapeHtml(label)}: ${ids.length}</summary><ul>${items}</ul></details>`;
-}
-
 function excludedNote(excluded: Record<string, number>): string {
   const parts = Object.entries(excluded)
-    .filter(([, count]) => count > 0)
-    .map(([reason, count]) => `${count} ${reason}`);
+    .filter(([, value]) => value > 0)
+    .map(([reason, value]) => `${value} ${reason}`);
   return parts.length ? `excluded: ${parts.join(', ')}` : 'excluded: none';
-}
-
-function bars(distribution: Distribution): string {
-  const rows: [string, number | null][] = [
-    ['typical', distribution.p50],
-    ['9 in 10', distribution.p90],
-    ['slowest', distribution.max],
-  ];
-  const scale = Math.max(1, ...rows.map(([, value]) => value ?? 0));
-  const height = 22;
-  const svgRows = rows
-    .map(([label, value], index) => {
-      const width =
-        value === null ? 0 : Math.max(2, Math.round((value / scale) * 220));
-      const y = index * height;
-      return `<text x="0" y="${y + 15}" class="bar-label">${label}</text><rect x="56" y="${y + 4}" width="${width}" height="14" rx="3" class="bar"></rect><text x="${60 + width}" y="${y + 15}" class="bar-value">${escapeHtml(seconds(value))}</text>`;
-    })
-    .join('');
-  return `<svg viewBox="0 0 360 ${height * rows.length}" width="100%" height="${height * rows.length}" role="img" aria-label="typical, nine in ten, and slowest">${svgRows}</svg><p class="help">Typical is the median: half the changes were faster, half slower. Nine in ten changes came in under the second bar. The third is the slowest one.</p>`;
 }
 
 function panel(
@@ -106,27 +155,153 @@ function figure(value: string, unit: string): string {
   return `<p class="figure">${value}<span class="unit">${unit}</span></p>`;
 }
 
+// --- Charts ----------------------------------------------------------------------------------------
+
+type Bar = { label: string; value: number | null; display: string };
+
+/** A horizontal bar chart with a zero line and a scale label, sized in the viewBox and fluid in width. */
+function barChart(bars: Bar[], caption: string): string {
+  const row = 24;
+  const left = 64;
+  const right = 78;
+  const width = 360;
+  const track = width - left - right;
+  const scale = Math.max(1, ...bars.map((bar) => bar.value ?? 0));
+  const scaleLabel =
+    bars.find((bar) => bar.value === scale)?.display ?? String(scale);
+  const height = row * bars.length + 14;
+  const gridlines = [0.25, 0.5, 0.75, 1]
+    .map(
+      (fraction) =>
+        `<line class="gridline" x1="${left + track * fraction}" y1="0" x2="${left + track * fraction}" y2="${row * bars.length}"></line>`,
+    )
+    .join('');
+  const rows = bars
+    .map((bar, index) => {
+      const length =
+        bar.value === null || bar.value === 0
+          ? 0
+          : Math.max(3, Math.round((bar.value / scale) * track));
+      const y = index * row;
+      return `<text x="0" y="${y + 16}" class="tick">${escapeHtml(bar.label)}</text><rect x="${left}" y="${y + 5}" width="${length}" height="14" rx="4" class="bar"></rect><text x="${left + length + 6}" y="${y + 16}" class="value">${escapeHtml(bar.display)}</text>`;
+    })
+    .join('');
+  return `<svg class="chart" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${escapeHtml(caption)}">${gridlines}<line class="axis" x1="${left}" y1="0" x2="${left}" y2="${row * bars.length}"></line>${rows}<text x="${left}" y="${height - 2}" class="tick">0</text><text x="${left + track}" y="${height - 2}" class="tick" text-anchor="end">${escapeHtml(scaleLabel)}</text></svg>`;
+}
+
+/** Columns over time: one column per bucket, a few dated ticks, no axis library. */
+function columnChart(
+  buckets: { label: string; value: number }[],
+  caption: string,
+): string {
+  const width = 360;
+  const height = 96;
+  const floor = height - 16;
+  const top = 6;
+  const scale = Math.max(1, ...buckets.map((bucket) => bucket.value));
+  const step = width / Math.max(1, buckets.length);
+  const barWidth = Math.max(1.5, Math.min(14, step - 1.5));
+  const columns = buckets
+    .map((bucket, index) => {
+      const length = Math.round(((bucket.value / scale) * (floor - top)) / 1);
+      const x = index * step + (step - barWidth) / 2;
+      return `<rect x="${x.toFixed(1)}" y="${floor - length}" width="${barWidth.toFixed(1)}" height="${Math.max(bucket.value > 0 ? 2 : 0, length)}" rx="1.5" class="bar"></rect>`;
+    })
+    .join('');
+  const ticks = [0, Math.floor(buckets.length / 2), buckets.length - 1]
+    .filter(
+      (index, position, all) => index >= 0 && all.indexOf(index) === position,
+    )
+    .map((index) => {
+      const x = index * step + step / 2;
+      const anchor =
+        index === 0 ? 'start' : index === buckets.length - 1 ? 'end' : 'middle';
+      return `<text x="${x.toFixed(1)}" y="${height - 3}" class="tick" text-anchor="${anchor}">${escapeHtml(buckets[index]?.label ?? '')}</text>`;
+    })
+    .join('');
+  return `<svg class="chart" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${escapeHtml(caption)}"><line class="axis" x1="0" y1="${floor}" x2="${width}" y2="${floor}"></line>${columns}${ticks}</svg>`;
+}
+
+/** Insertions above the line, deletions below it, one column per change, newest last. */
+function diffChart(
+  changes: { insertions: number; deletions: number }[],
+  caption: string,
+): string {
+  const width = 360;
+  const height = 92;
+  const middle = height / 2;
+  const scale = Math.max(
+    1,
+    ...changes.map((change) => Math.max(change.insertions, change.deletions)),
+  );
+  const step = width / Math.max(1, changes.length);
+  const barWidth = Math.max(2, Math.min(16, step - 2));
+  const columns = changes
+    .map((change, index) => {
+      const x = index * step + (step - barWidth) / 2;
+      const up = Math.round((change.insertions / scale) * (middle - 12));
+      const down = Math.round((change.deletions / scale) * (middle - 12));
+      return `<rect x="${x.toFixed(1)}" y="${middle - up}" width="${barWidth.toFixed(1)}" height="${Math.max(change.insertions > 0 ? 2 : 0, up)}" rx="1.5" class="bar"></rect><rect x="${x.toFixed(1)}" y="${middle}" width="${barWidth.toFixed(1)}" height="${Math.max(change.deletions > 0 ? 2 : 0, down)}" rx="1.5" class="bar bar-alt"></rect>`;
+    })
+    .join('');
+  return `<svg class="chart" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${escapeHtml(caption)}"><line class="axis" x1="0" y1="${middle}" x2="${width}" y2="${middle}"></line>${columns}</svg>`;
+}
+
+/** A proportion of the largest value in a column, drawn behind the number with no extra element. */
+function meter(value: number, largest: number): string {
+  const percent = largest > 0 ? Math.round((value / largest) * 100) : 0;
+  return `<span class="meter"><span class="meter-fill" style="width:${percent}%"></span></span>`;
+}
+
 function distributionPanel(
   title: string,
   distribution: Distribution,
   help: string,
+  links: Links,
 ): string {
-  const meta = `${trustBadges(distribution.trust)} over ${distribution.count} changes · ${escapeHtml(excludedNote(distribution.excluded))}`;
-  const body =
-    distribution.count === 0
-      ? `<p class="empty">No change with a pull head ref yet, so nothing to time.</p>`
-      : `${bars(distribution)}<p class="help">${escapeHtml(help)}</p>${cites('changes', distribution.cites)}`;
+  const meta = `${trustBadges(distribution.trust)} over ${count(distribution.count, 'change')} · ${escapeHtml(excludedNote(distribution.excluded))}`;
+  if (distribution.count === 0) {
+    return panel(
+      title,
+      `<p class="empty">No change with a pull head ref yet, so nothing to time.</p>`,
+      meta,
+    );
+  }
+  const bars: Bar[] = [
+    {
+      label: 'typical',
+      value: distribution.p50,
+      display: seconds(distribution.p50),
+    },
+    {
+      label: '9 in 10',
+      value: distribution.p90,
+      display: seconds(distribution.p90),
+    },
+    {
+      label: 'slowest',
+      value: distribution.max,
+      display: seconds(distribution.max),
+    },
+  ];
+  const body = `${figure(seconds(distribution.p50), 'typical')}${barChart(bars, 'typical, nine in ten, and slowest')}<p class="help">Typical is the median: half the changes were faster, half slower. Nine in ten changes came in under the second bar. The third is the slowest one. ${escapeHtml(help)}</p>${cites('changes', distribution.cites, links)}`;
   return panel(title, body, meta);
 }
 
-function spendRow(label: string, spend: Spend): string {
-  return `<tr><td>${escapeHtml(label)}</td><td class="num">$${spend.costUsd.toFixed(2)}</td><td class="num">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')}</td><td class="num">${spend.cachedTokens.toLocaleString('en-US')}</td><td class="num">${spend.sessions}</td><td>${cites('records', spend.cites)}</td></tr>`;
+function spendRow(
+  label: string,
+  spend: Spend,
+  largest: number,
+  links: Links,
+): string {
+  return `<tr><td>${escapeHtml(label)}</td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')}</td><td class="num">${spend.cachedTokens.toLocaleString('en-US')}</td><td class="num">${spend.sessions}</td><td>${cites('records', spend.cites, links)}</td></tr>`;
 }
 
 function spendTable(
   title: string,
   rows: Record<string, Spend>,
   missingFigures: number,
+  links: Links,
 ): string {
   const entries = Object.entries(rows);
   const key = title.replace('Spend by ', '');
@@ -138,9 +313,10 @@ function spendTable(
         : 'No session records with figures.';
     return panel(title, `<p class="empty">${escapeHtml(note)}</p>`, meta);
   }
-  const body = entries
-    .sort(([, a], [, b]) => b.costUsd - a.costUsd)
-    .map(([label, spend]) => spendRow(label, spend))
+  const sorted = entries.sort(([, a], [, b]) => b.costUsd - a.costUsd);
+  const largest = sorted[0][1].costUsd;
+  const body = sorted
+    .map(([label, spend]) => spendRow(label, spend, largest, links))
     .join('');
   return panel(
     title,
@@ -171,14 +347,10 @@ type ChangeRow = {
   files: number;
 };
 
-function changesTable(changes: ChangeRow[]): string {
+function changesTable(changes: ChangeRow[], links: Links): string {
   const recent = [...changes].reverse().slice(0, 15);
   const rows = recent
     .map((change) => {
-      const pull =
-        change.association.pullRequest === null
-          ? `<span class="warn">out-of-band</span>`
-          : `#${change.association.pullRequest} <span class="dim">${escapeHtml(change.association.method ?? '')}</span>`;
       const sessions =
         change.sessions.status === 'declared'
           ? change.sessions.sessions.length
@@ -188,18 +360,51 @@ function changesTable(changes: ChangeRow[]): string {
       const gaps = change.gaps
         .map((gap) => `<span class="gap">${escapeHtml(gap.type)}</span>`)
         .join(' ');
-      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject" title="${escapeHtml(change.id)}">${escapeHtml(change.subject)}</td><td>${pull}</td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num">+${change.insertions} −${change.deletions}</td><td>${sessions}</td><td>${gaps || '<span class="dim">none</span>'}</td></tr>`;
+      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject">${href(links, `commit/${change.id}`, change.id.slice(0, 10))} <span class="cite-title">${escapeHtml(change.subject)}</span></td><td>${pullRef(change.association.pullRequest, links)} <span class="dim">${escapeHtml(change.association.method ?? '')}</span></td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num nowrap"><span class="added">+${change.insertions}</span> <span class="removed">−${change.deletions}</span></td><td>${sessions}</td><td>${gaps || '<span class="dim">none</span>'}</td></tr>`;
     })
     .join('');
   return panel(
     'Recent changes',
-    `<div class="scroll"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">lines</th><th>sessions</th><th>gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    `<div class="scroll tall"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">lines</th><th>sessions</th><th>gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
     `${trustBadges(['observed'])} the newest ${recent.length} of ${changes.length} changes on the default branch; wait and cycle come from the pull head ref, sessions from the harness`,
     'span-all',
   );
 }
 
-function topFiles(pairs: { files: string[] }[], limit = 8): string {
+/** One column per day between the first and last merge, or per week when that is more than 60 columns. */
+function mergeActivity(changes: ChangeRow[]): string {
+  const days = changes
+    .map((change) => dateOnly(change.mergeTime))
+    .filter((day) => day !== 'unknown')
+    .sort();
+  if (days.length === 0) {
+    return '';
+  }
+  const start = Date.parse(`${days[0]}T00:00:00Z`);
+  const end = Date.parse(`${days[days.length - 1]}T00:00:00Z`);
+  const span = Math.round((end - start) / 86_400_000) + 1;
+  const perBucket = span > 60 ? 7 : 1;
+  const bucketCount = Math.ceil(span / perBucket);
+  const buckets = Array.from({ length: bucketCount }, (unused, index) => ({
+    label: new Date(start + index * perBucket * 86_400_000)
+      .toISOString()
+      .slice(5, 10),
+    value: 0,
+  }));
+  for (const day of days) {
+    const offset = Math.round(
+      (Date.parse(`${day}T00:00:00Z`) - start) / 86_400_000,
+    );
+    buckets[Math.floor(offset / perBucket)].value += 1;
+  }
+  const period = perBucket === 1 ? 'day' : 'week';
+  const peak = Math.max(...buckets.map((bucket) => bucket.value));
+  return `${columnChart(buckets, 'changes merged over the measured window')}<p class="help">${escapeHtml(
+    `One column per ${period} from ${days[0]} to ${days[days.length - 1]}; busiest ${period}, ${count(peak, 'change')}.`,
+  )}</p>`;
+}
+
+function topFiles(pairs: { files: string[] }[], limit = 6): string {
   const counts = new Map<string, number>();
   for (const pair of pairs) {
     for (const file of pair.files) {
@@ -210,17 +415,30 @@ function topFiles(pairs: { files: string[] }[], limit = 8): string {
   if (top.length === 0) {
     return '';
   }
-  return `<ul class="list">${top.map(([file, count]) => `<li><code>${escapeHtml(file)}</code> <span class="dim">in ${count} pairs</span></li>`).join('')}</ul>`;
+  const largest = top[0][1];
+  return `<ul class="list ranked">${top
+    .map(
+      ([file, value]) =>
+        `<li>${meter(value, largest)}<code>${escapeHtml(file)}</code> <span class="dim">${escapeHtml(`in ${count(value, 'pair')}`)}</span></li>`,
+    )
+    .join('')}</ul>`;
 }
 
 export function renderRepositoryHtml(repository: RepositoryProjection): string {
-  const heading = `<h2 id="${escapeHtml(repository.name)}">${escapeHtml(repository.name)} <small>${escapeHtml(repository.defaultBranch)}</small></h2>`;
+  const links = linksFor(repository);
+  const home =
+    repository.webUrl === null
+      ? ''
+      : ` <a class="ref home" href="${escapeHtml(repository.webUrl)}">${escapeHtml(repository.webUrl.replace(/^https:\/\//, ''))}</a>`;
+  const label = `${escapeHtml(repository.name)}-heading`;
+  const heading = `<h2 id="${escapeHtml(repository.name)}"><span id="${label}">${escapeHtml(repository.name)}</span> <span class="branch">${escapeHtml(repository.defaultBranch)}</span>${home}</h2>`;
+  const open = `<section class="repository" aria-labelledby="${label}">`;
   if (!repository.reachable) {
-    return `<section class="repository">${heading}<p class="warn">Unreachable: ${escapeHtml(repository.reason ?? 'unknown reason')}</p></section>`;
+    return `${open}${heading}<p class="warn">Unreachable: ${escapeHtml(repository.reason ?? 'unknown reason')}</p></section>`;
   }
   const signals = repository.signals!;
   if (repository.changes.length === 0) {
-    return `<section class="repository">${heading}<p class="empty">No changes on the default branch yet. Merge a pull request through the hooks, then sync and rebuild.</p></section>`;
+    return `${open}${heading}<p class="empty">No changes on the default branch yet. Merge a pull request through the hooks, then sync and rebuild.</p></section>`;
   }
   const changes = repository.changes as unknown as ChangeRow[];
   const outOfBand = changes.filter(
@@ -237,70 +455,80 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
   ]
     .map(
       ([label, value, trust]) =>
-        `<div class="stat"><span class="stat-value">${escapeHtml(value)}</span><span class="stat-label">${escapeHtml(label)} ${trustBadges([trust])}</span></div>`,
+        `<div class="stat"><dt class="stat-label">${escapeHtml(label)} ${trustBadges([trust])}</dt><dd class="stat-value">${escapeHtml(value)}</dd></div>`,
     )
     .join('');
   const signalPanels = signals.signals
     .map(
       (signal) =>
-        `<section class="panel signal"><h3>Signal: ${escapeHtml(signal.signal)}</h3><p class="meta">observed ${escapeHtml(seconds(signal.observed))} over the registry threshold of ${escapeHtml(seconds(signal.threshold))}</p>${cites('changes', signal.cites)}</section>`,
+        `<section class="panel signal"><h3>Signal: ${escapeHtml(signal.signal)}</h3><p class="meta">observed ${escapeHtml(seconds(signal.observed))} over the registry threshold of ${escapeHtml(seconds(signal.threshold))}</p>${cites('changes', signal.cites, links)}</section>`,
     )
     .join('');
-  const queueRows = [...signals.queue.pullRequests]
+  const queueEntries = [...signals.queue.pullRequests]
     .map((entry) => ({
       ...entry,
       age: ageFrom(repository.asOf, entry.oldestCommitAt),
     }))
-    .sort((a, b) => (b.age ?? -1) - (a.age ?? -1))
+    .sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
+  const queueChart = queueEntries.length
+    ? barChart(
+        queueEntries.slice(0, 8).map((entry) => ({
+          label: `#${entry.number}`,
+          value: entry.age,
+          display: seconds(entry.age),
+        })),
+        'age of each unmerged pull request',
+      )
+    : '';
+  const queueRows = queueEntries
     .map(
       (entry) =>
-        `<tr><td><code>#${entry.number}</code></td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td></tr>`,
+        `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td></tr>`,
     )
     .join('');
   const excludedLine = `${excluded.undeclared} undeclared, ${excluded.unreported} unreported, ${excluded.humanOnly} human-only, ${excluded.invalidSession} invalid, ${excluded.missingFigures} with figures missing`;
   const effortRows = Object.values(signals.spend.perEffortUnit)
     .map(
       (unit) =>
-        `<tr><td>${escapeHtml(unit.unit)}</td><td class="num">${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)}</td><td class="num">${unit.changes}</td><td class="num">${unit.excluded}</td><td>${cites('changes', unit.cites)}</td></tr>`,
+        `<tr><td>${escapeHtml(unit.unit)}</td><td class="num">${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)}</td><td class="num">${unit.changes}</td><td class="num">${unit.excluded}</td><td>${cites('changes', unit.cites, links)}</td></tr>`,
     )
     .join('');
   const checks = Object.entries(signals.localChecks)
-    .map(([outcome, count]) => `${count} ${escapeHtml(outcome)}`)
+    .map(([outcome, value]) => `${value} ${escapeHtml(outcome)}`)
     .join(', ');
-  return `<section class="repository">${heading}
+  const recentDiffs = [...changes].slice(-24);
+  return `${open}${heading}
 <p class="asof">Measured as of ${escapeHtml(dateOnly(repository.asOf))}, the newest commit the mirror holds. Merge times are the merging party's clock.</p>
-<div class="stats">${summary}</div>
+<dl class="stats">${summary}</dl>
 ${signalPanels}
 <div class="grid">
-${distributionPanel('Wait time', signals.waitTime, 'From the last commit on the pull request to the merge: how long finished work sat.')}
-${distributionPanel('Cycle time', signals.cycleTime, 'From the first commit on the pull request to the merge.')}
+${panel(
+  'Merge frequency',
+  `${figure(String(signals.mergeFrequency.perDay ?? 'n/a'), `merges per day over ${signals.mergeFrequency.days ?? 'n/a'} days, ${count(signals.mergeFrequency.changes, 'change')}`)}${mergeActivity(changes)}`,
+  trustBadges(signals.mergeFrequency.trust),
+)}
+${distributionPanel('Wait time', signals.waitTime, 'From the last commit on the pull request to the merge: how long finished work sat.', links)}
+${distributionPanel('Cycle time', signals.cycleTime, 'From the first commit on the pull request to the merge.', links)}
+${panel(
+  'Batch size',
+  `${figure(String(signals.batchSize.medianLines ?? 'n/a'), `median lines changed; ${signals.batchSize.medianFiles ?? 'n/a'} files and ${signals.batchSize.medianCommits ?? 'n/a'} commits per change`)}${diffChart(recentDiffs, 'lines added and removed per recent change')}<p class="help"><span class="added">added</span> above the line, <span class="removed">removed</span> below it: ${escapeHtml(`one column per change, oldest first, over the newest ${recentDiffs.length}; largest ${Math.max(0, ...recentDiffs.map((change) => Math.max(change.insertions, change.deletions))).toLocaleString('en-US')} lines.`)}</p>${cites('changes', signals.batchSize.cites, links)}`,
+  `${trustBadges(['observed'])} over ${count(signals.batchSize.count, 'change')}`,
+)}
 ${panel(
   'Unmerged queue',
-  `${figure(String(signals.queue.count), `pull requests, oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`)}${
+  `${figure(String(signals.queue.count), `pull requests, oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`)}${queueChart}${
     queueRows
-      ? `<div class="scroll"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th>oldest commit</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
+      ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th>oldest commit</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
       : '<p class="empty">Nothing waiting.</p>'
   }`,
   `${trustBadges(signals.queue.trust)} ${escapeHtml(signals.queue.note)}`,
-)}
-${panel(
-  'Batch size',
-  `${figure(String(signals.batchSize.medianLines ?? 'n/a'), `median lines changed; ${signals.batchSize.medianFiles ?? 'n/a'} files and ${signals.batchSize.medianCommits ?? 'n/a'} commits per change`)}${cites('changes', signals.batchSize.cites)}`,
-  `${trustBadges(['observed'])} over ${signals.batchSize.count} changes`,
-)}
-${panel(
-  'Merge frequency',
-  figure(
-    String(signals.mergeFrequency.perDay ?? 'n/a'),
-    `per day over ${signals.mergeFrequency.days ?? 'n/a'} days, ${signals.mergeFrequency.changes} changes`,
-  ),
-  trustBadges(signals.mergeFrequency.trust),
 )}
 ${panel(
   'Rework',
   `${figure(String(signals.rework.pairs.length), `pairs of changes touching the same file within ${signals.rework.windowDays} days`)}${topFiles(signals.rework.pairs)}${cites(
     'pairs',
     signals.rework.pairs.map((pair) => `${pair.later}<-${pair.earlier}`),
+    links,
   )}`,
   `${trustBadges(['observed'])} most-touched files first`,
 )}
@@ -309,13 +537,14 @@ ${panel(
   `${figure(String(signals.escapes.changes.length), `reverts or fixes after ${escapeHtml(signals.escapes.release ?? 'no release')} touching released files`)}${cites(
     'changes',
     signals.escapes.changes.map((entry) => entry.change),
+    links,
   )}`,
   trustBadges(['observed']),
 )}
 ${panel('Local checks', figure(checks || 'none', checks ? 'session records with a check outcome' : 'no session recorded a check outcome yet'), `${trustBadges(['reported'])} from session records`)}
 ${panel(
   'Spend',
-  `${figure(`$${signals.spend.total.costUsd.toFixed(2)}`, `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens over ${signals.spend.total.sessions} sessions with figures`)}${cites('records', signals.spend.total.cites)}`,
+  `${figure(`$${signals.spend.total.costUsd.toFixed(2)}`, `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens over ${signals.spend.total.sessions} sessions with figures`)}${cites('records', signals.spend.total.cites, links)}`,
   `${trustBadges(signals.spend.trust)} excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
 )}
 ${panel(
@@ -323,15 +552,16 @@ ${panel(
   `${figure(String(outOfBand.length), `out-of-band changes of ${changes.length}; ${repository.unreleased.length} unreleased${repository.movedTags.length ? `; moved tags: ${escapeHtml((repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', '))}` : ''}`)}${cites(
     'out-of-band',
     outOfBand.map((change) => change.id),
+    links,
   )}`,
   trustBadges(['observed']),
 )}
 </div>
-${changesTable(changes)}
+${changesTable(changes, links)}
 <div class="grid wide">
-${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures)}
-${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures)}
-${spendTable('Spend by model', signals.spend.byModel, excluded.missingFigures)}
+${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, links)}
+${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links)}
+${spendTable('Spend by model', signals.spend.byModel, excluded.missingFigures, links)}
 ${panel(
   'Cost per unit of effort',
   effortRows
@@ -343,7 +573,7 @@ ${
   signals.spend.unmergedPullRequests.sessions > 0
     ? panel(
         'Spend on unmerged pull requests',
-        `${figure(`$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`, `over ${signals.spend.unmergedPullRequests.sessions} sessions`)}${cites('records', signals.spend.unmergedPullRequests.cites)}`,
+        `${figure(`$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`, `over ${count(signals.spend.unmergedPullRequests.sessions, 'session')}`)}${cites('records', signals.spend.unmergedPullRequests.cites, links)}`,
         trustBadges(['reported']),
       )
     : ''
@@ -353,46 +583,190 @@ ${
 }
 
 const STYLE = `
-:root { color-scheme: light dark; --bg: #f6f6f3; --panel: #ffffff; --ink: #1c1c1a; --muted: #62625c; --line: #e1e1db; --accent: #2f6f9f; --observed: #2f6f9f; --reported: #9f6f2f; --signal: #b23a3a; --gap: #fff1e0; --gap-ink: #7a4a10; }
-@media (prefers-color-scheme: dark) { :root { --bg: #141513; --panel: #1e1f1c; --ink: #ecebe6; --muted: #a6a59e; --line: #32332e; --accent: #7fb3d9; --observed: #7fb3d9; --reported: #d9b37f; --signal: #e08080; --gap: #3a2a12; --gap-ink: #e8c48a; } }
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f3; --bg-accent: #e9ece7; --panel: #ffffff; --ink: #16181a; --muted: #5f6368;
+  --line: #e0e2dd; --line-strong: #cbcec8; --accent: #2f6f9f; --accent-soft: #d8e6f1;
+  --observed: #2f6f9f; --reported: #92611d; --signal: #b23a3a; --added: #2f7d4f; --removed: #a2453f;
+  --gap: #fdf0df; --gap-ink: #7a4a10;
+  --shadow: 0 1px 2px rgba(16, 20, 24, 0.05), 0 10px 24px -16px rgba(16, 20, 24, 0.24);
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 36px;
+  --radius: 12px;
+  --gutter: clamp(16px, 4vw, 34px);
+  --title: clamp(22px, 1.1vw + 19px, 28px);
+  --figure: clamp(23px, 0.9vw + 20px, 28px);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111312; --bg-accent: #1a1d1b; --panel: #1d201e; --ink: #ecece7; --muted: #a2a49d;
+    --line: #2e322f; --line-strong: #3d423e; --accent: #7fb3d9; --accent-soft: #24384b;
+    --observed: #7fb3d9; --reported: #d9b37f; --signal: #e58a8a; --added: #7fc79b; --removed: #e08d87;
+    --gap: #3a2a12; --gap-ink: #e8c48a; --shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+}
 * { box-sizing: border-box; }
-body { margin: 0; padding: 20px 16px 32px; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header { margin-bottom: 8px; }
-h1 { font-size: 24px; margin: 0 0 4px; }
-h2 { font-size: 20px; margin: 36px 0 4px; border-top: 1px solid var(--line); padding-top: 20px; }
-h2 small { color: var(--muted); font-weight: normal; font-size: 13px; }
-h3 { font-size: 12px; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+body {
+  margin: 0; padding: 0 0 var(--s6); background: var(--bg); color: var(--ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+.wrap { max-width: 1320px; margin: 0 auto; padding-inline: var(--gutter); }
+header.band {
+  background: var(--bg-accent); border-bottom: 1px solid var(--line);
+  padding-block: var(--s5) var(--s4); margin-bottom: var(--s5);
+}
+h1 { font-size: var(--title); letter-spacing: -0.02em; margin: 0 0 var(--s1); text-wrap: balance; }
+h1 .dot { color: var(--accent); }
+h2 {
+  position: sticky; top: 0; z-index: 3; background: var(--bg);
+  font-size: 19px; letter-spacing: -0.015em; margin: var(--s6) 0 var(--s1);
+  border-top: 1px solid var(--line); padding-block: var(--s4) var(--s2);
+  display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap;
+}
+main > .repository:first-child h2 { margin-top: 0; border-top: 0; padding-top: 0; }
+h3 {
+  font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); font-weight: 600;
+}
+.branch {
+  font-size: 11px; font-weight: 500; color: var(--muted); border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: 1px 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .asof, .meta, .cites-empty, .empty, .help, .dim { color: var(--muted); font-size: 12px; }
-.help { margin: 4px 0 0; }
-.warn { color: var(--signal); }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 12px 0 16px; }
-.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
-.stat-value { display: block; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.stat-label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
-.grid.wide { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); }
-@media (max-width: 720px) { .grid, .grid.wide { grid-template-columns: 1fr; } }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; min-width: 0; overflow: hidden; }
-.panel.signal { border-color: var(--signal); margin-top: 12px; }
-.panel.span-all { margin-top: 12px; }
-.figure { font-size: 26px; margin: 4px 0; font-variant-numeric: tabular-nums; }
-.figure .unit { display: block; font-size: 12px; color: var(--muted); font-weight: normal; }
-.badge { display: inline-block; padding: 0 6px; border-radius: 10px; font-size: 10px; border: 1px solid currentColor; vertical-align: middle; text-transform: none; letter-spacing: 0; }
+.asof, .help, .empty { text-wrap: pretty; }
+.asof { margin: 0 0 var(--s4); max-width: 68ch; }
+.meta, .help, .cites-empty { margin: 0; }
+.warn { color: var(--signal); font-weight: 500; }
+.nav { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); margin-top: var(--s3); }
+.nav a {
+  color: var(--ink); text-decoration: none; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 12px; font-size: 12px;
+}
+.nav a:hover { border-color: var(--accent); color: var(--accent); }
+.stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+  gap: var(--s2); margin: 0 0 var(--s4);
+}
+.stat {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--s3) var(--s4); box-shadow: var(--shadow); margin: 0;
+  display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: var(--s1);
+}
+.stat-value {
+  font-size: var(--figure); font-weight: 600; letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums; line-height: 1.15; margin: 0;
+}
+.stat-label {
+  font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: var(--s1); flex-wrap: wrap;
+}
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(310px, 100%), 1fr));
+  gap: var(--s3); margin-top: var(--s3); align-items: start;
+}
+.grid.wide { grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); }
+@media (max-width: 720px) {
+  .grid, .grid.wide { grid-template-columns: 1fr; }
+  h2 { position: static; }
+}
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--s4); min-width: 0; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: var(--s2); container-type: inline-size;
+}
+.panel.signal { border-color: var(--signal); border-left-width: 3px; margin-top: var(--s3); }
+.panel.span-all { margin-top: var(--s3); }
+@container (max-width: 330px) {
+  .meter { display: none; }
+  .figure { font-size: 22px; }
+}
+.figure {
+  font-size: var(--figure); margin: 0; font-weight: 600; letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.figure .unit {
+  display: block; font-size: 12px; color: var(--muted); font-weight: 400; letter-spacing: 0;
+  margin-top: var(--s1); line-height: 1.45; text-wrap: pretty;
+}
+.badge {
+  display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 500;
+  border: 1px solid currentColor; vertical-align: middle; text-transform: none; letter-spacing: 0;
+  white-space: nowrap;
+}
 .badge-observed { color: var(--observed); }
 .badge-reported { color: var(--reported); }
-.gap { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px; background: var(--gap); color: var(--gap-ink); }
+.gap {
+  display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px;
+  background: var(--gap); color: var(--gap-ink);
+}
+.added { color: var(--added); }
+.removed { color: var(--removed); }
+.chart { display: block; overflow: visible; }
 .bar { fill: var(--accent); }
-.bar-label, .bar-value { font-size: 11px; fill: var(--ink); }
-.scroll { overflow-x: auto; }
+.bar-alt { fill: var(--removed); }
+line.gridline { stroke: var(--line); stroke-width: 1; }
+line.axis { stroke: var(--line-strong); stroke-width: 1; }
+text.tick { font-size: 10px; fill: var(--muted); }
+text.value { font-size: 11px; fill: var(--ink); font-weight: 500; }
+.meter {
+  display: inline-block; width: 44px; height: 6px; border-radius: 999px; background: var(--accent-soft);
+  margin-right: var(--s2); vertical-align: middle; overflow: hidden; flex: none;
+}
+.meter-fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.scroll { overflow: auto; scrollbar-width: thin; overscroll-behavior: contain; }
+.scroll.tall { max-height: min(460px, 70vh); }
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
-td.subject { white-space: normal; min-width: 220px; }
+thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--panel);
+  text-align: left; font-weight: 600; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.06em; font-size: 10px; box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+th, td { padding: 6px var(--s2) 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+thead th { border-bottom: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--bg-accent); }
+td.subject { white-space: normal; min-width: 240px; text-wrap: pretty; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.nowrap { white-space: nowrap; }
 td.mono, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+a.ref { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+a.ref:hover { border-bottom-color: var(--accent); }
+a.home { font-size: 12px; font-weight: 400; }
+a:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
+.cite-title { color: var(--ink); }
+.cite-join { color: var(--muted); padding: 0 6px; }
 details.cites summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-details.cites ul { margin: 4px 0 0; padding-left: 18px; max-height: 160px; overflow: auto; font-size: 12px; }
-ul.list { margin: 6px 0 0; padding-left: 18px; font-size: 12px; }
-footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+details.cites summary:hover { color: var(--accent); }
+details.cites ul {
+  margin: var(--s2) 0 0; padding-left: var(--s4); max-height: 200px; overflow: auto;
+  font-size: 12px; scrollbar-width: thin; overscroll-behavior: contain;
+  content-visibility: auto; contain-intrinsic-size: auto 200px;
+}
+details.cites li { margin-bottom: 3px; text-wrap: pretty; }
+ul.list { margin: 0; padding-left: var(--s4); font-size: 12px; }
+ul.list.ranked { list-style: none; padding-left: 0; display: flex; flex-direction: column; gap: var(--s1); }
+ul.list.ranked li { display: flex; align-items: center; min-width: 0; }
+ul.list.ranked code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ul.list.ranked .dim { white-space: nowrap; padding-left: var(--s1); }
+.repository { content-visibility: auto; contain-intrinsic-size: auto 1400px; }
+footer {
+  margin-top: var(--s6); padding-top: var(--s4); border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 12px; max-width: 78ch; text-wrap: pretty;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+  a.ref, .nav a, details.cites summary { transition: color 120ms ease, border-color 120ms ease; }
+}
+@media print {
+  body { background: #fff; padding: 0; }
+  h2 { position: static; }
+  .panel, .stat { box-shadow: none; break-inside: avoid; }
+  .repository { content-visibility: visible; }
+  .scroll, .scroll.tall, details.cites ul { max-height: none; overflow: visible; }
+  details.cites > ul { display: block; }
+}
 `;
 
 export function renderBoardHtml(projection: Projection | null): string {
@@ -409,7 +783,7 @@ export function renderBoardHtml(projection: Projection | null): string {
       (repository) =>
         `<a href="#${escapeHtml(repository.name)}">${escapeHtml(repository.name)}</a>`,
     )
-    .join(' · ');
+    .join('');
   const versions = projection
     ? `projection schema ${projection.schemaVersion}, session schema ${projection.sessionSchemaVersion}, registry schema ${projection.registrySchemaVersion}`
     : 'no projection';
@@ -422,13 +796,15 @@ export function renderBoardHtml(projection: Projection | null): string {
 <style>${STYLE}</style>
 </head>
 <body>
-<header>
-<h1>The Board</h1>
-<p class="meta">${escapeHtml(versions)} · ${repositories.length} repositories registered, ${unreachable.length} unreachable${unreachable.length ? ' (' + escapeHtml(unreachable.map((r) => r.name).join(', ')) + ')' : ''}</p>
-<p class="meta">${nav}</p>
-</header>
+<header class="band"><div class="wrap">
+<h1>The Board<span class="dot">.</span></h1>
+<p class="meta">${escapeHtml(versions)} · ${count(repositories.length, 'repository', 'repositories')} registered, ${unreachable.length} unreachable${unreachable.length ? ' (' + escapeHtml(unreachable.map((repository) => repository.name).join(', ')) + ')' : ''}</p>
+${nav ? `<nav class="nav">${nav}</nav>` : ''}
+</div></header>
+<main class="wrap">
 ${body}
 <footer>Every figure names the trust classes it was computed from and the changes or records behind it. Nothing here is keyed to a person. Reviews, checks, and platform timestamps are not observed; see docs/methodology.md.</footer>
+</main>
 </body>
 </html>
 `;

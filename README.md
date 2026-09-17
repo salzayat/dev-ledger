@@ -66,7 +66,9 @@ Per repository and across the registry: cycle time and wait time (from the pull 
 squash does not erase them), the unmerged queue and its age, batch size, merge frequency, rework, escapes
 after the newest release, local check outcomes, spend by spec, provider, model, and per unit of effort,
 with every figure naming its trust classes, its excluded count, and the changes behind it. The dashboard is one
-self-contained HTML page with no script and no external resource, readable from a file URL, in light and dark. Undeclared and
+self-contained HTML page with inline SVG charts, no script, and no loaded resource, readable from a file URL, in light and
+dark. Every cited commit shows the change's subject beside its abbreviated hash and links to the commit on GitHub when the
+registry URL is a GitHub remote; with any other remote the same citations render unlinked. Undeclared and
 unreported changes are counted, never read as zero. Nothing is keyed to a person.
 [`docs/methodology.md`](docs/methodology.md) explains each figure.
 
@@ -84,6 +86,7 @@ repository turns it on, every control that needs them reads as not observable.
 | `./scripts/telemetry.sh sync`              | Mirror-fetch every registered repository over SSH.                                                                |
 | `./scripts/telemetry.sh rebuild`           | Rebuild the projection and print its content hash.                                                                |
 | `./scripts/telemetry.sh board`             | Render The Board from the projection.                                                                             |
+| `./scripts/telemetry.sh board --html`      | Write the dashboard to `.telemetry/board.html` and print its path.                                                |
 | `./scripts/telemetry.sh cursor <consumer>` | Replay changes since the consumer's cursor and advance it.                                                        |
 | `./scripts/telemetry.sh validate`          | Validate session files against the schema.                                                                        |
 | `./scripts/telemetry.sh session`           | Record a session start, or write and commit a session file at session end.                                        |
