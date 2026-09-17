@@ -53,3 +53,8 @@ Thumbs.db
 .claude/settings.local.json
 
 .nx/polygraph
+
+# Telemetry state: mirrors, the projection, and cursors are rebuilt, never tracked
+.telemetry/mirrors
+.telemetry/projection.json
+.telemetry/cursors

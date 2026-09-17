@@ -11,4 +11,11 @@ if [ "$current_branch" = "main" ]; then
   exit 1
 fi
 
+# Session files must satisfy the schema before they are committed with the work.
+staged_sessions=$(git diff --cached --name-only --diff-filter=ACMR -- .telemetry/sessions | grep '\.json$' || true)
+if [ -n "$staged_sessions" ] && [ -d node_modules ]; then
+  # shellcheck disable=SC2086
+  ./scripts/telemetry.sh validate $staged_sessions
+fi
+
 ./scripts/check.sh

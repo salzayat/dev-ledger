@@ -1,0 +1,40 @@
+#!/bin/sh
+# Writes the Spec:, Session:, Change:, effort, and Cost-Class: trailers onto every commit made through the
+# hooks, from values kept in branch-local git configuration. Skipped for merge and squash messages, which
+# carry the platform's own message. Skipping this hook surfaces later as an undeclared session.
+set -eu
+
+message_file=$1
+source=${2:-}
+
+case "$source" in
+  merge | squash) exit 0 ;;
+esac
+
+branch=$(git branch --show-current 2>/dev/null || true)
+[ -n "$branch" ] || exit 0
+
+config() {
+  git config --get "branch.$branch.$1" 2>/dev/null || true
+}
+
+spec=$(config telemetry-spec)
+change=$(config telemetry-change)
+story_points=$(config telemetry-story-points)
+work_hours=$(config telemetry-work-hours)
+cost_class=$(config telemetry-cost-class)
+session=$(git config --get telemetry.session 2>/dev/null || true)
+[ -n "$session" ] || session=none
+
+if [ -z "$change" ]; then
+  change="c-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
+  git config "branch.$branch.telemetry-change" "$change"
+fi
+
+set -- --trailer "Session: $session" --trailer "Change: $change"
+[ -n "$spec" ] && set -- --trailer "Spec: $spec" "$@"
+[ -n "$story_points" ] && set -- "$@" --trailer "Story-Points: $story_points"
+[ -n "$work_hours" ] && set -- "$@" --trailer "Work-Hours: $work_hours"
+[ -n "$cost_class" ] && set -- "$@" --trailer "Cost-Class: $cost_class"
+
+git interpret-trailers --in-place --if-exists doNothing "$@" "$message_file"

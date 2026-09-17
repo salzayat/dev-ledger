@@ -1,14 +1,11 @@
 {
-  "name": "@dev-ledger/greeter",
-  "version": "0.0.0",
+  "name": "@dev-ledger/capture",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": {
       "@dev-ledger/source": "./src/index.ts"
     }
-  },
-  "dependencies": {
-    "@dev-ledger/hello": "*"
   }
 }

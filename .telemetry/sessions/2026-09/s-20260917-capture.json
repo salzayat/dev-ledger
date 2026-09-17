@@ -1,0 +1,27 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "capture/telemetry-capture",
+  "cachedTokens": 0,
+  "commits": [
+    "c16bbb329260dd8a4a2dfa446112e712fb7645d3"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-17T20:18:30Z",
+  "figuresMissing": true,
+  "figuresSource": "agent session; the harness did not expose token or cost figures",
+  "inputTokens": 0,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 0,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260917-capture",
+  "spec": "add-flow-observability",
+  "startedAt": "2026-09-17T19:45:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 2010
+}

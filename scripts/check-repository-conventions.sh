@@ -8,23 +8,20 @@ fail() {
 
 [ -f docs/dependency-patterns.md ] || fail "Missing dependency pattern documentation"
 [ -f plans/roadmap.md ] || fail "Missing roadmap"
-[ -f packages/hello/src/index.ts ] || fail "Missing current example implementation"
-[ -f packages/hello/src/index.test.ts ] || fail "Missing current example test"
+[ -f packages/capture/src/index.ts ] || fail "Missing capture package implementation"
+[ -f packages/capture/src/capture.test.ts ] || fail "Missing capture package test"
+[ -f telemetry.config.json ] || fail "Missing telemetry.config.json"
+[ -x scripts/telemetry.sh ] || fail "Missing executable scripts/telemetry.sh"
+for hook in prepare-commit-msg commit-msg pre-commit pre-push; do
+  [ -x ".githooks/$hook" ] || fail "Missing executable .githooks/$hook"
+done
 
 grep -q '^## OpenSpec Dependencies$' docs/dependency-patterns.md \
   || fail "Dependency documentation must define the OpenSpec dependency convention"
 
-# TEMPLATE.md tells a fork owner to replace packages/hello's implementation and test, removing the
-# TEMPLATE:REPLACE marker in the process. This check must tolerate that finished state (neither file
-# carries the marker) as well as this repository's own unforked state (both carry it) — it exists only
-# to catch a half-finished replacement, where one file was updated and the other was not.
-impl_has_marker=false
-test_has_marker=false
-grep -q 'TEMPLATE:REPLACE' packages/hello/src/index.ts && impl_has_marker=true
-grep -q 'TEMPLATE:REPLACE' packages/hello/src/index.test.ts && test_has_marker=true
-
-if [ "$impl_has_marker" != "$test_has_marker" ]; then
-  fail "packages/hello's implementation and test disagree on the TEMPLATE:REPLACE marker — finish replacing both, or restore the marker in both, before running this check"
+# The template's example packages were replaced by capture; no TEMPLATE:REPLACE marker may remain.
+if grep -rq 'TEMPLATE:REPLACE' packages/; then
+  fail "A TEMPLATE:REPLACE marker remains under packages/; the template examples were replaced"
 fi
 
 printf '%s\n' "Repository convention check passed"

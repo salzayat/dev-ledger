@@ -36,7 +36,7 @@ Useful Nx commands:
 ```bash
 npm exec nx show projects
 npm exec nx graph
-npm exec nx run hello:test
+npm exec nx run capture:test
 ```
 
 ## Change Workflow
