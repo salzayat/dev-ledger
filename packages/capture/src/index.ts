@@ -34,6 +34,7 @@ export {
   CONFIG_PATH,
   canonicalJson,
   captureMain,
+  gitEnvironment,
   loadConfig,
   sessionSummary,
 } from './cli.ts';

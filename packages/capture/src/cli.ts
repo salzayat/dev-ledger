@@ -20,11 +20,40 @@ import { validateMessage } from './trailers.ts';
 
 export const CONFIG_PATH = 'telemetry.config.json';
 
+/** Git's own variables, exported by every hook, and never what a child of this command should act on. */
+const INHERITED_GIT_VARIABLES = [
+  'GIT_DIR',
+  'GIT_INDEX_FILE',
+  'GIT_WORK_TREE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_PREFIX',
+  'GIT_COMMON_DIR',
+];
+
+/**
+ * The environment for a git child: the caller's, minus anything that would point the child at another
+ * repository or index. Capture's commands run inside hooks, where those variables are set, so a command
+ * must act on the working copy it was given and never on the caller's index.
+ */
+export function gitEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    LC_ALL: 'C',
+  };
+  for (const name of INHERITED_GIT_VARIABLES) {
+    delete env[name];
+  }
+  return env;
+}
+
 function git(dir: string, args: string[]): string {
   return execFileSync('git', args, {
     cwd: dir,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
+    env: gitEnvironment(),
   });
 }
 

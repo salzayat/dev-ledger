@@ -18,6 +18,7 @@ contract.
 | Board dashboard (phase one addendum)         | `add-board-dashboard`                                         | Complete |
 | Board presentation (phase one addendum)      | `improve-board-presentation`                                  | Complete |
 | Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
+| Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
 | Change audit (phase two)                     | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -58,6 +59,10 @@ The pull request telemetry milestone belongs to workflow governance rather than 
 puts the records a branch produces into the description a reviewer reads, and corrects two defects in the
 same lines — a generated body heading that did not match the repository's own template, and trailers that
 were dropped whenever a body file was supplied.
+
+The capture git environment row is a defect fix, not a capability: the flow package already refuses to let
+a git child inherit the caller's index, and the capture package — the one whose commands run inside hooks —
+did not, which corrupted this repository's index once during the pull request telemetry work.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
