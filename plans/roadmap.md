@@ -6,19 +6,21 @@ contract.
 
 ## Milestone Tracking
 
-| Phase                                       | Governing changes                                             | Status   |
-| ------------------------------------------- | ------------------------------------------------------------- | -------- |
-| Repository evolution conventions            | `add-repository-evolution-markers`                            | Complete |
-| Executable PR and dependency governance     | `add-executable-pr-and-dependency-governance`                 | Complete |
-| Foundation                                  | None                                                          | Complete |
-| Agent harness and MCP governance            | `improve-agentic-boiler-governance`                           | Complete |
-| Template and example expansion              | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
-| Fork rename automation                      | `add-project-rename-tooling`                                  | Complete |
-| Flow observability (phase one)              | `add-flow-observability`                                      | Complete |
-| Board dashboard (phase one addendum)        | `add-board-dashboard`                                         | Complete |
-| Board presentation (phase one addendum)     | `improve-board-presentation`                                  | Complete |
-| Per pull request spend (phase one addendum) | `add-per-pull-request-spend`                                  | Complete |
-| Change audit (phase two)                    | `add-change-audit`                                            | Blocked  |
+| Phase                                        | Governing changes                                             | Status   |
+| -------------------------------------------- | ------------------------------------------------------------- | -------- |
+| Repository evolution conventions             | `add-repository-evolution-markers`                            | Complete |
+| Executable PR and dependency governance      | `add-executable-pr-and-dependency-governance`                 | Complete |
+| Foundation                                   | None                                                          | Complete |
+| Agent harness and MCP governance             | `improve-agentic-boiler-governance`                           | Complete |
+| Template and example expansion               | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
+| Fork rename automation                       | `add-project-rename-tooling`                                  | Complete |
+| Flow observability (phase one)               | `add-flow-observability`                                      | Complete |
+| Board dashboard (phase one addendum)         | `add-board-dashboard`                                         | Complete |
+| Board presentation (phase one addendum)      | `improve-board-presentation`                                  | Complete |
+| Per pull request spend (phase one addendum)  | `add-per-pull-request-spend`                                  | Complete |
+| Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
+| Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
+| Change audit (phase two)                     | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -58,6 +60,15 @@ The per-pull-request spend milestone follows the Board presentation milestone be
 the tables that one introduced. It also corrects a defect the presentation work exposed: spend on unmerged
 pull requests counted a record with missing figures as a real zero, while the merged path excluded and
 counted it. Its rule is the accepted one either way — counted, never zeroed.
+
+The pull request telemetry milestone belongs to workflow governance rather than to the product phases: it
+puts the records a branch produces into the description a reviewer reads, and corrects two defects in the
+same lines — a generated body heading that did not match the repository's own template, and trailers that
+were dropped whenever a body file was supplied.
+
+The capture git environment row is a defect fix, not a capability: the flow package already refuses to let
+a git child inherit the caller's index, and the capture package — the one whose commands run inside hooks —
+did not, which corrupted this repository's index once during the pull request telemetry work.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

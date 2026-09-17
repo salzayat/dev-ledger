@@ -8,6 +8,11 @@ import {
   validateSessionFile,
 } from './session.ts';
 import { formatTrailers, parseTrailers, validateMessage } from './trailers.ts';
+import { gitEnvironment, sessionSummary } from './cli.ts';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const allocationConfig = parseConfig(
   JSON.stringify({
@@ -231,4 +236,122 @@ test('a session whose figures the harness could not supply is recorded as missin
     DEFAULT_CONFIG,
   );
   assert.ok(errors.some((error) => error.startsWith('figuresMissing')));
+});
+
+// A git child must never inherit this process's index or repository: these tests run under the pre-commit
+// hook, which exports GIT_INDEX_FILE and GIT_DIR, and a `git add` in a fixture directory would otherwise
+// write fixture paths into the real repository's index.
+function fixtureGit(dir: string, args: string[]): string {
+  return execFileSync('git', args, {
+    cwd: dir,
+    encoding: 'utf8',
+    env: gitEnvironment(),
+  });
+}
+
+function summaryRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'dev-ledger-summary-'));
+  const run = (args: string[]) => fixtureGit(dir, args);
+  run(['init', '--quiet', '--initial-branch=main']);
+  run(['config', 'user.email', 'contributor@example.invalid']);
+  run(['config', 'user.name', 'contributor']);
+  writeFileSync(join(dir, 'README.md'), 'base\n');
+  run(['add', '--all']);
+  run(['commit', '--quiet', '-m', 'chore: base']);
+  run(['switch', '--quiet', '-c', 'work']);
+  return dir;
+}
+
+function writeRecord(
+  dir: string,
+  sessionId: string,
+  extra: Record<string, unknown>,
+): void {
+  const path = join(dir, '.telemetry', 'sessions', '2026-09');
+  mkdirSync(path, { recursive: true });
+  writeFileSync(
+    join(path, `${sessionId}.json`),
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        sessionId,
+        provider: 'provider-a',
+        model: 'model-x',
+        inputTokens: 1000,
+        outputTokens: 200,
+        cachedTokens: 100,
+        costUsd: 0.5,
+        figuresSource: 'harness',
+        startedAt: '2026-09-01T09:00:00Z',
+        endedAt: '2026-09-01T10:00:00Z',
+        wallClockSeconds: 3600,
+        agentRunSeconds: 1800,
+        billingKind: 'metered',
+        branch: 'work',
+        commits: [],
+        localCheck: { outcome: 'passed', command: 'npm run check' },
+        ...extra,
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+}
+
+test('a branch with no session record says so explicitly', () => {
+  const dir = summaryRepo();
+  const summary = sessionSummary(dir, 'main', 'HEAD');
+  assert.match(summary, /### Session records on this branch/);
+  assert.match(summary, /This branch adds no session record\./);
+  assert.doesNotMatch(summary, /\| record \|/);
+});
+
+test('the summary names a record with figures and one without, and embeds both', () => {
+  const dir = summaryRepo();
+  const run = (args: string[]) => fixtureGit(dir, args);
+  writeRecord(dir, 's-paid', {});
+  writeRecord(dir, 's-blind', {
+    figuresMissing: true,
+    inputTokens: 0,
+    outputTokens: 0,
+    cachedTokens: 0,
+    costUsd: 0,
+    localCheck: { outcome: 'not-run', command: 'npm run check' },
+  });
+  run(['add', '--all']);
+  run(['commit', '--quiet', '-m', 'chore(telemetry): record sessions']);
+  const summary = sessionSummary(dir, 'main', 'HEAD');
+  assert.match(
+    summary,
+    /\| `\.telemetry\/sessions\/2026-09\/s-paid\.json` \| `s-paid` \| provider-a \/ model-x \| 1,000 in · 200 out · 100 cached · \$0\.50 \| passed \|/,
+  );
+  assert.match(
+    summary,
+    /`s-blind` \| provider-a \/ model-x \| figures missing \| not-run \|/,
+  );
+  // The record that reports nothing must not be summarised as costing nothing.
+  const blindRow = summary
+    .split('\n')
+    .find((line) => line.includes('`s-blind`') && line.startsWith('|'))!;
+  assert.doesNotMatch(blindRow, /\$0\.00/);
+  assert.match(summary, /<details><summary><code>s-paid<\/code><\/summary>/);
+  assert.match(summary, /"sessionId": "s-blind"/);
+});
+
+test('a git child never inherits the caller index or repository', () => {
+  process.env.GIT_INDEX_FILE = '/nonexistent/index';
+  process.env.GIT_DIR = '/nonexistent/.git';
+  try {
+    const dir = summaryRepo();
+    assert.equal(
+      fixtureGit(dir, ['rev-parse', '--is-inside-work-tree']).trim(),
+      'true',
+    );
+    assert.match(sessionSummary(dir, 'main', 'HEAD'), /no session record/);
+    assert.equal(gitEnvironment().GIT_INDEX_FILE, undefined);
+    assert.equal(gitEnvironment().GIT_DIR, undefined);
+  } finally {
+    delete process.env.GIT_INDEX_FILE;
+    delete process.env.GIT_DIR;
+  }
 });

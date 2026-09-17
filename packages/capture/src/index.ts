@@ -30,4 +30,11 @@ export type {
   SessionFile,
   SessionInput,
 } from './session.ts';
-export { CONFIG_PATH, canonicalJson, captureMain, loadConfig } from './cli.ts';
+export {
+  CONFIG_PATH,
+  canonicalJson,
+  captureMain,
+  gitEnvironment,
+  loadConfig,
+  sessionSummary,
+} from './cli.ts';

@@ -93,6 +93,13 @@ and a change that declared no session reads `undeclared` — neither is `$0.00`,
 them. Every such row still cites the records behind it, including the ones excluded from its figures: the
 record that says the figures are missing is the evidence for the claim.
 
+## A pull request shows its own records
+
+`scripts/pr.sh` puts the branch's session records into the description it opens, built by
+`telemetry session summary` from git and the session files alone. The reviewer sees what the branch
+recorded before deciding whether to merge it, and a record with no figures is named as missing there too.
+The projection is not read: the pull request does not exist yet when its description is written.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It
