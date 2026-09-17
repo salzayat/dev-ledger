@@ -576,3 +576,32 @@ test('child git processes never inherit a parent index or repository', () => {
     delete process.env.GIT_DIR;
   }
 });
+
+test('a squash subject inherited from another repository does not mark a newer pull request as merged', () => {
+  const fixture = makeFixtureRepo();
+  // Upstream history: a squash merge whose subject names pull request 1 of the repository it came from.
+  directPush(fixture, 'feat(upstream): inherited change (#1)', {
+    'upstream.txt': 'u',
+  });
+  // This repository's own pull request 1, opened later and still unmerged.
+  openPullRequest(
+    fixture,
+    'mine',
+    [
+      [
+        trailered('feat(mine): new work', {
+          Session: 'none',
+          Change: 'c-mine',
+        }),
+        { 'mine.txt': 'm' },
+      ],
+    ],
+    { hours: 48 },
+  );
+  const { repo } = build(registryFor(fixture.dir));
+  assert.deepEqual(
+    (repo.unmerged as { number: number }[]).map((entry) => entry.number),
+    [1],
+    'the inherited subject predates the pull request, so the pull request is still in the queue',
+  );
+});

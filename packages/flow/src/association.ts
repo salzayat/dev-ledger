@@ -127,6 +127,10 @@ export function associate(
 
   const associations = new Map<string, Association>();
   const associatedNumbers = new Set<number>();
+  // A subject number is only unique within one repository. A fork inherits squash subjects that name the
+  // upstream repository's pull requests, so a merge is accepted as a pull head's merge only when it did
+  // not happen before that pull head's commits existed.
+  const subjectMergeTime = new Map<number, string>();
   for (const change of changes) {
     const fromSubject = subjectPullRequest(change.subject);
     if (fromSubject !== null) {
@@ -135,7 +139,10 @@ export function associate(
         method: 'subject',
         classification: 'pull-request',
       });
-      associatedNumbers.add(fromSubject);
+      const previous = subjectMergeTime.get(fromSubject);
+      if (previous === undefined || previous < change.mergeTime) {
+        subjectMergeTime.set(fromSubject, change.mergeTime);
+      }
       continue;
     }
     const fromTip = change.commits
@@ -176,11 +183,19 @@ export function associate(
   }
   const unmerged: UnmergedPullRequest[] = [];
   for (const head of pullHeads) {
-    if (associatedNumbers.has(head.number) || mergedTips.has(head.tip)) {
-      continue;
-    }
     const commits = offMainByNumber.get(head.number) ?? [];
     const oldest = commits.map((commit) => commit.authorDate).sort()[0] ?? null;
+    const subjectMerge = subjectMergeTime.get(head.number);
+    const mergedBySubject =
+      subjectMerge !== undefined &&
+      (oldest === null || Date.parse(subjectMerge) >= Date.parse(oldest));
+    if (
+      associatedNumbers.has(head.number) ||
+      mergedTips.has(head.tip) ||
+      mergedBySubject
+    ) {
+      continue;
+    }
     unmerged.push({
       number: head.number,
       tip: head.tip,

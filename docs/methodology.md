@@ -18,7 +18,9 @@ Nothing here reads the hosting platform. A change is associated with a pull requ
 squash or merge subject, by a pull head ref (`refs/pull/N/head`) whose tip sits inside the change, or by
 patch identity between the change's commits and the commits on a pull head ref. The method used is
 recorded on every change. A change that matches none of them is `out-of-band`: a direct push, or a merge
-made without the platform's refs available. That is weaker than the platform's own record, and it is
+made without the platform's refs available. A subject number is unique only within one repository, and a
+fork inherits squash subjects that name the upstream repository's pull requests, so a pull head stays in
+the unmerged queue unless a merge naming its number happened after its commits existed. That is weaker than the platform's own record, and it is
 enough for the question this repository answers, which is where work waits.
 
 ## Timing comes from the pull head ref
