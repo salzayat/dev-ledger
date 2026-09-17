@@ -14,6 +14,32 @@ export class GitError extends Error {
   }
 }
 
+// Git sets GIT_INDEX_FILE, GIT_DIR, and friends for the processes it spawns (hooks during a partial
+// commit, for one). A child git run against another repository must not inherit them, or it writes into
+// the parent's temporary index.
+const INHERITED_GIT_VARIABLES = [
+  'GIT_INDEX_FILE',
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_PREFIX',
+  'GIT_COMMON_DIR',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_NAMESPACE',
+];
+
+export function gitEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    LC_ALL: 'C',
+  };
+  for (const name of INHERITED_GIT_VARIABLES) {
+    delete env[name];
+  }
+  return env;
+}
+
 export function git(dir: string, args: string[], input?: string): string {
   try {
     return execFileSync('git', args, {
@@ -22,7 +48,7 @@ export function git(dir: string, args: string[], input?: string): string {
       input,
       maxBuffer: 256 * 1024 * 1024,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+      env: gitEnvironment(),
     });
   } catch (error) {
     const failure = error as { stderr?: string | Buffer; message: string };

@@ -18,7 +18,7 @@ import {
   tag,
   trailered,
 } from './fixture.ts';
-import { git } from './git.ts';
+import { git, gitEnvironment } from './git.ts';
 import {
   buildProjection,
   canonicalJson,
@@ -557,4 +557,22 @@ test('commit helper keeps the fixture deterministic', () => {
   const fixture = makeFixtureRepo();
   const hash = commit(fixture, 'chore(repo): deterministic', { 'd.txt': 'd' });
   assert.equal(hash.length, 40);
+});
+
+test('child git processes never inherit a parent index or repository', () => {
+  process.env.GIT_INDEX_FILE = '/nonexistent/index';
+  process.env.GIT_DIR = '/nonexistent/.git';
+  try {
+    const env = gitEnvironment();
+    assert.equal(env.GIT_INDEX_FILE, undefined);
+    assert.equal(env.GIT_DIR, undefined);
+    const fixture = makeFixtureRepo();
+    assert.equal(
+      git(fixture.dir, ['rev-parse', '--is-inside-work-tree']).trim(),
+      'true',
+    );
+  } finally {
+    delete process.env.GIT_INDEX_FILE;
+    delete process.env.GIT_DIR;
+  }
 });

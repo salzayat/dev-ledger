@@ -79,6 +79,15 @@ difference is explainable. There is no shared projection to push: the registry a
 the only shared state, and both are files in this repository. That keeps the reproducibility claim testable
 with two laptops and no service.
 
+## Child git processes get a clean environment
+
+The tests and the projection spawn git against mirrors and fixture repositories. When one of those spawns
+happens inside a hook, git has already set `GIT_INDEX_FILE`, `GIT_DIR`, and their relatives for the parent
+operation (a partial commit hands its hooks a temporary index), and a child that inherits them writes
+into the parent's index. The first dogfooding pull request hit exactly that: a session-file commit failed
+with an invalid object because a fixture's README had been staged into the temporary index. The git
+wrapper now strips every inherited `GIT_*` location variable, and a test asserts it.
+
 ## The contract is what the second phase builds on
 
 `add-change-audit` layers rules over the same projection and adds a governance view to the same Board
