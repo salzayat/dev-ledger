@@ -53,7 +53,9 @@ to observed. There is no third class here; platform facts belong to phase two's 
 ## The Board is a page rendered from the projection
 
 `telemetry board --html` writes one self-contained HTML page from the projection: inline styles, inline
-SVG bars for the distributions, no script, no external resource. Nothing on the page can compute a figure
+SVG bars for the distributions, no script, no external resource. Each repository opens with a summary strip
+(wait and cycle p50, queue, merges per day, spend, out-of-band), then the panels, then a table of the newest
+changes with each one's pull request, wait, cycle, lines, session status, and gaps. Nothing on the page can compute a figure
 the projection does not hold, so the citation rule holds for the page as well as for the data.
 
 ## Signals, not findings
