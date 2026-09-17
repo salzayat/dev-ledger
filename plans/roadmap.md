@@ -6,24 +6,27 @@ contract.
 
 ## Milestone Tracking
 
-| Phase                                        | Governing changes                                             | Status   |
-| -------------------------------------------- | ------------------------------------------------------------- | -------- |
-| Repository evolution conventions             | `add-repository-evolution-markers`                            | Complete |
-| Executable PR and dependency governance      | `add-executable-pr-and-dependency-governance`                 | Complete |
-| Foundation                                   | None                                                          | Complete |
-| Agent harness and MCP governance             | `improve-agentic-boiler-governance`                           | Complete |
-| Template and example expansion               | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
-| Fork rename automation                       | `add-project-rename-tooling`                                  | Complete |
-| Flow observability (phase one)               | `add-flow-observability`                                      | Complete |
-| Board dashboard (phase one addendum)         | `add-board-dashboard`                                         | Complete |
-| Board presentation (phase one addendum)      | `improve-board-presentation`                                  | Complete |
-| Per pull request spend (phase one addendum)  | `add-per-pull-request-spend`                                  | Complete |
-| Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
-| Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
-| Session figures (telemetry capture)          | `add-session-figures-from-transcript`                         | Complete |
-| Change audit (phase two)                     | `add-change-audit`                                            | Blocked  |
-| Subscription and operator spend (phase one)  | `add-subscription-and-operator-spend`                         | Pending  |
-| Board publication (phase one)                | `add-board-publication`                                       | Blocked  |
+| Phase                                             | Governing changes                                             | Status   |
+| ------------------------------------------------- | ------------------------------------------------------------- | -------- |
+| Repository evolution conventions                  | `add-repository-evolution-markers`                            | Complete |
+| Executable PR and dependency governance           | `add-executable-pr-and-dependency-governance`                 | Complete |
+| Foundation                                        | None                                                          | Complete |
+| Agent harness and MCP governance                  | `improve-agentic-boiler-governance`                           | Complete |
+| Template and example expansion                    | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
+| Fork rename automation                            | `add-project-rename-tooling`                                  | Complete |
+| Flow observability (phase one)                    | `add-flow-observability`                                      | Complete |
+| Board dashboard (phase one addendum)              | `add-board-dashboard`                                         | Complete |
+| Board presentation (phase one addendum)           | `improve-board-presentation`                                  | Complete |
+| Per pull request spend (phase one addendum)       | `add-per-pull-request-spend`                                  | Complete |
+| DORA signals (phase one addendum)                 | `add-dora-signals`                                            | Complete |
+| Pull request telemetry (workflow governance)      | `add-telemetry-in-pull-request-body`                          | Complete |
+| Capture git environment (defect)                  | `fix-capture-git-environment`                                 | Complete |
+| Session figures (telemetry capture)               | `add-session-figures-from-transcript`                         | Complete |
+| Review fixes (session figures, Board links)       | `fix-transcript-figures-and-board-links`                      | Complete |
+| Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
+| Subscription and operator spend (phase one)       | `add-subscription-and-operator-spend`                         | Blocked  |
+| Board publication (phase one)                     | `add-board-publication`                                       | Blocked  |
+| Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -78,19 +81,34 @@ the schema always accepted token counts and nothing produced them. It comes afte
 environment fix because its end-to-end test runs a capture command as a child process against a fixture
 repository.
 
-The subscription and operator spend milestone comes before board publication because every currency figure
-The Board renders is `$0.00` today: validation requires a subscription session to record no marginal cost,
-and every recorded session is a subscription session, so the cost of a plan is a fact no record holds. It
-adds a subscription cost record per billing period, allocates that amount across the period's sessions in
+The review fixes row corrects five defects a review of the four rows above it found: a transcript's repeated
+message kept its first usage record instead of its last, a transcript-filled record kept a source written
+before the sum, an SSH host alias derived a dead link for every citation, a pipe could end a table cell in
+the pull request body, and two template skill files carried another project's boundary text.
+
+The flow efficiency and work mix row is the last phase one addendum: the reads the flow frameworks ask for
+after DORA (flow efficiency, work mix, iterations, abandonment), the product read git can see exactly for a
+repository that follows the OpenSpec loop (spec lead time), and the cost figures a preparer asks for once
+token counts are real. It follows the DORA signals row for the weekly buckets and the review fixes row for
+the figures, and it is drafted rather than started. Every read that needs a review, a check run, a
+deployment, or an incident stays in the change audit row.
+
+The subscription and operator spend row comes before board publication because every currency figure The
+Board renders is `$0.00` today: validation requires a subscription session to record no marginal cost, and
+every recorded session is a subscription session, so what a plan costs is a fact no record holds. It adds a
+subscription cost record per billing period, allocates that amount across the period's sessions in
 proportion to agent run seconds, and admits the operator as a dimension covering agents and humans alike —
 agents in currency, humans in hours, never summed and never priced. It supersedes the accepted prohibition
-on operator-keyed figures; pseudonymity stays enforced where it always was, in the record schema.
+on operator-keyed figures; pseudonymity stays enforced where it always was, in the record schema. It follows
+the flow efficiency and work mix row because both modify `Flow signals per repository and in aggregate`, and
+whichever archives second is rebased onto the first.
 
-The board publication milestone follows it because a published page should not lead with a spend panel
-reading zero over the repository's whole history. It builds The Board on every pull request as a run
-artifact and a job summary, and deploys it to Pages from the default branch only, gated on the repository
-being public — the repository is private until the first release, so the gate lives in the workflow rather
-than in a sequencing note. It is `Blocked` until `add-subscription-and-operator-spend` is archived.
+The board publication row follows it because a published page should not lead with a spend panel reading
+zero over the repository's whole history. It builds The Board on every pull request as a run artifact and a
+job summary, and deploys it to Pages from the default branch only, gated on the repository being public —
+the repository is private until the first release, so the gate lives in the workflow rather than in a
+sequencing note. It also modifies `A registry of repositories synced over SSH`, which the flow efficiency
+and work mix row modifies too.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

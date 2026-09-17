@@ -14,9 +14,9 @@ a registry edit, because `registry.json` is the version-controlled record of wha
 should not have to be rewritten to describe where one machine happened to fetch from. The recorded ref tips
 are unchanged by which transport fetched them, so the projection built in continuous integration is the same
 projection an operator builds locally from the same tips, as
-`openspec/specs/flow-observability/spec.md:262` requires.
+`openspec/specs/flow-observability/spec.md:314` requires.
 
-This also keeps `Sync needs no platform credential` (`openspec/specs/flow-observability/spec.md:37`) true
+This also keeps `Sync needs no platform credential` (`openspec/specs/flow-observability/spec.md:36`) true
 rather than carving an exception into it. A public HTTPS fetch of a public repository needs no credential at
 all, and the platform-issued token used while the repository is private is the one the workflow already
 holds for checkout.

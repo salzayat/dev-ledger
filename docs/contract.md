@@ -39,9 +39,11 @@ rejected.
 Figures reach a record in one of two ways, both `reported`: the harness states them in the payload, or
 `session end --transcript <file>` sums them from a local transcript — a JSONL file whose records carry a
 `usage` object in the wire format of the model API. A transcript fills only the figures the payload omits,
-records are deduplicated by message identifier (a streaming transcript repeats a message as it grows),
-`cachedTokens` is cache reads plus cache writes, and cost is never derived from a price table. A transcript
-with no usage record leaves the session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
+and when it filled any, `figuresSource` names the transcript and the number of messages summed. Records
+are deduplicated by message identifier and the last record for an identifier wins (a streaming transcript
+repeats a message as it grows, each record carrying its usage so far), `cachedTokens` is cache reads plus
+cache writes, and cost is never derived from a price table. A transcript with no usage record leaves the
+session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
 
 ## Trailer vocabulary (version 1)
 
@@ -80,7 +82,8 @@ as absent.
 ```
 
 Thresholds: `waitTimeP50Seconds`, `cycleTimeP50Seconds`, `queueAgeSeconds`, `batchSizeLines`,
-`reworkWindowDays`.
+`reworkWindowDays`. An optional `webUrl` (https only) names the browsable repository when the remote's host
+is an SSH alias the derivation cannot read; it is recorded in the projection in place of the derived URL.
 
 ## Projection (schema version 1)
 
@@ -88,7 +91,9 @@ Thresholds: `waitTimeP50Seconds`, `cycleTimeP50Seconds`, `queueAgeSeconds`, `bat
 `telemetry rebuild` and byte-identical on any machine whose mirrors hold the same ref tips. The header
 names `schemaVersion`, `sessionSchemaVersion`, `registrySchemaVersion`, and `configSchemaVersion`. Each
 repository carries `refTips` (the refs the mirror held), `changes`, `sessions`, `unmerged`, `releases`,
-`unreleased`, `movedTags`, and `signals`, or `reachable: false` with a reason.
+`unreleased`, `movedTags`, and `signals`, or `reachable: false` with a reason. `signals` carries the flow reads,
+`dora` (deployment frequency, lead time to release with its merge-to-tag part, change failure rate, time to fix,
+each with its approximation note), `trends.weekly`, `costClasses`, and `coverage`.
 
 Each change carries its identity (the last commit on the default branch), `kind`, `commits`,
 `association` (`pullRequest`, `method`: `subject`, `pull-head`, or `patch-identity`, and `classification`:

@@ -8,7 +8,7 @@ metadata:
 
 # React Best Practices
 
-Use this skill when creating, reviewing, or refactoring React code, especially in the future research dashboard.
+Use this skill when creating, reviewing, or refactoring React code, if a React app is ever added under `apps/`; the repository has none today.
 
 ## Priorities
 
@@ -80,7 +80,7 @@ Use this skill when creating, reviewing, or refactoring React code, especially i
 
 ## Review Checklist
 
-- No signal, report, or strategy logic is embedded in UI components.
+- No signal, threshold, association, or timing logic is embedded in UI components; they render the projection.
 - Data-heavy dashboard views avoid avoidable waterfalls.
 - Client components receive only the data they need.
 - Effects are not used to duplicate derived state.

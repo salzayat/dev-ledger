@@ -175,14 +175,42 @@ test('a web URL is derived from a GitHub remote and from nothing else', () => {
     'https://github.example.com/acme/repo',
   );
   assert.equal(webUrl('/tmp/dev-ledger-fixture'), null);
+  // An SSH host alias is how a machine picks a key; it is not a host the derivation can read.
+  assert.equal(webUrl('git@github.com-work:salzayat/dev-ledger.git'), null);
   assert.equal(webUrl('git@gitlab.com:acme/repo.git'), null);
+});
+
+test('a registry entry may name its web URL explicitly, and a bad one is an error', () => {
+  const parsed = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [
+        {
+          name: 'aliased',
+          url: 'git@github.com-work:salzayat/dev-ledger.git',
+          webUrl: 'https://github.com/salzayat/dev-ledger/',
+        },
+        { name: 'plain', url: 'git@github.com:salzayat/dev-ledger.git' },
+        { name: 'bad', url: '/tmp/repo', webUrl: 'file:///tmp/repo' },
+      ],
+    }),
+  );
+  assert.equal(
+    parsed.registry.repositories[0].webUrl,
+    'https://github.com/salzayat/dev-ledger',
+  );
+  assert.equal(parsed.registry.repositories[1].webUrl, null);
+  assert.match(
+    parsed.errors.join('\n'),
+    /repositories\[2\]\.webUrl must be an https URL/,
+  );
 });
 
 test('the projection records the derived web URL, never the registry path', () => {
   const projection = fixtureProjection();
   assert.equal(projection.repositories.fixture.webUrl, null);
   assert.equal(projection.repositories.gone.webUrl, null);
-  assert.equal(projection.schemaVersion, 3);
+  assert.equal(projection.schemaVersion, 4);
 });
 
 test('every panel carries trust classes, excluded counts, and citations', () => {
@@ -199,6 +227,9 @@ test('every panel carries trust classes, excluded counts, and citations', () => 
     'Spend',
     'Recent changes',
     'Population',
+    'Spend over time',
+    'Spend by cost class',
+    'DORA keys, approximated to the release tag',
     'Spend by spec',
     'Spend by provider',
     'Spend by model',
@@ -213,6 +244,11 @@ test('every panel carries trust classes, excluded counts, and citations', () => 
   assert.match(html, /add-one/);
   assert.match(html, /s-1\.json/);
   assert.match(html, /Signal: wait-time-p50/);
+  assert.match(html, /releases \/ week/);
+  assert.match(html, /release tags stand in for deployments/);
+  assert.match(html, /lead time to release/);
+  assert.match(html, /escapes \/ release/);
+  assert.match(html, /time to fix/);
   assert.match(html, /Unreachable:/);
   assert.match(html, /Measured as of/);
 });

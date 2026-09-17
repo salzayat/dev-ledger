@@ -76,6 +76,23 @@ export function renderRepository(repository: RepositoryProjection): string[] {
     .map(([outcome, count]) => `${count} ${outcome}`)
     .join(', ');
   lines.push(`  local checks: ${checks || 'none recorded'} [reported]`);
+  const dora = signals.dora;
+  lines.push(
+    `  DORA (to the release tag): releases/week ${dora.deploymentFrequency.perWeek ?? 'n/a'} over ${dora.deploymentFrequency.releases} releases; lead time to release typical ${seconds(dora.leadTimeToRelease.p50)} (merge to tag ${seconds(dora.leadTimeToRelease.mergeToTag.p50)}); escapes/release ${dora.changeFailureRate.perRelease ?? 'n/a'} (${dora.changeFailureRate.escapes} over ${dora.changeFailureRate.releases}); time to fix typical ${seconds(dora.timeToFix.p50)} over ${dora.timeToFix.count} [observed]`,
+  );
+  lines.push(
+    `  spend by cost class: ${
+      Object.entries(signals.costClasses)
+        .map(
+          ([name, spend]) =>
+            `${name} $${spend.costUsd.toFixed(2)} (${spend.sessions} sessions, ${spend.missingFigures} without figures)`,
+        )
+        .join(', ') || 'none'
+    } [reported]`,
+  );
+  lines.push(
+    `  coverage: ${signals.coverage.agent} with an agent session, ${signals.coverage.humanOnly} human-only, ${signals.coverage.undeclared} undeclared, ${signals.coverage.unreported} unreported of ${signals.coverage.total}`,
+  );
   lines.push(
     `  ${spendLine('spend total', signals.spend.total)} [${signals.spend.trust.join(', ')}]`,
   );

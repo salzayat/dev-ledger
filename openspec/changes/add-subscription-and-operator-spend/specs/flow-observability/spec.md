@@ -93,13 +93,13 @@ excluded from the human-hours figure with their counts stated, and SHALL NOT be 
 
 The system SHALL provide one read surface, The Board, rendering the projection per repository and across the
 registry: the flow signals and any thresholds exceeded, spend per spec reference, per provider, per model,
-and per operator, cost per unit of recorded effort, the unmerged queue, undeclared, unreported, and
-out-of-band changes, and unreachable repositories. Every figure SHALL show the trust classes it was computed
-from and its excluded count, and SHALL be traceable to the changes and records it was computed from. An
-allocated figure SHALL show its basis, and a figure drawn from an open period SHALL be marked provisional.
-The Board SHALL present human operator effort in hours and agent operator effort in currency and tokens,
-SHALL NOT sum the two, SHALL NOT price human effort at any rate, and SHALL identify a human operator by its
-pseudonymous identifier alone. The Board SHALL read only from the projection, and SHALL render an explicit
+and per operator, cost per unit of recorded effort, the unmerged queue, undeclared, unreported, and out-of-band changes,
+and unreachable repositories. Every figure SHALL show the trust classes it was computed from and its excluded
+count, and SHALL be traceable to the changes and records it was computed from. An allocated figure SHALL
+show its basis, and a figure drawn from an open period SHALL be marked provisional. The Board SHALL present
+human operator effort in hours and agent operator effort in currency and tokens, SHALL NOT sum the two,
+SHALL NOT price human effort at any rate, and SHALL identify a human operator by its pseudonymous
+identifier alone. The Board SHALL read only from the projection, and SHALL render an explicit
 empty state when the projection has no records. The Board SHALL be available as a terminal render and as a
 static HTML dashboard written by `telemetry board --html`: one self-contained page with inline styles and
 inline SVG, containing no script element and loading no external resource, readable from a file URL, laid out
@@ -109,7 +109,10 @@ commit SHALL render as its abbreviated hash beside the change's subject, and SHA
 hosting platform when the repository's web URL is recorded; a cited pull request SHALL link to that pull
 request and a cited session record to that file on the default branch. A hyperlink to the hosting platform is
 navigation and SHALL NOT be treated as an external resource; when no web URL is recorded the same text SHALL
-render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show each pull request's spend beside its age, and the recent-changes table SHALL show each change's spend, each rendering what the records say rather than a zero when figures are missing, with every session record cited.
+render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show each pull request's spend beside its age, and the recent-changes table SHALL show each change's spend, each rendering what the records say rather than a zero when figures are missing, with every session record cited. The Board SHALL show the four DORA
+reads as a strip of cards, each with its approximation note and its citations, a spend-over-time chart with
+the same weekly buckets as merge activity, a spend-by-cost-class panel, and the coverage counts, on both the
+HTML dashboard and the terminal render.
 
 #### Scenario: The Board with an empty projection
 
@@ -130,6 +133,13 @@ render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show ea
 - THEN the operator panel MUST show human effort in hours and agent effort in currency and tokens
 - AND no panel MUST sum a figure in hours with a figure in currency
 - AND no panel MUST show a human operator's effort as a currency amount
+
+#### Scenario: An operator identifier is never resolved to a person
+
+- GIVEN a projection whose session records carry pseudonymous operator identifiers
+- WHEN the operator dimension is rendered
+- THEN no name or email address MUST appear
+- AND each human operator MUST be identified by its pseudonymous identifier alone
 
 #### Scenario: An allocated figure shows its basis
 
@@ -187,6 +197,13 @@ render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show ea
 - GIVEN a change on the default branch carrying no `Session:` trailer
 - WHEN an operator opens the dashboard
 - THEN that change's row in the recent-changes table MUST read `undeclared` in place of a spend figure
+
+#### Scenario: The DORA strip names its approximations
+
+- GIVEN a repository with release tags
+- WHEN an operator opens the dashboard
+- THEN four cards MUST show deployment frequency, lead time to release, change failure rate, and time to
+  fix, each with a note naming the release tag as the approximation and each citing its tags or changes
 
 ## MODIFIED Requirements
 
@@ -248,12 +265,22 @@ touching files a change within the configured window also touched), escapes (a r
 `fix` in its subject that touches files of a change in the most recent release, after that release's tag),
 local check outcomes per change, and spend (tokens and cost) per change, per unmerged pull request, per
 spec reference, per provider, per model, and per operator, computed separately for each enabled effort unit
-where a unit applies. Each read SHALL be available per repository and across the registry, SHALL state the
-trust classes it included and the number of changes excluded for lacking what it needs, and SHALL raise a
-signal when a registered threshold is exceeded, naming the threshold and the changes behind it. Spend per
-unmerged pull request SHALL cite every session record of that pull request, including the records excluded
-from its figures. A read keyed to an operator SHALL identify a human operator by its pseudonymous identifier
-alone and SHALL report human effort in hours only, never in currency.
+where a unit applies. It SHALL also provide the four DORA reads approximated to the release tag, each carrying a note
+naming the approximation: deployment frequency as releases per week over the measured window, citing the
+tags; lead time for changes as the interval from a change's first commit to the release tag that carried it,
+with the merge-to-tag interval reported separately and unreleased changes excluded by reason; change
+failure rate as escapes divided by releases in the window, with the denominator stated; and time to fix as
+the interval from the merge of the released change an escape targets, resolved by shared files, to the
+merge of the escape. It SHALL provide weekly trends of changes merged and session cost over the measured
+window, spend by cost class (`rd`, `production`, `unclassified`, taken from the session's cost class, then
+the change's `Cost-Class:` trailer, never defaulted), and coverage counts of changes with an agent session,
+human-only, undeclared, and unreported. Each read SHALL be available per repository and across the
+registry, SHALL state the trust classes it included and the number of changes excluded for lacking what it
+needs, and SHALL raise a signal when a registered threshold is exceeded, naming the threshold and the
+changes behind it. Spend per unmerged pull request SHALL cite every session record of that pull request,
+including the records excluded from its figures. A read keyed to an operator SHALL identify a human
+operator by its pseudonymous identifier alone and SHALL report human effort in hours only, never in
+currency, and no read SHALL resolve that identifier to a name or an email address.
 
 #### Scenario: A wait-time threshold raises a signal
 
@@ -299,6 +326,41 @@ alone and SHALL report human effort in hours only, never in currency.
 - THEN it MUST identify that operator by its pseudonymous identifier alone
 - AND it MUST report that operator's effort in hours
 - AND it MUST NOT report that operator's effort in currency
+
+#### Scenario: Deployment frequency counts release tags and says so
+
+- GIVEN two release tags fourteen days apart
+- WHEN the DORA reads are computed
+- THEN deployment frequency MUST report one release per week citing both tags
+- AND its note MUST state that releases stand in for deployments
+
+#### Scenario: Lead time runs to the tag and excludes unreleased work
+
+- GIVEN a change merged and carried by a later release tag, and a change merged after the newest tag
+- WHEN lead time to release is computed
+- THEN the first change's value MUST be the interval from its first commit to that tag
+- AND the second change MUST be excluded with the reason `unreleased`
+
+#### Scenario: Change failure rate states its denominator
+
+- GIVEN two releases and one escape after the newest
+- WHEN change failure rate is computed
+- THEN it MUST report 0.5 escapes per release over 2 releases citing the escape
+
+#### Scenario: Time to fix runs from the targeted change's merge
+
+- GIVEN a released change and a later `fix` change touching one of its files
+- WHEN time to fix is computed
+- THEN its value MUST be the interval between the two merges
+- AND it MUST cite the fix and the change it targets
+
+#### Scenario: Spend by cost class is never defaulted
+
+- GIVEN a change carrying `Cost-Class: production` with two sessions, one carrying its own class `rd`, and a
+  change with no class anywhere
+- WHEN spend by cost class is computed
+- THEN the `rd` session's figures MUST be under `rd`, the other under `production`, and the unclassed change
+  under `unclassified`
 
 ## REMOVED Requirements
 

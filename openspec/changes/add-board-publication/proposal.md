@@ -15,7 +15,7 @@ empty board. Building one in CI therefore requires `telemetry sync`, which fetch
 (`git@github.com:salzayat/dev-ledger.git`) using the operator's own git access
 (`packages/flow/src/sync.ts:28-43`) with no URL override anywhere in `packages/flow`. Wiring that up as it
 stands means putting a private key into a workflow, which `Sync needs no platform credential`
-(`openspec/specs/flow-observability/spec.md:37`) and the repository's own credential boundary both refuse.
+(`openspec/specs/flow-observability/spec.md:36`) and the repository's own credential boundary both refuse.
 
 ## What Changes
 
@@ -34,6 +34,10 @@ stands means putting a private key into a workflow, which `Sync needs no platfor
 
 `add-subscription-and-operator-spend` (active, `Pending`). Until it is archived, every currency figure on
 the page renders `$0.00`, so this change is selected only after it is archived and verified.
+
+`add-flow-efficiency-and-work-mix` (active, `Pending`), which modifies `A registry of repositories synced
+over SSH` as this change does. Both deltas rewrite the same requirement, so whichever archives second is
+rebased onto the first.
 
 ## Non-Goals
 

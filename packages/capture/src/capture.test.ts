@@ -300,6 +300,22 @@ function writeRecord(
   );
 }
 
+test('a pipe in a record field cannot end its table cell', () => {
+  const dir = summaryRepo();
+  writeRecord(dir, 's-piped', { model: 'model|x' });
+  fixtureGit(dir, ['add', '--all']);
+  fixtureGit(dir, [
+    'commit',
+    '--quiet',
+    '-m',
+    'chore(telemetry): record session',
+  ]);
+  assert.match(
+    sessionSummary(dir, 'main', 'HEAD'),
+    /\| `s-piped` \| provider-a \/ model\\\|x \| 1,000 in/,
+  );
+});
+
 test('a branch with no session record says so explicitly', () => {
   const dir = summaryRepo();
   const summary = sessionSummary(dir, 'main', 'HEAD');
@@ -368,18 +384,19 @@ const transcriptLine = (
     message: { ...(id === null ? {} : { id }), usage, ...extra },
   });
 
-test('a message repeated across transcript records is counted once', () => {
+test('a message repeated across transcript records is counted once, from its last record', () => {
   const transcript = [
     transcriptLine('msg-1', { input_tokens: 10, output_tokens: 5 }),
     transcriptLine('msg-1', { input_tokens: 10, output_tokens: 40 }),
-    transcriptLine('msg-1', { input_tokens: 10, output_tokens: 90 }),
     transcriptLine('msg-2', { input_tokens: 3, output_tokens: 7 }),
+    transcriptLine('msg-1', { input_tokens: 10, output_tokens: 90 }),
     transcriptLine(null, { input_tokens: 1, output_tokens: 1 }),
   ].join('\n');
   const figures = sumTranscriptUsage(transcript)!;
   assert.equal(figures.messages, 3);
   assert.equal(figures.inputTokens, 14);
-  assert.equal(figures.outputTokens, 13);
+  // A streaming record carries the message's cumulative usage, so the last one saw the whole message.
+  assert.equal(figures.outputTokens, 98);
 });
 
 test('cached tokens are reads plus writes, and input counts neither', () => {
@@ -451,12 +468,12 @@ test('a session recorded with a transcript carries its figures, and a stated fig
   writeFileSync(
     join(dir, 'transcript.jsonl'),
     [
+      transcriptLine('msg-1', { input_tokens: 20, output_tokens: 12 }),
       transcriptLine('msg-1', {
         input_tokens: 20,
         output_tokens: 30,
         cache_read_input_tokens: 40,
       }),
-      transcriptLine('msg-1', { input_tokens: 20, output_tokens: 30 }),
     ].join('\n'),
   );
   writeFileSync(join(dir, 'payload.json'), payload({}));
@@ -480,6 +497,37 @@ test('a session recorded with a transcript carries its figures, and a stated fig
     [20, 30, 40],
   );
   assert.match(summed.figuresSource, /summed from 1 messages/);
+
+  // A payload written before the sum says the harness had no figures; once the transcript supplied
+  // them, that source would describe figures the record does not carry.
+  const stale = summaryRepo();
+  writeFileSync(
+    join(stale, 'transcript.jsonl'),
+    readFileSync(join(dir, 'transcript.jsonl')),
+  );
+  writeFileSync(
+    join(stale, 'payload.json'),
+    payload({
+      figuresSource:
+        'agent session; the harness did not expose token or cost figures',
+    }),
+  );
+  runCli(stale, [
+    'session',
+    'end',
+    '--payload',
+    'payload.json',
+    '--transcript',
+    'transcript.jsonl',
+  ]);
+  const replaced = JSON.parse(
+    readFileSync(
+      join(stale, '.telemetry/sessions/2026-09/s-figures.json'),
+      'utf8',
+    ),
+  );
+  assert.equal(replaced.inputTokens, 20);
+  assert.match(replaced.figuresSource, /summed from 1 messages/);
 
   const stated = summaryRepo();
   writeFileSync(

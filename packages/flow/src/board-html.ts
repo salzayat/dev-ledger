@@ -1,5 +1,11 @@
 import type { Projection, RepositoryProjection } from './projection.ts';
-import type { Distribution, Spend } from './signals.ts';
+import type {
+  CostClassSpend,
+  Coverage,
+  Distribution,
+  RepositorySignals,
+  Spend,
+} from './signals.ts';
 
 // The Board as one self-contained HTML page: inline styles, inline SVG, no script, no loaded resource.
 // Same figures as the terminal render, laid out per repository, with trust classes and excluded counts
@@ -462,6 +468,106 @@ function topFiles(pairs: { files: string[] }[], limit = 6): string {
     .join('')}</ul>`;
 }
 
+/** The four DORA reads as cards, each with its approximation note and its citations. */
+function doraStrip(signals: RepositorySignals, links: Links): string {
+  const dora = signals.dora;
+  const cards: {
+    label: string;
+    value: string;
+    note: string;
+    cites: string;
+    excluded?: string;
+  }[] = [
+    {
+      label: 'releases / week',
+      value:
+        dora.deploymentFrequency.perWeek === null
+          ? 'n/a'
+          : String(dora.deploymentFrequency.perWeek),
+      note: `${count(dora.deploymentFrequency.releases, 'release')} over ${dora.deploymentFrequency.days ?? 'n/a'} days. ${dora.deploymentFrequency.note}.`,
+      cites: dora.deploymentFrequency.tags.length
+        ? `<details class="cites"><summary>tags: ${dora.deploymentFrequency.tags.length}</summary><ul>${dora.deploymentFrequency.tags.map((tag) => `<li><code>${escapeHtml(tag)}</code></li>`).join('')}</ul></details>`
+        : '<p class="cites-empty">cites: none</p>',
+    },
+    {
+      label: 'lead time to release',
+      value: seconds(dora.leadTimeToRelease.p50),
+      note: `typical, over ${count(dora.leadTimeToRelease.count, 'released change')}; of that, ${seconds(dora.leadTimeToRelease.mergeToTag.p50)} typical from merge to tag. ${dora.leadTimeToRelease.note}.`,
+      cites: cites('changes', dora.leadTimeToRelease.cites, links),
+      excluded: excludedNote(dora.leadTimeToRelease.excluded),
+    },
+    {
+      label: 'escapes / release',
+      value:
+        dora.changeFailureRate.perRelease === null
+          ? 'n/a'
+          : String(dora.changeFailureRate.perRelease),
+      note: `${count(dora.changeFailureRate.escapes, 'escape')} over ${count(dora.changeFailureRate.releases, 'release')}. ${dora.changeFailureRate.note}.`,
+      cites: cites('escapes', dora.changeFailureRate.cites, links),
+    },
+    {
+      label: 'time to fix',
+      value: seconds(dora.timeToFix.p50),
+      note: `typical, over ${count(dora.timeToFix.count, 'escape')}. ${dora.timeToFix.note}.`,
+      cites: cites('fixes', dora.timeToFix.cites, links),
+      excluded: excludedNote(dora.timeToFix.excluded),
+    },
+  ];
+  return `<section class="panel dora" aria-label="DORA keys approximated to the release tag"><h3>DORA keys, approximated to the release tag</h3><p class="meta">${trustBadges(['observed'])} the four keys most teams report, computed from release tags because deployments are not observed here</p><div class="dora-grid">${cards
+    .map(
+      (card) =>
+        `<div class="stat dora-card"><dt class="stat-label">${escapeHtml(card.label)}</dt><dd class="stat-value">${escapeHtml(card.value)}</dd><p class="help">${escapeHtml(card.note)}${card.excluded ? ' ' + escapeHtml(card.excluded) : ''}</p>${card.cites}</div>`,
+    )
+    .join('')}</div></section>`;
+}
+
+function spendOverTime(trends: RepositorySignals['trends']): string {
+  const weeks = trends.weekly;
+  if (weeks.length === 0) {
+    return panel(
+      'Spend over time',
+      '<p class="empty">No merged changes yet.</p>',
+      trustBadges(['reported']),
+    );
+  }
+  const total = weeks.reduce((sum, week) => sum + week.costUsd, 0);
+  const peak = Math.max(...weeks.map((week) => week.costUsd));
+  return panel(
+    'Spend over time',
+    `${figure(`$${total.toFixed(2)}`, `across ${count(weeks.length, 'week')}; busiest week $${peak.toFixed(2)}`)}${columnChart(
+      weeks.map((week) => ({ label: week.week.slice(5), value: week.costUsd })),
+      'session cost per week',
+    )}<p class="help">${escapeHtml(trends.note)}.</p>`,
+    trustBadges(['reported']),
+  );
+}
+
+function costClassPanel(
+  costClasses: CostClassSpend,
+  coverage: Coverage,
+  links: Links,
+): string {
+  const entries = Object.entries(costClasses).sort(
+    ([, a], [, b]) => b.costUsd - a.costUsd,
+  );
+  const largest = entries[0]?.[1].costUsd ?? 0;
+  const rows = entries
+    .map(
+      ([name, spend]) =>
+        `<tr><td><code>${escapeHtml(name)}</code></td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num">${spend.sessions}</td><td class="num">${spend.missingFigures}</td><td>${cites('records', spend.cites, links)}</td></tr>`,
+    )
+    .join('');
+  const table = rows
+    ? `<div class="scroll"><table><thead><tr><th>class</th><th class="num">cost</th><th class="num">sessions</th><th class="num">no figures</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : '<p class="empty">No session records yet.</p>';
+  const coverageLine = `${coverage.agent} with an agent session, ${coverage.humanOnly} human-only, ${coverage.undeclared} undeclared, ${coverage.unreported} unreported, of ${count(coverage.total, 'change')}`;
+  return panel(
+    'Spend by cost class',
+    `${table}<p class="help">Coverage: ${escapeHtml(coverageLine)}.</p>`,
+    `${trustBadges(['reported'])} the session's own class, then the change's Cost-Class trailer, never defaulted`,
+  );
+}
+
 export function renderRepositoryHtml(repository: RepositoryProjection): string {
   const links = linksFor(repository);
   const home =
@@ -550,6 +656,7 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
   return `${open}${heading}
 <p class="asof">Measured as of ${escapeHtml(dateOnly(repository.asOf))}, the newest commit the mirror holds. Merge times are the merging party's clock.</p>
 <dl class="stats">${summary}</dl>
+${doraStrip(signals, links)}
 ${signalPanels}
 <div class="grid">
 ${panel(
@@ -557,6 +664,8 @@ ${panel(
   `${figure(String(signals.mergeFrequency.perDay ?? 'n/a'), `merges per day over ${signals.mergeFrequency.days ?? 'n/a'} days, ${count(signals.mergeFrequency.changes, 'change')}`)}${mergeActivity(changes)}`,
   trustBadges(signals.mergeFrequency.trust),
 )}
+${spendOverTime(signals.trends)}
+${costClassPanel(signals.costClasses, signals.coverage, links)}
 ${distributionPanel('Wait time', signals.waitTime, 'From the last commit on the pull request to the merge: how long finished work sat.', links)}
 ${distributionPanel('Cycle time', signals.cycleTime, 'From the first commit on the pull request to the merge.', links)}
 ${panel(
@@ -728,6 +837,11 @@ h3 {
   display: flex; flex-direction: column; gap: var(--s2); container-type: inline-size;
 }
 .panel.signal { border-color: var(--signal); border-left-width: 3px; margin-top: var(--s3); }
+.panel.dora { margin-bottom: var(--s3); }
+.dora-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: var(--s2); }
+.dora-card { box-shadow: none; display: block; }
+.dora-card .stat-value { margin: var(--s1) 0; }
+.dora-card .help { margin-top: var(--s1); }
 .panel.span-all { margin-top: var(--s3); }
 @container (max-width: 330px) {
   .meter { display: none; }

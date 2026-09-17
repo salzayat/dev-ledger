@@ -20,8 +20,8 @@ The same records are asymmetric about who did the work. `agentRunSeconds`
 (`packages/capture/src/session.ts:27`) and `operatorActiveSeconds` (`packages/capture/src/session.ts:35`)
 sit beside each other in one record, but the accepted contract admits only the first to a read: provider and
 model are first-class dimensions of both the flow signals
-(`openspec/specs/flow-observability/spec.md:183`) and The Board
-(`openspec/specs/flow-observability/spec.md:319`), while `No read SHALL be keyed to a person` and `The Board
+(`openspec/specs/flow-observability/spec.md:190`) and The Board
+(`openspec/specs/flow-observability/spec.md:381`), while `No read SHALL be keyed to a person` and `The Board
 SHALL NOT present any figure keyed to an operator identifier` exclude the human. The schema is symmetric and
 the read is not, so agent labour is observable and the human labour it substitutes for is not. Measuring the
 substitution is the question this repository exists to answer.
@@ -49,6 +49,10 @@ substitution is the question this repository exists to answer.
 `add-session-figures-from-transcript` (archived), which established `agentRunSeconds` and `figuresMissing`
 as recorded facts; this change reads both as the basis and the exclusion rule for allocation. No active
 change is required first.
+
+`add-flow-efficiency-and-work-mix` (active, `Pending`), which modifies `Flow signals per repository and in
+aggregate` as this change does. Both deltas rewrite the same requirement, so whichever archives second is
+rebased onto the first; this change is selected after it.
 
 ## Non-Goals
 

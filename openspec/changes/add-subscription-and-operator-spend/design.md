@@ -32,11 +32,11 @@ figure on strictly more of the existing corpus than a basis of tokens would.
 
 Eight of the twelve existing records carry `agentRunSeconds: 0`. Those sessions cannot take a share of a
 proportional allocation, and giving them one of zero would state that they cost nothing, which is precisely
-what `openspec/specs/flow-observability/spec.md:118-127` forbids for every other unknown figure: missing
+what `openspec/specs/flow-observability/spec.md:125-134` forbids for every other unknown figure: missing
 inputs are excluded with their count stated and are never counted as zero.
 
 So the allocation excludes them and says how many it excluded, exactly as cost per story point already
-excludes changes lacking the unit (`openspec/specs/flow-observability/spec.md:203-208`). When every session
+excludes changes lacking the unit (`openspec/specs/flow-observability/spec.md:221-226`). When every session
 in a period carries zero agent seconds, none of that period's amount is allocatable; the period reports its
 amount as unallocated rather than spreading it evenly over sessions that recorded no agent time.
 
@@ -65,7 +65,7 @@ the existing one gains a third value.
 
 ## An open period's allocation is provisional
 
-The projection stays deterministic in the sense `openspec/specs/flow-observability/spec.md:262` requires:
+The projection stays deterministic in the sense `openspec/specs/flow-observability/spec.md:314` requires:
 the same records and the same ref tips produce the same bytes. But a change merged early in a month holds a
 larger share of that month than it will hold once the rest of the month's sessions land, so its allocated
 cost falls over the period without any record changing. That is a property of proportional allocation, not
@@ -75,7 +75,7 @@ as provisional, and one drawn from a closed period does not.
 ## Operators are symmetric in what is tracked and asymmetric in unit
 
 The accepted contract admits provider and model as dimensions
-(`openspec/specs/flow-observability/spec.md:183-194`) while excluding the human operator, so the agent side
+(`openspec/specs/flow-observability/spec.md:190-212`) while excluding the human operator, so the agent side
 of a change is measurable and the human side is not. This change makes the dimension cover both.
 
 The units stay different on purpose. An agent's consumption of a paid plan is denominated in the currency
@@ -92,7 +92,7 @@ it was withholding a measurement, not protecting an identity.
 
 ## Human-only changes have hours that no record holds
 
-`openspec/specs/flow-observability/spec.md:139-143` establishes `Session: none` as a declaration that a
+`openspec/specs/flow-observability/spec.md:145-149` establishes `Session: none` as a declaration that a
 change was human-only work rather than a missing record. Such a change has human hours by definition and no
 session file to carry them, because `operatorActiveSeconds` is computed by a harness hook from that
 harness's own events.

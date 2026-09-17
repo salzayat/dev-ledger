@@ -1,0 +1,26 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "fix/review-fixes",
+  "cachedTokens": 132633068,
+  "commits": [
+    "1238b4692653bd2fda8677dcbf84f3305d79f559"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T01:05:00Z",
+  "figuresSource": "summed from 242 messages in the session transcript",
+  "inputTokens": 6580,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 499638,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260917-review-fixes",
+  "spec": "fix-transcript-figures-and-board-links",
+  "startedAt": "2026-09-18T00:20:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 2700
+}
