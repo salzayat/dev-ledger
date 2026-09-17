@@ -107,7 +107,54 @@ export type RepositorySignals = {
       }
     >;
   };
+  dora: DoraSignals;
+  trends: { weekly: WeeklyBucket[]; note: string };
+  costClasses: CostClassSpend;
+  coverage: Coverage;
   signals: Signal[];
+};
+
+export type DoraSignals = {
+  deploymentFrequency: {
+    releases: number;
+    days: number | null;
+    perWeek: number | null;
+    tags: string[];
+    note: string;
+  };
+  leadTimeToRelease: Distribution & { mergeToTag: Distribution; note: string };
+  changeFailureRate: {
+    escapes: number;
+    releases: number;
+    perRelease: number | null;
+    cites: string[];
+    note: string;
+  };
+  timeToFix: Distribution & { note: string };
+};
+
+export type WeeklyBucket = {
+  week: string;
+  changes: number;
+  costUsd: number;
+  sessions: number;
+  cites: string[];
+};
+
+export type CostClassSpend = Record<string, Spend & { missingFigures: number }>;
+
+export type Coverage = {
+  total: number;
+  agent: number;
+  humanOnly: number;
+  undeclared: number;
+  unreported: number;
+};
+
+export type ReleaseSummary = {
+  tag: string;
+  changes: string[];
+  at: string | null;
 };
 
 export type ChangeFacts = {
@@ -197,11 +244,46 @@ function distribution(
   };
 }
 
+function distributionOf(
+  entries: { value: number | null; cite: string; reason?: string }[],
+): Distribution {
+  const excluded: Record<string, number> = {};
+  const values: number[] = [];
+  const cites: string[] = [];
+  for (const entry of entries) {
+    if (entry.value === null) {
+      const reason = entry.reason ?? 'unknown';
+      excluded[reason] = (excluded[reason] ?? 0) + 1;
+    } else {
+      values.push(entry.value);
+      cites.push(entry.cite);
+    }
+  }
+  values.sort((a, b) => a - b);
+  return {
+    count: values.length,
+    p50: percentile(values, 0.5),
+    p90: percentile(values, 0.9),
+    max: values.length ? values[values.length - 1] : null,
+    excluded,
+    trust: ['observed'],
+    cites,
+  };
+}
+
+/** The Monday on or before the date, as YYYY-MM-DD. */
+function weekOf(iso: string): string {
+  const date = new Date(iso);
+  const day = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - day);
+  return date.toISOString().slice(0, 10);
+}
+
 export function computeSignals(
   facts: ChangeFacts[],
   sessions: Map<string, SessionRecord>,
   unmerged: UnmergedPullRequest[],
-  releases: { tag: string; changes: string[] }[],
+  releases: ReleaseSummary[],
   thresholds: Thresholds,
   configAt: (change: Change) => TelemetryConfig,
   now: string,
@@ -466,6 +548,203 @@ export function computeSignals(
     add(spend.unmergedPullRequests, record);
   }
 
+  // DORA, approximated to the release tag. Every note says what stands in for what.
+  const dated = releases
+    .filter((release) => release.at !== null)
+    .sort((a, b) => Date.parse(a.at!) - Date.parse(b.at!));
+  const releaseSpan =
+    dated.length > 1
+      ? Math.max(
+          1,
+          (Date.parse(dated[dated.length - 1].at!) - Date.parse(dated[0].at!)) /
+            86_400_000,
+        )
+      : null;
+  const deploymentFrequency = {
+    releases: dated.length,
+    days: releaseSpan === null ? null : Math.round(releaseSpan * 100) / 100,
+    perWeek:
+      releaseSpan === null
+        ? null
+        : Math.round((dated.length / (releaseSpan / 7)) * 100) / 100,
+    tags: dated.map((release) => release.tag),
+    note: 'release tags stand in for deployments; deployments are not observed in phase one',
+  };
+  const carriedBy = new Map<string, ReleaseSummary>();
+  for (const release of dated) {
+    for (const id of release.changes) {
+      if (!carriedBy.has(id)) {
+        carriedBy.set(id, release);
+      }
+    }
+  }
+  const leadEntries = facts.map((fact) => {
+    const release = carriedBy.get(fact.change.id);
+    if (!release) {
+      return { value: null, cite: fact.change.id, reason: 'unreleased' };
+    }
+    if (fact.timing.firstAuthoredAt === null) {
+      return {
+        value: null,
+        cite: fact.change.id,
+        reason: fact.timing.reason ?? 'no-pull-head',
+      };
+    }
+    return {
+      value: Math.max(
+        0,
+        Math.round(
+          (Date.parse(release.at!) - Date.parse(fact.timing.firstAuthoredAt)) /
+            1000,
+        ),
+      ),
+      cite: fact.change.id,
+    };
+  });
+  const mergeToTagEntries = facts.map((fact) => {
+    const release = carriedBy.get(fact.change.id);
+    return release
+      ? {
+          value: Math.max(
+            0,
+            Math.round(
+              (Date.parse(release.at!) - Date.parse(fact.change.mergeTime)) /
+                1000,
+            ),
+          ),
+          cite: fact.change.id,
+        }
+      : { value: null, cite: fact.change.id, reason: 'unreleased' };
+  });
+  const leadTimeToRelease = {
+    ...distributionOf(leadEntries),
+    mergeToTag: distributionOf(mergeToTagEntries),
+    note: 'from the first commit on the pull request to the release tag that carried the change; a deployment record would end it at the environment instead',
+  };
+  const changeFailureRate = {
+    escapes: escapes.changes.length,
+    releases: dated.length,
+    perRelease:
+      dated.length > 0
+        ? Math.round((escapes.changes.length / dated.length) * 100) / 100
+        : null,
+    cites: escapes.changes.map((entry) => entry.change),
+    note: 'escapes (reverts and fixes after the newest release touching released files) per release tag in the window',
+  };
+  const factById = new Map(facts.map((fact) => [fact.change.id, fact]));
+  const releasedFacts = newest
+    ? newest.changes
+        .map((id) => factById.get(id))
+        .filter((fact): fact is ChangeFacts => fact !== undefined)
+    : [];
+  const timeToFix = {
+    ...distributionOf(
+      escapes.changes.map((escape) => {
+        const fix = factById.get(escape.change);
+        const target = [...releasedFacts]
+          .reverse()
+          .find((candidate) =>
+            candidate.files.some((file) => escape.files.includes(file)),
+          );
+        if (!fix || !target) {
+          return { value: null, cite: escape.change, reason: 'no-target' };
+        }
+        return {
+          value: Math.max(
+            0,
+            Math.round(
+              (Date.parse(fix.change.mergeTime) -
+                Date.parse(target.change.mergeTime)) /
+                1000,
+            ),
+          ),
+          cite: `${fix.change.id}<-${target.change.id}`,
+        };
+      }),
+    ),
+    note: 'from the merge of the released change an escape targets to the merge of the escape; restore in production would need a deployment record',
+  };
+  const dora: DoraSignals = {
+    deploymentFrequency,
+    leadTimeToRelease,
+    changeFailureRate,
+    timeToFix,
+  };
+
+  // Weekly trends over the measured window, one bucket per Monday-started week.
+  const weeklyMap = new Map<string, WeeklyBucket>();
+  if (facts.length > 0) {
+    const first = weekOf(facts.map((fact) => fact.change.mergeTime).sort()[0]);
+    const last = weekOf(
+      facts
+        .map((fact) => fact.change.mergeTime)
+        .sort()
+        .at(-1)!,
+    );
+    for (
+      let cursor = Date.parse(`${first}T00:00:00Z`);
+      cursor <= Date.parse(`${last}T00:00:00Z`);
+      cursor += 7 * 86_400_000
+    ) {
+      const week = new Date(cursor).toISOString().slice(0, 10);
+      weeklyMap.set(week, {
+        week,
+        changes: 0,
+        costUsd: 0,
+        sessions: 0,
+        cites: [],
+      });
+    }
+    for (const fact of facts) {
+      const bucket = weeklyMap.get(weekOf(fact.change.mergeTime))!;
+      bucket.changes += 1;
+      bucket.cites.push(fact.change.id);
+      const changeSpend = spend.byChange[fact.change.id];
+      if (changeSpend) {
+        bucket.costUsd =
+          Math.round((bucket.costUsd + changeSpend.costUsd) * 1e6) / 1e6;
+        bucket.sessions += changeSpend.sessions;
+      }
+    }
+  }
+  const trends = {
+    weekly: [...weeklyMap.values()],
+    note: 'weeks start on Monday; cost is the session cost of changes merged that week, records without figures excluded',
+  };
+
+  // Spend by cost class: the session's own class, then the change's trailer, never a default.
+  const costClasses: CostClassSpend = {};
+  const classSpend = (name: string) =>
+    (costClasses[name] ??= { ...emptySpend(), missingFigures: 0 });
+  for (const fact of facts) {
+    const trailerClass =
+      typeof fact.change.trailers['Cost-Class'] === 'string'
+        ? fact.change.trailers['Cost-Class']
+        : null;
+    for (const id of fact.sessions.sessions) {
+      const record = sessions.get(id);
+      if (!record?.file) {
+        continue;
+      }
+      const name = record.file.costClass ?? trailerClass ?? 'unclassified';
+      if (!add(classSpend(name), record)) {
+        classSpend(name).missingFigures += 1;
+        classSpend(name).cites.push(record.path);
+      }
+    }
+  }
+  const coverage: Coverage = {
+    total: facts.length,
+    agent: facts.filter(
+      (fact) =>
+        fact.sessions.status === 'declared' &&
+        fact.sessions.sessions.length > 0,
+    ).length,
+    humanOnly: spend.excluded.humanOnly,
+    undeclared: spend.excluded.undeclared,
+    unreported: spend.excluded.unreported,
+  };
+
   const signals: Signal[] = [];
   if (
     thresholds.waitTimeP50Seconds !== undefined &&
@@ -543,6 +822,10 @@ export function computeSignals(
     escapes,
     localChecks,
     spend,
+    dora,
+    trends,
+    costClasses,
+    coverage,
     signals,
   };
 }

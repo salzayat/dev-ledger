@@ -31,7 +31,7 @@ import {
 import { mirrorPath, refTips } from './sync.ts';
 import { timingFor } from './timing.ts';
 
-export const PROJECTION_SCHEMA_VERSION = 3;
+export const PROJECTION_SCHEMA_VERSION = 4;
 export const CONFIG_PATH = 'telemetry.config.json';
 
 export type RepositoryProjection = {
@@ -214,6 +214,14 @@ export function buildRepositoryProjection(
     changes,
     previousTagTargets,
   );
+  const releaseDates = new Map(
+    [
+      ...readCommits(
+        dir,
+        releaseView.releases.map((release) => release.commit),
+      ).values(),
+    ].map((commit) => [commit.hash, commit.committerDate]),
+  );
   const facts: ChangeFacts[] = changes.map((change) => {
     const association = associations.get(change.id)!;
     let insertions = 0;
@@ -239,6 +247,7 @@ export function buildRepositoryProjection(
     releaseView.releases.map((release) => ({
       tag: release.tag,
       changes: release.changes,
+      at: releaseDates.get(release.commit) ?? null,
     })),
     entry.thresholds,
     configAt,

@@ -1,0 +1,27 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "flow/dora-signals",
+  "cachedTokens": 0,
+  "commits": [
+    "c70603ce93c536535139e6e0ede9bb0c73708978"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-17T23:50:00Z",
+  "figuresMissing": true,
+  "figuresSource": "agent session; the harness did not expose token or cost figures",
+  "inputTokens": 0,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 0,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260917-dora",
+  "spec": "add-dora-signals",
+  "startedAt": "2026-09-17T23:10:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 2400
+}

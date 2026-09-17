@@ -126,6 +126,34 @@ writes into the description onto that commit. Without it, trailers come only fro
 which still works for merge commits and rebase merges; for a squash merge whose message drops them, the
 change reads as undeclared.
 
+## DORA, approximated to the release tag
+
+The four DORA keys are defined against deployments, and git holds releases, not deployments. The Board
+shows all four anyway, each computed to the release tag and labeled that way:
+
+- Deployment frequency is release tags per week over the measured window.
+- Lead time for changes runs from a change's first commit to the tag that carried it; the merge-to-tag
+  part is shown separately so a slow release cadence is not mistaken for slow review.
+- Change failure rate is escapes (reverts and fixes after the newest release touching released files) per
+  release, with the denominator printed beside it.
+- Time to restore is shown as time to fix: from the merge of the released change an escape targets to the
+  merge of the escape. A fix targets the most recent released change it shares a file with.
+
+A team that deploys every tag reads these as they stand. A team that does not reads the note. Phase two's
+collector replaces the tag with a deployment record without changing the shape of the read.
+
+## Cost by class
+
+A session may carry its own cost class, and a change may carry a `Cost-Class:` trailer. The session's value
+wins for that session's figures, the change's value covers its other sessions, and anything else is
+`unclassified` and never defaulted. Spend by class is the read a preparer asks for first; records without
+figures are counted beside it, never as zero.
+
+## Trends
+
+Merge activity and spend share one set of weekly buckets, starting on the Monday of the first merge, so
+throughput and cost can be read side by side.
+
 ## What this does not see
 
 Reviews, approvals, check outcomes, pull request open and close times, and whether an unmerged pull

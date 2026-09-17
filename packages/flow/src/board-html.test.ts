@@ -182,7 +182,7 @@ test('the projection records the derived web URL, never the registry path', () =
   const projection = fixtureProjection();
   assert.equal(projection.repositories.fixture.webUrl, null);
   assert.equal(projection.repositories.gone.webUrl, null);
-  assert.equal(projection.schemaVersion, 3);
+  assert.equal(projection.schemaVersion, 4);
 });
 
 test('every panel carries trust classes, excluded counts, and citations', () => {
@@ -199,6 +199,9 @@ test('every panel carries trust classes, excluded counts, and citations', () => 
     'Spend',
     'Recent changes',
     'Population',
+    'Spend over time',
+    'Spend by cost class',
+    'DORA keys, approximated to the release tag',
     'Spend by spec',
     'Spend by provider',
     'Spend by model',
@@ -213,6 +216,11 @@ test('every panel carries trust classes, excluded counts, and citations', () => 
   assert.match(html, /add-one/);
   assert.match(html, /s-1\.json/);
   assert.match(html, /Signal: wait-time-p50/);
+  assert.match(html, /releases \/ week/);
+  assert.match(html, /release tags stand in for deployments/);
+  assert.match(html, /lead time to release/);
+  assert.match(html, /escapes \/ release/);
+  assert.match(html, /time to fix/);
   assert.match(html, /Unreachable:/);
   assert.match(html, /Measured as of/);
 });

@@ -18,6 +18,7 @@ contract.
 | Board dashboard (phase one addendum)         | `add-board-dashboard`                                         | Complete |
 | Board presentation (phase one addendum)      | `improve-board-presentation`                                  | Complete |
 | Per pull request spend (phase one addendum)  | `add-per-pull-request-spend`                                  | Complete |
+| DORA signals (phase one addendum)            | `add-dora-signals`                                            | Complete |
 | Pull request telemetry (workflow governance) | `add-telemetry-in-pull-request-body`                          | Complete |
 | Capture git environment (defect)             | `fix-capture-git-environment`                                 | Complete |
 | Session figures (telemetry capture)          | `add-session-figures-from-transcript`                         | Complete |

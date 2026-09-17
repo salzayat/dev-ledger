@@ -9,6 +9,7 @@ import { advanceCursor } from './cursor.ts';
 import {
   commit,
   directPush,
+  writeFiles,
   makeFixtureRepo,
   mergeCommit,
   mergeRebase,
@@ -603,5 +604,159 @@ test('a squash subject inherited from another repository does not mark a newer p
     (repo.unmerged as { number: number }[]).map((entry) => entry.number),
     [1],
     'the inherited subject predates the pull request, so the pull request is still in the queue',
+  );
+});
+
+test('DORA reads approximate to the release tag and say so', () => {
+  const fixture = makeFixtureRepo();
+  writeFiles(fixture, {
+    'telemetry.config.json': JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: [],
+        costClasses: ['rd', 'production'],
+      },
+    }),
+  });
+  commit(fixture, 'chore(repo): enable cost allocation', {});
+  const first = openPullRequest(fixture, 'f1', [
+    [
+      trailered('feat(f): add', {
+        Session: 's-a',
+        Change: 'c-f1',
+        'Cost-Class': 'production',
+      }),
+      {
+        'src/f.ts': 'v1',
+        '.telemetry/sessions/2026-09/s-a.json': sessionJson('s-a', {
+          costClass: 'rd',
+          costUsd: 1,
+          operatorActiveSeconds: 0,
+          operatorActiveAlgorithm: 'idle-cap-v1:900',
+          operatorId: null,
+        }),
+        '.telemetry/sessions/2026-09/s-b.json': sessionJson('s-b', {
+          costUsd: 2,
+          operatorActiveSeconds: 0,
+          operatorActiveAlgorithm: 'idle-cap-v1:900',
+          operatorId: null,
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    first,
+    'feat(f): add',
+    'Session: s-a\nSession: s-b\nCost-Class: production',
+    { hours: 24 },
+  );
+  tag(fixture, 'v1.0.0');
+  const fix = openPullRequest(
+    fixture,
+    'f2',
+    [
+      [
+        trailered('fix(f): repair', { Session: 'none', Change: 'c-f2' }),
+        { 'src/f.ts': 'v2' },
+      ],
+    ],
+    { hours: 48 },
+  );
+  mergeSquash(fixture, fix, 'fix(f): repair', '', { hours: 24 });
+  commit(
+    fixture,
+    'chore(repo): bump',
+    { 'CHANGELOG.md': 'x' },
+    { hours: 24 * 12 },
+  );
+  tag(fixture, 'v1.1.0');
+  const unreleased = openPullRequest(fixture, 'f3', [
+    [
+      trailered('feat(f): later', { Session: 'none', Change: 'c-f3' }),
+      { 'later.txt': 'l' },
+    ],
+  ]);
+  mergeSquash(fixture, unreleased, 'feat(f): later');
+  const { repo } = build(registryFor(fixture.dir));
+  const dora = repo.signals!.dora;
+  assert.equal(dora.deploymentFrequency.releases, 2);
+  assert.deepEqual(dora.deploymentFrequency.tags, ['v1.0.0', 'v1.1.0']);
+  assert.ok(dora.deploymentFrequency.perWeek! > 0);
+  assert.match(
+    dora.deploymentFrequency.note,
+    /release tags stand in for deployments/,
+  );
+  assert.equal(
+    dora.leadTimeToRelease.excluded.unreleased,
+    1,
+    'the change after the newest tag is excluded by reason',
+  );
+  assert.ok(dora.leadTimeToRelease.cites.includes(first.mergedAs!));
+  assert.ok(dora.leadTimeToRelease.p50! > 0);
+  assert.ok(dora.leadTimeToRelease.mergeToTag.p50! >= 0);
+  assert.equal(
+    dora.changeFailureRate.escapes,
+    0,
+    'the fix is inside the newest release, so it is not an escape',
+  );
+  assert.equal(dora.changeFailureRate.releases, 2);
+  const classes = repo.signals!.costClasses;
+  assert.equal(classes.rd.costUsd, 1, "the session's own class wins");
+  assert.equal(
+    classes.production.costUsd,
+    2,
+    "the change's trailer covers the other session",
+  );
+  assert.equal(classes.unclassified, undefined);
+  assert.ok(repo.signals!.trends.weekly.length >= 2);
+  assert.equal(
+    repo.signals!.trends.weekly.reduce((sum, week) => sum + week.changes, 0),
+    repo.changes.length,
+  );
+  assert.equal(repo.signals!.coverage.agent, 1);
+});
+
+test('an escape after the newest release yields a failure rate and a time to fix', () => {
+  const fixture = makeFixtureRepo();
+  const released = openPullRequest(fixture, 'r1', [
+    [
+      trailered('feat(r): ship', { Session: 'none', Change: 'c-r1' }),
+      { 'src/r.ts': 'v1' },
+    ],
+  ]);
+  mergeSquash(fixture, released, 'feat(r): ship');
+  tag(fixture, 'v2.0.0');
+  const fix = openPullRequest(
+    fixture,
+    'r2',
+    [
+      [
+        trailered('fix(r): repair', { Session: 'none', Change: 'c-r2' }),
+        { 'src/r.ts': 'v2' },
+      ],
+    ],
+    { hours: 10 },
+  );
+  mergeSquash(fixture, fix, 'fix(r): repair', '', { hours: 2 });
+  const { repo } = build(registryFor(fixture.dir));
+  const dora = repo.signals!.dora;
+  assert.equal(dora.changeFailureRate.escapes, 1);
+  assert.equal(dora.changeFailureRate.perRelease, 1);
+  assert.deepEqual(dora.changeFailureRate.cites, [fix.mergedAs]);
+  assert.equal(dora.timeToFix.count, 1);
+  assert.equal(
+    dora.timeToFix.p50,
+    12 * 3600,
+    'from the released change merge to the fix merge',
+  );
+  assert.deepEqual(dora.timeToFix.cites, [
+    `${fix.mergedAs}<-${released.mergedAs}`,
+  ]);
+  assert.match(
+    dora.timeToFix.note,
+    /restore in production would need a deployment record/,
   );
 });
