@@ -1,0 +1,35 @@
+{
+  "name": "flow",
+  "sourceRoot": "packages/flow/src",
+  "projectType": "library",
+  "implicitDependencies": ["capture"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "options": {
+        "outputPath": "dist/packages/flow",
+        "main": "packages/flow/src/index.ts",
+        "tsConfig": "packages/flow/tsconfig.lib.json",
+        "assets": []
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p packages/flow/tsconfig.lib.json"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint packages/flow/src"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --conditions=@dev-ledger/source --experimental-strip-types --test packages/flow/src/*.test.ts"
+      }
+    }
+  }
+}
