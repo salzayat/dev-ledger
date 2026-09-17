@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "repositories": [
+    {
+      "name": "dev-ledger",
+      "url": "git@github.com:salzayat/dev-ledger.git",
+      "defaultBranch": "main",
+      "releaseTagPattern": "v*",
+      "thresholds": { "waitTimeP50Seconds": 172800, "reworkWindowDays": 14 }
+    },
+    {
+      "name": "binary-logic",
+      "url": "git@github.com:salzayat/binary-logic.git",
+      "defaultBranch": "main",
+      "releaseTagPattern": "v*",
+      "thresholds": { "waitTimeP50Seconds": 172800, "reworkWindowDays": 14 }
+    }
+  ]
+}

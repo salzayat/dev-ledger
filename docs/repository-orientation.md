@@ -10,12 +10,16 @@ this page is guidance, not a replacement for those contracts.
 .
 ├── apps/                 Future thin, deployable applications
 ├── packages/             Reusable libraries and domain logic
-│   ├── hello/            Current deterministic typed example
-│   └── greeter/          Second example; depends on hello, shows inter-package composition
+│   ├── capture/          Session file schema, configuration, trailers (phase one)
+│   └── flow/             Registry, sync, projection, signals, The Board, the command line (phase one)
 ├── openspec/
 │   ├── specs/            Accepted behavioral requirements and scenarios
 │   └── changes/          Active proposals; archive completed changes
-├── scripts/              Repository checks, hooks, and PR automation
+├── scripts/              Repository checks, hooks, PR automation, and telemetry.sh
+├── .githooks/            prepare-commit-msg, commit-msg, pre-commit, pre-push
+├── telemetry.config.json Effort vocabulary, spec pattern, cost allocation
+├── registry.json         The repositories the projection covers
+├── .telemetry/           sessions/ (tracked); mirrors, projection, cursors (untracked)
 ├── .agent/
 │   ├── commands/         Canonical shared agent commands
 │   └── skills/           Canonical shared agent skills
@@ -56,7 +60,7 @@ Open the single governing spec for your task instead of scanning them all. Each 
 
 | Capability                      | Scope                                                                            |
 | ------------------------------- | -------------------------------------------------------------------------------- |
-| `repository-foundation`         | The small, deterministic Nx starting point and its example packages.             |
+| `repository-foundation`         | The small, deterministic Nx starting point: the `capture` and `flow` packages.   |
 | `repository-documentation`      | Repository intent, authority boundaries, `AGENTS.md`, and orientation guidance.  |
 | `repository-planning`           | Roadmap sequencing, OpenSpec dependency declarations, and readiness evidence.    |
 | `workflow-governance`           | Executable PR automation and pre-merge dependency-readiness checks.              |
@@ -89,17 +93,18 @@ task instead of the full session.
 6. Run `/verify-change` and archive only after all tasks and verification requirements are complete.
 
 Use `npm exec nx show projects` and `npm exec nx show project <project> --json` to inspect the workspace.
-Use Nx targets such as `npm exec nx run hello:test`; do not invoke project tooling directly when an Nx target
+Use Nx targets such as `npm exec nx run flow:test`; do not invoke project tooling directly when an Nx target
 exists.
 
 Read [`TEMPLATE.md`](../TEMPLATE.md) first if you are setting this repository up as the start of a new
 project rather than contributing to this one; it is a one-time rename/replace/verify checklist that precedes
 the agent loop below.
 
-`packages/greeter` is the worked example of a dependent package. It imports `hello`'s typed export via
-`@dev-ledger/hello`, declared as both an npm workspace dependency and an Nx `implicitDependencies`
+`packages/flow` is the worked example of a dependent package. It imports `capture`'s typed exports via
+`@dev-ledger/capture`, declared as both an npm workspace dependency and an Nx `implicitDependencies`
 entry. That import resolves at typecheck and test time through the `@dev-ledger/source` package export
-condition, so no build step is required.
+condition, so no build step is required. [`docs/contract.md`](contract.md) lists the versioned schemas
+`flow` reads and phase two pins; [`docs/methodology.md`](methodology.md) explains every figure on The Board.
 
 When adding a new package that depends on another, follow the same shape: a `package.json` with a matching
 `exports` map, a `project.json` with `implicitDependencies`, and a `node --conditions=@dev-ledger/source`

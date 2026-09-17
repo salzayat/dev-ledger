@@ -10,7 +10,10 @@ fail() {
 [ -f plans/roadmap.md ] || fail "Missing roadmap"
 [ -f packages/capture/src/index.ts ] || fail "Missing capture package implementation"
 [ -f packages/capture/src/capture.test.ts ] || fail "Missing capture package test"
+[ -f packages/flow/src/index.ts ] || fail "Missing flow package implementation"
+[ -f packages/flow/src/flow.test.ts ] || fail "Missing flow package test"
 [ -f telemetry.config.json ] || fail "Missing telemetry.config.json"
+[ -f registry.json ] || fail "Missing registry.json"
 [ -x scripts/telemetry.sh ] || fail "Missing executable scripts/telemetry.sh"
 for hook in prepare-commit-msg commit-msg pre-commit pre-push; do
   [ -x ".githooks/$hook" ] || fail "Missing executable .githooks/$hook"
@@ -19,9 +22,9 @@ done
 grep -q '^## OpenSpec Dependencies$' docs/dependency-patterns.md \
   || fail "Dependency documentation must define the OpenSpec dependency convention"
 
-# The template's example packages were replaced by capture; no TEMPLATE:REPLACE marker may remain.
+# The template's example packages were replaced by capture and flow; no TEMPLATE:REPLACE marker may remain.
 if grep -rq 'TEMPLATE:REPLACE' packages/; then
-  fail "A TEMPLATE:REPLACE marker remains under packages/; the template examples were replaced"
+  fail "A TEMPLATE:REPLACE marker remains under packages/; the template examples were replaced by capture and flow"
 fi
 
 printf '%s\n' "Repository convention check passed"

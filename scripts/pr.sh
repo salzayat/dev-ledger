@@ -18,6 +18,8 @@ Options:
   --title TITLE      PR title. Default: commit subject
   --body BODY        PR body text. Default: generated template
   --body-file PATH   Read PR body literally from a file
+  --spec NAME        OpenSpec change this work serves; written as a Spec: trailer on commits and the PR body
+  --story-points N   Reported effort; written as a Story-Points: trailer when the unit is enabled
   --all             Stage all tracked and untracked changes
   --reuse-branch    Reuse an existing local branch instead of requiring a new one
   --skip-checks     Skip ./scripts/check.sh after staging. Use only for documented tool outages.
@@ -45,6 +47,8 @@ pr_title=
 pr_body=
 body_inline=false
 body_file=
+spec_name=
+story_points=
 paths=
 
 while [ "$#" -gt 0 ]; do
@@ -84,6 +88,16 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -gt 0 ] || die "--body requires a value"
       pr_body=$1
       body_inline=true
+      ;;
+    --spec)
+      shift
+      [ "$#" -gt 0 ] || die "--spec requires a value"
+      spec_name=$1
+      ;;
+    --story-points)
+      shift
+      [ "$#" -gt 0 ] || die "--story-points requires a value"
+      story_points=$1
       ;;
     --body-file)
       shift
@@ -201,6 +215,10 @@ else
   created_branch=true
 fi
 
+# Branch-local telemetry values the prepare-commit-msg hook writes as trailers.
+[ -n "$spec_name" ] && git config "branch.$pr_branch.telemetry-spec" "$spec_name"
+[ -n "$story_points" ] && git config "branch.$pr_branch.telemetry-story-points" "$story_points"
+
 if [ "$stage_all" = true ]; then
   git add -A
 else
@@ -251,6 +269,26 @@ if [ -z "$pr_body" ]; then
 
   pr_body=$(printf '## Summary\n\n- %s\n\n## OpenSpec\n\n<!-- Which OpenSpec requirement or change under openspec/changes/ this supports. -->\n\n## Verification\n\n- %s\n\n## Skipped checks\n\n- %s\n\n## Data / reports\n\n<!-- Note if this PR changes data, reports, or experiment outputs, and where. -->\n' \
     "$summary" "$verification_line" "$skipped_line")
+fi
+
+# Trailers at the end of the description, so the recommended "title and description" merge message
+# setting carries them onto the squash or merge commit. Distinct Session: values come from the branch.
+trailer_block=""
+spec_value=$(git config --get "branch.$pr_branch.telemetry-spec" 2>/dev/null || true)
+[ -n "$spec_value" ] && trailer_block="${trailer_block}Spec: ${spec_value}
+"
+session_values=$(git log --format=%B "${base_branch}..${pr_branch}" | sed -n 's/^Session: //p' | sort -u)
+if [ -n "$session_values" ]; then
+  for session_value in $session_values; do
+    trailer_block="${trailer_block}Session: ${session_value}
+"
+  done
+fi
+points_value=$(git config --get "branch.$pr_branch.telemetry-story-points" 2>/dev/null || true)
+[ -n "$points_value" ] && trailer_block="${trailer_block}Story-Points: ${points_value}
+"
+if [ -n "$trailer_block" ] && [ -z "$body_file" ]; then
+  pr_body=$(printf '%s\n\n%s' "$pr_body" "$trailer_block")
 fi
 
 if [ -n "$body_file" ]; then

@@ -1,0 +1,14 @@
+{
+  "name": "@dev-ledger/flow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@dev-ledger/source": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@dev-ledger/capture": "*"
+  }
+}

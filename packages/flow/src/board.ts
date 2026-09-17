@@ -1,0 +1,148 @@
+import type { Projection, RepositoryProjection } from './projection.ts';
+import type { Distribution, Spend } from './signals.ts';
+
+// The Board: one read surface over the projection. Every figure names its trust classes, its excluded
+// count, and the changes or records behind it. Nothing is keyed to a person.
+
+function seconds(value: number | null): string {
+  if (value === null) {
+    return 'n/a';
+  }
+  if (value < 3600) {
+    return `${Math.round(value / 60)}m`;
+  }
+  if (value < 86_400) {
+    return `${(value / 3600).toFixed(1)}h`;
+  }
+  return `${(value / 86_400).toFixed(1)}d`;
+}
+
+function short(id: string): string {
+  return id
+    .split('<-')
+    .map((part) => part.slice(0, 10))
+    .join('<-');
+}
+
+function distributionLine(label: string, distribution: Distribution): string[] {
+  const excluded = Object.entries(distribution.excluded)
+    .map(([reason, count]) => `${count} ${reason}`)
+    .join(', ');
+  return [
+    `${label}: p50 ${seconds(distribution.p50)}, p90 ${seconds(distribution.p90)}, max ${seconds(distribution.max)} over ${distribution.count} changes [${distribution.trust.join(', ')}]${excluded ? `; excluded: ${excluded}` : ''}`,
+    `  cites: ${distribution.cites.map(short).join(' ') || '(none)'}`,
+  ];
+}
+
+function spendLine(label: string, spend: Spend): string {
+  return `${label}: $${spend.costUsd.toFixed(2)}, ${spend.inputTokens + spend.outputTokens} tokens (${spend.cachedTokens} cached) over ${spend.sessions} sessions; cites: ${spend.cites.length ? spend.cites.join(' ') : '(none)'}`;
+}
+
+export function renderRepository(repository: RepositoryProjection): string[] {
+  const lines: string[] = [
+    `== ${repository.name} (${repository.defaultBranch})`,
+  ];
+  if (!repository.reachable) {
+    lines.push(`  unreachable: ${repository.reason}`);
+    return lines;
+  }
+  const signals = repository.signals!;
+  if (repository.changes.length === 0) {
+    lines.push(
+      '  no changes on the default branch yet: merge a pull request through the hooks and rebuild',
+    );
+    return lines;
+  }
+  lines.push(
+    ...distributionLine('  cycle time', signals.cycleTime).map((line) => line),
+  );
+  lines.push(...distributionLine('  wait time', signals.waitTime));
+  lines.push(
+    `  queue: ${signals.queue.count} unmerged pull requests, oldest ${seconds(signals.queue.oldestAgeSeconds)} [${signals.queue.trust.join(', ')}] (${signals.queue.note})`,
+  );
+  lines.push(
+    `  batch size: median ${signals.batchSize.medianFiles ?? 'n/a'} files, ${signals.batchSize.medianLines ?? 'n/a'} lines, ${signals.batchSize.medianCommits ?? 'n/a'} commits over ${signals.batchSize.count} changes`,
+  );
+  lines.push(
+    `  merge frequency: ${signals.mergeFrequency.perDay ?? 'n/a'} per day over ${signals.mergeFrequency.days ?? 'n/a'} days [${signals.mergeFrequency.trust.join(', ')}]`,
+  );
+  lines.push(
+    `  rework (${signals.rework.windowDays}d window): ${signals.rework.pairs.length} pairs${signals.rework.pairs.length ? '; cites: ' + signals.rework.pairs.map((pair) => `${short(pair.later)}<-${short(pair.earlier)}`).join(' ') : ''}`,
+  );
+  lines.push(
+    `  escapes after ${signals.escapes.release ?? '(no release)'}: ${signals.escapes.changes.length}${signals.escapes.changes.length ? '; cites: ' + signals.escapes.changes.map((entry) => `${short(entry.change)}(${entry.kind})`).join(' ') : ''}`,
+  );
+  const checks = Object.entries(signals.localChecks)
+    .map(([outcome, count]) => `${count} ${outcome}`)
+    .join(', ');
+  lines.push(`  local checks: ${checks || 'none recorded'} [reported]`);
+  lines.push(
+    `  ${spendLine('spend total', signals.spend.total)} [${signals.spend.trust.join(', ')}]`,
+  );
+  const excluded = signals.spend.excluded;
+  lines.push(
+    `  spend excluded: ${excluded.undeclared} undeclared, ${excluded.unreported} unreported, ${excluded.humanOnly} human-only, ${excluded.invalidSession} invalid session files, ${excluded.missingFigures} sessions with figures missing (counted, never zeroed)`,
+  );
+  for (const [spec, spend] of Object.entries(signals.spend.bySpec)) {
+    lines.push(`  ${spendLine(`spend by spec ${spec}`, spend)}`);
+  }
+  for (const [provider, spend] of Object.entries(signals.spend.byProvider)) {
+    lines.push(`  ${spendLine(`spend by provider ${provider}`, spend)}`);
+  }
+  for (const [model, spend] of Object.entries(signals.spend.byModel)) {
+    lines.push(`  ${spendLine(`spend by model ${model}`, spend)}`);
+  }
+  for (const unit of Object.values(signals.spend.perEffortUnit)) {
+    lines.push(
+      `  cost per ${unit.unit}: ${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)} over ${unit.changes} changes; excluded ${unit.excluded} for lacking the unit or a complete session record; cites: ${unit.cites.map(short).join(' ') || '(none)'}`,
+    );
+  }
+  if (signals.spend.unmergedPullRequests.sessions > 0) {
+    lines.push(
+      `  ${spendLine('spend on unmerged pull requests', signals.spend.unmergedPullRequests)}`,
+    );
+  }
+  const outOfBand = repository.changes.filter(
+    (change) =>
+      (change.association as { classification: string }).classification ===
+      'out-of-band',
+  );
+  lines.push(
+    `  out-of-band changes: ${outOfBand.length}${outOfBand.length ? '; cites: ' + outOfBand.map((change) => short(change.id as string)).join(' ') : ''}`,
+  );
+  lines.push(`  unreleased changes: ${repository.unreleased.length}`);
+  if (repository.movedTags.length > 0) {
+    lines.push(
+      `  moved tags: ${(repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', ')}`,
+    );
+  }
+  for (const signal of signals.signals) {
+    lines.push(
+      `  SIGNAL ${signal.signal}: observed ${signal.observed} over threshold ${signal.threshold}; cites: ${signal.cites.map(short).join(' ')}`,
+    );
+  }
+  return lines;
+}
+
+export function renderBoard(projection: Projection | null): string {
+  if (!projection || Object.keys(projection.repositories).length === 0) {
+    return [
+      'The Board is empty.',
+      'Register a repository in registry.json, then run: telemetry sync && telemetry rebuild',
+    ].join('\n');
+  }
+  const lines: string[] = [
+    `The Board (projection schema ${projection.schemaVersion}, session schema ${projection.sessionSchemaVersion})`,
+  ];
+  for (const repository of Object.values(projection.repositories)) {
+    lines.push('', ...renderRepository(repository));
+  }
+  const unreachable = Object.values(projection.repositories).filter(
+    (repository) => !repository.reachable,
+  );
+  lines.push(
+    '',
+    `repositories: ${Object.keys(projection.repositories).length} registered, ${unreachable.length} unreachable${unreachable.length ? ' (' + unreachable.map((r) => r.name).join(', ') + ')' : ''}`,
+  );
+  return lines.join('\n');
+}
