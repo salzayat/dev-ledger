@@ -4,10 +4,10 @@
   "branch": "flow/board-dashboard",
   "cachedTokens": 0,
   "commits": [
-    "12c04e7b069b18c06aeab329d4d8449c8dc59f40"
+    "b688501e3b4c9e57f233f5941f53573e37e3fb87"
   ],
   "costUsd": 0,
-  "endedAt": "2026-09-17T21:55:00Z",
+  "endedAt": "2026-09-17T21:58:00Z",
   "figuresMissing": true,
   "figuresSource": "agent session; the harness did not expose token or cost figures",
   "inputTokens": 0,
@@ -23,5 +23,5 @@
   "spec": "add-board-dashboard",
   "startedAt": "2026-09-17T21:30:00Z",
   "subscriptionId": "claude-max",
-  "wallClockSeconds": 1500
+  "wallClockSeconds": 1680
 }
