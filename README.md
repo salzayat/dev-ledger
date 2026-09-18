@@ -54,7 +54,7 @@ undeclared on purpose.
 
 ## What The Ledger shows
 
-One page per repository, in four tabs: **flow** (wait and cycle time, velocity, the queue, batch size,
+One page per repository, in four tabs: **flow** (wait and cycle time, velocity as the relative complexity of tasks completed per week, the queue, batch size,
 work mix, flow efficiency, iterations, spec lead time, rework, escapes, check compliance), **DORA** (the
 four keys approximated to the release tag), **spend** (reported and allocated spend by period, cost class,
 spec, provider, model, and operator; the plan's cost per token; cost per change and per release), and

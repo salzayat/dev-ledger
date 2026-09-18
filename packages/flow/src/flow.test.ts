@@ -1890,3 +1890,80 @@ test('flow efficiency counts only active time inside the cycle window, and spec 
   // From the proposal's first commit, not the trailer's: the fixture advances hours between commits.
   assert.ok((lead.max ?? 0) >= 3 * 3600, `lead ${lead.max}`);
 });
+
+test('velocity is the relative complexity of tasks completed per week, unweighted tasks counting one', () => {
+  const fixture = makeFixtureRepo();
+  const draft = openPullRequest(fixture, 'draft', [
+    [
+      'docs(openspec): draft add-t',
+      {
+        'openspec/changes/add-t/tasks.md': [
+          '# Tasks',
+          '- [ ] 1.1 ~3 build the thing',
+          '- [ ] 1.2 ~5 test the thing',
+          '- [ ] 1.3 document it',
+          '',
+        ].join('\n'),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, draft, 'docs(openspec): draft add-t');
+  const work = openPullRequest(fixture, 'work', [
+    [
+      'feat(t): build and test',
+      {
+        'openspec/changes/add-t/tasks.md': [
+          '# Tasks',
+          '- [x] 1.1 ~3 build the thing',
+          '- [x] 1.2 ~5 test the thing',
+          '- [ ] 1.3 document it',
+          '',
+        ].join('\n'),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, work, 'feat(t): build and test');
+  const archive = openPullRequest(fixture, 'archive', [
+    [
+      'docs(openspec): archive add-t',
+      {
+        'openspec/changes/archive/2026-09-18-add-t/tasks.md': [
+          '# Tasks',
+          '- [x] 1.1 ~3 build the thing',
+          '- [x] 1.2 ~5 test the thing',
+          '- [x] 1.3 document it',
+          '',
+        ].join('\n'),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, archive, 'docs(openspec): archive add-t');
+  const built = build(registryFor(fixture.dir));
+  const repo = built.repo;
+  const velocity = repo.signals!.velocity;
+  assert.equal(velocity.tasks, 3);
+  assert.equal(
+    velocity.complexity,
+    9,
+    '3 + 5, and the unweighted task counts one',
+  );
+  assert.equal(velocity.unweightedTasks, 1);
+  assert.ok(
+    velocity.complexityPerWeek !== null && velocity.complexityPerWeek > 0,
+  );
+  const workChange = repo.changes.find((c) => c.id === work.mergedAs) as
+    { tasks: unknown[] } | undefined;
+  assert.equal(
+    (workChange?.tasks ?? []).length,
+    2,
+    'the work change ticked two tasks',
+  );
+  const archiveChange = repo.changes.find((c) => c.id === archive.mergedAs) as
+    { tasks: { id: string }[] } | undefined;
+  assert.deepEqual(
+    archiveChange?.tasks.map((t) => t.id),
+    ['1.3'],
+    'the archive move re-ticks nothing',
+  );
+  assert.match(renderLedgerHtml(built.projection), /complexity per week/);
+});

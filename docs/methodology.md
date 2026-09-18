@@ -198,10 +198,13 @@ rather than extending it, so a repository that wants that churn counted can say 
 
 ## Velocity, and what it is not
 
-The Ledger reports story points and changes merged per week over the measured window, from the effort
-trailers already recorded. Changes recording no points are excluded and counted, never read as zero points,
-so a window in which half the work carried no estimate reports the half it could measure and says how much
-it could not.
+Velocity needs a size declared before the work, and the repository already holds one: every change's
+`tasks.md`. A task line may carry a relative complexity after its identifier (`- [x] 1.2 ~3 ...`), and a
+change completes the tasks that are ticked at its last commit and were not at its base, keyed by change
+name so that archiving a list completes nothing. The Ledger reports the summed complexity of completed
+tasks per week, with tasks and changes per week beside it. An unweighted task counts one and the panel says
+how many were unweighted, never guessing a weight. Story points per week remain where a change recorded
+them, with the changes that recorded none excluded and counted.
 
 It is per repository and per week. There is no velocity per operator and there will not be: the operator
 dimension exists to compare agent labour with human labour on the same change, not to rank people by

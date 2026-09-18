@@ -91,6 +91,9 @@ export function renderRepository(repository: RepositoryProjection): string[] {
     } [reported]`,
   );
   lines.push(
+    `  velocity: ${signals.velocity.complexityPerWeek ?? 'n/a'} complexity per week over ${signals.velocity.weeks} weeks (${signals.velocity.tasks} tasks, ${signals.velocity.unweightedTasks} unweighted; ${signals.velocity.changesPerWeek ?? 'n/a'} changes per week) [observed]`,
+  );
+  lines.push(
     `  coverage: ${signals.coverage.agent} with an agent session, ${signals.coverage.humanOnly} human-only, ${signals.coverage.undeclared} undeclared, ${signals.coverage.unreported} unreported of ${signals.coverage.total}`,
   );
   const allocation = signals.allocation;

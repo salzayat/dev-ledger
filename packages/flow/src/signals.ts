@@ -4,6 +4,7 @@ import type { Change } from './history.ts';
 import type { Thresholds } from './registry.ts';
 import type { ChangeSessions, SessionRecord } from './sessions.ts';
 import type { SubscriptionRecord } from './subscriptions.ts';
+import type { CompletedTask } from './tasks.ts';
 import type { Timing } from './timing.ts';
 
 // The flow signals. Every read states the trust classes it used and how many changes it excluded, cites
@@ -383,6 +384,13 @@ export type DoraSignals = {
 export type Velocity = {
   trust: string[];
   weeks: number;
+  /** Tasks completed in the window and their summed relative complexity, unweighted tasks counting one. */
+  tasks: number;
+  complexity: number;
+  /** Completed tasks that declared no weight: counted one each, and stated. */
+  unweightedTasks: number;
+  complexityPerWeek: number | null;
+  tasksPerWeek: number | null;
   storyPoints: number;
   changes: number;
   pointsPerWeek: number | null;
@@ -394,6 +402,10 @@ export type Velocity = {
 
 export type WeeklyBucket = {
   week: string;
+  /** Tasks completed by changes merged that week, and their summed relative complexity. */
+  tasks: number;
+  complexity: number;
+  unweightedTasks: number;
   /** Story points merged that week, from the changes that recorded them. */
   storyPoints: number;
   /** Changes merged that week recording no points: excluded from velocity, never read as zero points. */
@@ -430,6 +442,8 @@ export type ChangeFacts = {
   deletions: number;
   /** Subjects of the branch commits a merge commit brought in, oldest first; empty for a squash or a push. */
   branchSubjects: string[];
+  /** OpenSpec tasks this change ticked, with their relative complexity where declared. */
+  tasks: CompletedTask[];
 };
 
 function percentile(sorted: number[], fraction: number): number | null {
@@ -1478,6 +1492,9 @@ export function computeSignals(
       const week = new Date(cursor).toISOString().slice(0, 10);
       weeklyMap.set(week, {
         week,
+        tasks: 0,
+        complexity: 0,
+        unweightedTasks: 0,
         storyPoints: 0,
         withoutPoints: 0,
         changes: 0,
@@ -1489,6 +1506,13 @@ export function computeSignals(
     for (const fact of facts) {
       const bucket = weeklyMap.get(weekOf(fact.change.mergeTime))!;
       bucket.changes += 1;
+      for (const task of fact.tasks) {
+        bucket.tasks += 1;
+        bucket.complexity += task.weight ?? 1;
+        if (task.weight === null) {
+          bucket.unweightedTasks += 1;
+        }
+      }
       const points = numberOr(fact.change.trailers['Story-Points']);
       if (points === null) {
         bucket.withoutPoints += 1;
@@ -1514,9 +1538,29 @@ export function computeSignals(
     (sum, week) => sum + week.withoutPoints,
     0,
   );
+  const velocityTasks = weekly.reduce((sum, week) => sum + week.tasks, 0);
+  const velocityComplexity = weekly.reduce(
+    (sum, week) => sum + week.complexity,
+    0,
+  );
+  const velocityUnweighted = weekly.reduce(
+    (sum, week) => sum + week.unweightedTasks,
+    0,
+  );
   const velocity: Velocity = {
     trust: ['observed'],
     weeks: weekly.length,
+    tasks: velocityTasks,
+    complexity: velocityComplexity,
+    unweightedTasks: velocityUnweighted,
+    complexityPerWeek:
+      weekly.length > 0
+        ? Math.round((velocityComplexity / weekly.length) * 100) / 100
+        : null,
+    tasksPerWeek:
+      weekly.length > 0
+        ? Math.round((velocityTasks / weekly.length) * 100) / 100
+        : null,
     storyPoints: velocityPoints,
     changes: velocityChanges,
     // No weeks means no rate. A zero would claim nothing shipped over a window that does not exist.
@@ -1529,7 +1573,7 @@ export function computeSignals(
         ? Math.round((velocityChanges / weekly.length) * 100) / 100
         : null,
     excludedWithoutPoints: withoutPoints,
-    note: 'story points and changes merged per week over the measured window; changes recording no points are excluded and counted',
+    note: "relative complexity of the OpenSpec tasks completed per week, read from each change's task list; an unweighted task counts one and is stated; story points and changes per week sit beside it",
   };
   const trends = {
     weekly,
