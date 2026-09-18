@@ -23,7 +23,10 @@ contract.
 | Capture git environment (defect)                  | `fix-capture-git-environment`                                 | Complete |
 | Session figures (telemetry capture)               | `add-session-figures-from-transcript`                         | Complete |
 | Review fixes (session figures, Board links)       | `fix-transcript-figures-and-board-links`                      | Complete |
+| Session trailer default (defect)                  | `fix-session-none-default`                                    | Pending  |
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
+| Subscription and operator spend (phase one)       | `add-subscription-and-operator-spend`                         | Blocked  |
+| Board publication (phase one)                     | `add-board-publication`                                       | Blocked  |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -90,6 +93,31 @@ repository that follows the OpenSpec loop (spec lead time), and the cost figures
 token counts are real. It follows the DORA signals row for the weekly buckets and the review fixes row for
 the figures, and it is drafted rather than started. Every read that needs a review, a check run, a
 deployment, or an incident stays in the change audit row.
+
+The session trailer default row is a defect fix, not a capability, and it comes before the rows below it
+because it corrects a record every later row reads. Two accepted specs give `Session: none` two meanings:
+capture writes it whenever no session is active, and the projection reads it as a declaration that a human
+worked without an agent. Because ending a session unsets the active session, every commit made after a
+session is recorded — a review fix, a follow-up, a revert — is silently declared human-only, which
+falsifies the coverage counts the flow efficiency row accepts. The fix writes no trailer when nothing is
+known, leaving the change `undeclared`, and makes the human-only declaration something an operator states.
+
+The subscription and operator spend row comes before board publication because every currency figure The
+Board renders is `$0.00` today: validation requires a subscription session to record no marginal cost, and
+every recorded session is a subscription session, so what a plan costs is a fact no record holds. It adds a
+subscription cost record per billing period, allocates that amount across the period's sessions in
+proportion to agent run seconds, and admits the operator as a dimension covering agents and humans alike —
+agents in currency, humans in hours, never summed and never priced. It supersedes the accepted prohibition
+on operator-keyed figures; pseudonymity stays enforced where it always was, in the record schema. It follows
+the flow efficiency and work mix row because both modify `Flow signals per repository and in aggregate`, and
+whichever archives second is rebased onto the first.
+
+The board publication row follows it because a published page should not lead with a spend panel reading
+zero over the repository's whole history. It builds The Board on every pull request as a run artifact and a
+job summary, and deploys it to Pages from the default branch only, gated on the repository being public —
+the repository is private until the first release, so the gate lives in the workflow rather than in a
+sequencing note. It also modifies `A registry of repositories synced over SSH`, which the flow efficiency
+and work mix row modifies too.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
