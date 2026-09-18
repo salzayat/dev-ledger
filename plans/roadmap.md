@@ -23,7 +23,7 @@ contract.
 | Capture git environment (defect)                  | `fix-capture-git-environment`                                 | Complete |
 | Session figures (telemetry capture)               | `add-session-figures-from-transcript`                         | Complete |
 | Review fixes (session figures, Ledger links)      | `fix-transcript-figures-and-board-links`                      | Complete |
-| Session trailer default (defect)                  | `fix-session-none-default`                                    | Pending  |
+| Session trailer default (defect)                  | `fix-session-none-default`                                    | Complete |
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (phase one addendum)           | `add-operator-dimension`                                      | Complete |

@@ -39,5 +39,5 @@
 - [x] 4.6 Verify the coverage counts over a fixture containing one agent-session change, one declared
       human-only change, and one change committed with no active session, and assert each lands in its own
       count.
-- [ ] 4.7 Run `npm run check`, and run a commit through the installed hooks end to end in each of the three
+- [x] 4.7 Run `npm run check`, and run a commit through the installed hooks end to end in each of the three
       states, recording the results in the pull request.
