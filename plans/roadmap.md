@@ -27,6 +27,7 @@ contract.
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
+| Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Blocked  |
 | Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Pending  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
@@ -124,6 +125,15 @@ real when it lands. It was archived after its implementation had merged, out of 
 asks for; the flow efficiency and work mix draft, which modifies the same registry requirement, was rebased
 onto the accepted text in the same change.
 
+The operator hours row is a defect fix that follows the operator dimension row directly. Enabling cost
+allocation made two operator fields mandatory on every session record while nothing produced them, so all
+nineteen committed records failed validation and every new one would have. It derives the figure from the
+operator's own prompts in the session transcript — the time they spent prompting in the message thread, with
+the harness's own tool traffic excluded, since that traffic would otherwise report an engineer as present
+through an unattended agent run — and it stops treating an absent figure as an invalid record, so a missing
+operator figure is counted the way every other missing figure in this repository already is. It is
+`Blocked` only on archive order: `add-operator-dimension` is implemented and merged but not yet archived, and
+this change amends the requirement that one enabled.
 The allocated token rate row relates the two figures the subscription work left unrelated: what a period
 cost and how many tokens its sessions reported. Input and output lead the denominator and cache reads sit
 beside it, because over this repository's own records the two differ by more than two orders of magnitude,

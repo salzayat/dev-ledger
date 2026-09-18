@@ -5,6 +5,7 @@ import type { TelemetryConfig } from './config.ts';
 export const SESSION_SCHEMA_VERSION = 1;
 export const SESSIONS_PATH = '.telemetry/sessions';
 export const IDLE_CAP_ALGORITHM = 'idle-cap-v1';
+export const ATTRIBUTION_ALGORITHM = 'prompt-attribution-v1';
 
 export type BillingKind = 'metered' | 'subscription';
 export type CheckOutcome = 'passed' | 'failed' | 'not-run';
@@ -34,6 +35,8 @@ export type SessionFile = {
   costClass?: string;
   operatorActiveSeconds?: number;
   operatorActiveAlgorithm?: string;
+  agentAutonomousSeconds?: number;
+  idleSeconds?: number;
   operatorId?: string | null;
   corrects?: string;
 };
@@ -48,6 +51,68 @@ export function sessionFilePath(sessionId: string, endedAt: string): string {
     throw new Error(`endedAt must be an ISO 8601 timestamp, got "${endedAt}"`);
   }
   return `${SESSIONS_PATH}/${month}/${sessionId}.json`;
+}
+
+export type TimeAttribution = {
+  /** Man hours, in seconds: time a person was working the thread. */
+  operatorActiveSeconds: number;
+  /** Time the agent was producing on its own, with no person required. */
+  agentAutonomousSeconds: number;
+  /** Time the thread sat open with nobody in it. */
+  idleSeconds: number;
+};
+
+/**
+ * Splits the span between an operator's first and last prompt into three, from timestamps alone.
+ *
+ * Between one prompt and the next, the agent works first and the person works last: the agent runs until
+ * its final record in that gap, then the person reads what came back, thinks, and types. So the span up to
+ * that last agent record is autonomous, and the tail after it belongs to the operator — up to the idle cap,
+ * beyond which the thread was simply left open and the remainder is idle.
+ *
+ * The three sum to the span, which is what makes the figure checkable. Capping the whole gap instead, with
+ * no notion of who was producing, charges an unattended agent run to the person: over this repository's own
+ * transcripts that reads about 1.75 times the man hours actually worked.
+ */
+export function attributeTranscriptTime(
+  events: { timestamp: string; kind: 'prompt' | 'agent' }[],
+  idleCapSeconds: number,
+): TimeAttribution {
+  const at = (value: string) => Date.parse(value);
+  const ordered = events
+    .filter((event) => !Number.isNaN(at(event.timestamp)))
+    .sort((a, b) => at(a.timestamp) - at(b.timestamp));
+  const prompts = ordered.filter((event) => event.kind === 'prompt');
+  const attribution: TimeAttribution = {
+    operatorActiveSeconds: 0,
+    agentAutonomousSeconds: 0,
+    idleSeconds: 0,
+  };
+  for (let index = 1; index < prompts.length; index += 1) {
+    const from = at(prompts[index - 1].timestamp);
+    const to = at(prompts[index].timestamp);
+    let lastAgent = from;
+    for (const event of ordered) {
+      const when = at(event.timestamp);
+      if (event.kind === 'agent' && when > from && when <= to) {
+        lastAgent = Math.max(lastAgent, when);
+      }
+    }
+    const autonomous = (lastAgent - from) / 1000;
+    const tail = (to - lastAgent) / 1000;
+    const working = Math.min(tail, idleCapSeconds);
+    attribution.agentAutonomousSeconds += autonomous;
+    attribution.operatorActiveSeconds += working;
+    attribution.idleSeconds += tail - working;
+  }
+  attribution.operatorActiveSeconds = Math.round(
+    attribution.operatorActiveSeconds,
+  );
+  attribution.agentAutonomousSeconds = Math.round(
+    attribution.agentAutonomousSeconds,
+  );
+  attribution.idleSeconds = Math.round(attribution.idleSeconds);
+  return attribution;
 }
 
 /**
@@ -188,17 +253,26 @@ export function validateSessionFile(
     );
   }
   if (config.costAllocation.enabled) {
+    // Absence is counted by the reads, not rejected here. A harness that cannot supply the figure — every
+    // harness before this was derived, and any transcript with fewer than two prompts — writes a record of
+    // work whose operator time is unknown, which is the same class of fact as `figuresMissing` and is
+    // handled the same way: excluded and counted, never zero and never fatal. A figure that is present and
+    // malformed is still an error.
     if (
-      typeof file.operatorActiveSeconds !== 'number' ||
-      file.operatorActiveSeconds < 0
+      file.operatorActiveSeconds !== undefined &&
+      (typeof file.operatorActiveSeconds !== 'number' ||
+        file.operatorActiveSeconds < 0)
     ) {
       errors.push(
-        'operatorActiveSeconds must be a non-negative number when cost allocation is enabled',
+        'operatorActiveSeconds must be a non-negative number when present',
       );
     }
-    if (typeof file.operatorActiveAlgorithm !== 'string') {
+    if (
+      file.operatorActiveAlgorithm !== undefined &&
+      typeof file.operatorActiveAlgorithm !== 'string'
+    ) {
       errors.push(
-        'operatorActiveAlgorithm must name the algorithm when cost allocation is enabled',
+        'operatorActiveAlgorithm must name the algorithm when present',
       );
     }
     if (file.operatorId !== null && file.operatorId !== undefined) {
@@ -236,6 +310,10 @@ export type SessionInput = {
   costClass?: string;
   agentRunSeconds?: number;
   operatorEvents?: string[];
+  operatorActiveSeconds?: number;
+  operatorActiveAlgorithm?: string;
+  agentAutonomousSeconds?: number;
+  idleSeconds?: number;
   operatorId?: string | null;
   corrects?: string;
 };
@@ -295,11 +373,35 @@ export function buildSessionFile(
     if (input.costClass) {
       file.costClass = input.costClass;
     }
-    file.operatorActiveSeconds = computeOperatorActiveSeconds(
-      input.operatorEvents ?? [],
-      config.costAllocation.idleCapSeconds,
-    );
-    file.operatorActiveAlgorithm = `${IDLE_CAP_ALGORITHM}:${config.costAllocation.idleCapSeconds}`;
+    // A stated figure wins; otherwise the events supply one. Fewer than two events measures no engagement,
+    // so the figure is left absent rather than written as a zero the reads would have to trust.
+    const events = input.operatorEvents ?? [];
+    // A stated figure comes from the transcript attribution, which knows who was producing; bare operator
+    // events can only be capped flatly. The recorded algorithm names whichever actually ran, so a figure
+    // never claims to know more than it does.
+    const attributed = input.operatorActiveSeconds !== undefined;
+    const seconds =
+      input.operatorActiveSeconds ??
+      (events.length >= 2
+        ? computeOperatorActiveSeconds(
+            events,
+            config.costAllocation.idleCapSeconds,
+          )
+        : undefined);
+    if (seconds !== undefined) {
+      file.operatorActiveSeconds = seconds;
+      file.operatorActiveAlgorithm =
+        input.operatorActiveAlgorithm ??
+        `${attributed ? ATTRIBUTION_ALGORITHM : IDLE_CAP_ALGORITHM}:${config.costAllocation.idleCapSeconds}`;
+      // The other two spans travel with it, so a reader can check that they sum to the session's span and
+      // see how much of it needed nobody.
+      if (input.agentAutonomousSeconds !== undefined) {
+        file.agentAutonomousSeconds = input.agentAutonomousSeconds;
+      }
+      if (input.idleSeconds !== undefined) {
+        file.idleSeconds = input.idleSeconds;
+      }
+    }
     file.operatorId =
       input.operatorId &&
       config.costAllocation.operators.includes(input.operatorId)
