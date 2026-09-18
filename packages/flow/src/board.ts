@@ -121,6 +121,31 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   lines.push(
     `  allocation excluded: ${allocation.excluded.noAgentSeconds} sessions with no agent seconds, ${allocation.excluded.noPeriodRecord} with no period record, ${allocation.excluded.invalidSession} invalid sessions, ${allocation.excluded.invalidRecord} invalid records (counted, never zeroed)`,
   );
+  // The operator dimension: agents in the subscription's currency, humans in hours. Kept as separate lines
+  // because the two units are never summed — no record holds a rate that could combine them.
+  const operators = signals.operators;
+  for (const [key, agent] of Object.entries(operators.agents)) {
+    const amounts =
+      Object.entries(agent.currencies)
+        .map(([currency, amount]) =>
+          money(amount.amount + amount.overage, currency),
+        )
+        .join(' ') || 'no subscription period';
+    lines.push(
+      `  agent ${key}: ${amounts}${agent.provisional ? ' (provisional)' : ''}, ${(agent.inputTokens + agent.outputTokens).toLocaleString('en-US')} tokens over ${agent.sessions} sessions`,
+    );
+  }
+  for (const [id, human] of Object.entries(operators.humans)) {
+    lines.push(
+      `  operator ${id}: ${human.hours.toFixed(1)} h over ${human.sessions} sessions`,
+    );
+  }
+  if (Object.keys(operators.humans).length === 0) {
+    lines.push('  operator hours: none recorded');
+  }
+  lines.push(
+    `  operator excluded: ${operators.excluded.humanOnly} human-only changes, ${operators.excluded.noOperator} sessions without an operator identifier (counted, never zeroed) [${operators.trust.join(', ')}]`,
+  );
   lines.push(
     `  ${spendLine('spend total', signals.spend.total)} [${signals.spend.trust.join(', ')}]`,
   );

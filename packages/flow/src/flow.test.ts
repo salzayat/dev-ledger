@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { renderBoard } from './board.ts';
+import { renderBoardHtml } from './board-html.ts';
 import { advanceCursor } from './cursor.ts';
 import {
   commit,
@@ -564,7 +565,91 @@ test('the board renders an empty state and never a person dimension', () => {
   const { projection } = build(registryFor(fixture.dir));
   const text = renderBoard(projection);
   assert.match(text, /no changes on the default branch yet|cycle time/);
-  assert.doesNotMatch(text, /operator|author/i);
+  // The operator dimension is now a read, so the board may name an operator. What it must never do is
+  // resolve one to a person: no name, no email address, no author.
+  assert.doesNotMatch(text, /author|@[a-z0-9.-]+\.[a-z]{2,}/i);
+});
+
+test('the operator dimension keeps agents in currency, humans in hours, and neither in the other', () => {
+  const fixture = makeFixtureRepo();
+  writeFiles(fixture, {
+    'telemetry.config.json': JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: ['op-1'],
+        costClasses: ['rd', 'production'],
+      },
+    }),
+  });
+  commit(fixture, 'chore(repo): enable cost allocation', {});
+
+  const worked = openPullRequest(fixture, 'w1', [
+    [
+      trailered('feat(w): agent and human', {
+        Session: 's-op',
+        Change: 'c-w1',
+      }),
+      {
+        'src/w.ts': 'v1',
+        '.telemetry/subscriptions/2026-09/plan-x.json': subscriptionJson(
+          'plan-x',
+          '2026-09',
+          100,
+        ),
+        '.telemetry/sessions/2026-09/s-op.json': sessionJson('s-op', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-x',
+          costUsd: 0,
+          agentRunSeconds: 3600,
+          operatorActiveSeconds: 5400,
+          operatorActiveAlgorithm: 'idle-cap-v1:900',
+          operatorId: 'op-1',
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, worked, 'feat(w): agent and human', 'Session: s-op', {
+    hours: 24,
+  });
+
+  // A change declaring human-only work has hours no record holds: excluded and counted, never zero.
+  const alone = openPullRequest(fixture, 'h1', [
+    [
+      trailered('docs(h): by hand', { Session: 'none', Change: 'c-h1' }),
+      { 'docs/h.md': 'hand' },
+    ],
+  ]);
+  mergeSquash(fixture, alone, 'docs(h): by hand', 'Session: none', {
+    hours: 24,
+  });
+
+  const { repo, projection } = build(registryFor(fixture.dir));
+  const operators = repo.signals.operators;
+
+  // The human is measured in hours, from operatorActiveSeconds alone.
+  assert.ok(operators.humans['op-1'], 'the declared operator is a dimension');
+  assert.equal(operators.humans['op-1'].hours, 1.5);
+  assert.equal(operators.humans['op-1'].sessions, 1);
+
+  // The agent is measured in the subscription's currency: the sole eligible session takes the whole period.
+  const agent = operators.agents['provider-a/model-x'];
+  assert.ok(agent, 'the agent operator is a dimension');
+  assert.equal(agent.currencies.USD.amount, 100);
+
+  // Human-only work is counted as an exclusion rather than read as an operator working no hours.
+  assert.equal(operators.excluded.humanOnly, 1);
+
+  // No figure crosses the two units, and no identifier resolves to a person.
+  const html = renderBoardHtml(projection);
+  assert.match(html, /op-1/);
+  assert.match(html, /1\.5 h/);
+  assert.doesNotMatch(html, /\$[0-9.]+\s*(<[^>]*>)?\s*(per hour|\/ ?h\b)/i);
+  assert.doesNotMatch(html, /hourlyRate|salary|compensation/i);
+  // The operator's own row carries hours and never a currency amount.
+  const row = html.slice(html.indexOf('>op-1<'), html.indexOf('>op-1<') + 400);
+  assert.doesNotMatch(row, /\$/);
 });
 
 test('a projection built over many synthetic changes stays well under a minute', () => {

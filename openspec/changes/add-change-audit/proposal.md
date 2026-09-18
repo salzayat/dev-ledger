@@ -66,8 +66,10 @@ tagged).
 
 - No compliance certification. A pack is evidence for named controls; no output claims a system is
   compliant with any standard.
-- No per-person aggregation anywhere, including evidence packs. A rule may compare the actors on one change
-  record and may never group, count, rank, or trend by person across records.
+- No identifier resolved to a person anywhere, including evidence packs. `add-operator-dimension` admits a
+  pseudonymous operator as a dimension of the flow reads, so this change no longer forbids aggregating by
+  that identifier; it forbids resolving one to a name or an email address, and forbids pricing a human
+  operator's hours at any rate. A rule may compare the actors on one change record.
 - No credential outside this repository's continuous integration, and none by default. The collector is
   off until a repository's configuration turns it on and a maintainer provisions the credential.
 - No workflow in any audited repository. Producing agent reviews inside an audited repository is a later

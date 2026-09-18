@@ -7,6 +7,7 @@ import type {
   Distribution,
   RepositorySignals,
   Spend,
+  Operators,
 } from './signals.ts';
 
 // The Board as one self-contained HTML page: inline styles, inline SVG, no script, no loaded resource.
@@ -451,6 +452,62 @@ function spendTable(
   );
 }
 
+/**
+ * The operator dimension: two tables, never one. Agents carry currency and tokens, humans carry hours, and
+ * there is deliberately no total row across them — no record in this repository holds a rate, so a combined
+ * figure could only be invented. Each human operator is its pseudonymous identifier and nothing else.
+ */
+function operatorPanel(operators: Operators, links: Links): string {
+  const agents = Object.entries(operators.agents).sort(
+    ([, a], [, b]) => b.sessions - a.sessions,
+  );
+  const humans = Object.entries(operators.humans).sort(
+    ([, a], [, b]) => b.hours - a.hours,
+  );
+
+  const money = (agent: Operators['agents'][string]): string => {
+    const parts = Object.entries(agent.currencies).map(
+      ([currency, amount]) =>
+        `${currency === 'USD' ? '$' : ''}${(amount.amount + amount.overage).toFixed(2)}${currency === 'USD' ? '' : ' ' + escapeHtml(currency)}`,
+    );
+    if (parts.length === 0) {
+      return '<span class="dim">no subscription period</span>';
+    }
+    return `${parts.join(' ')}${agent.provisional ? ' <span class="dim">provisional</span>' : ''}`;
+  };
+
+  const agentRows =
+    agents
+      .map(
+        ([key, agent]) =>
+          `<tr><td>${escapeHtml(key)}</td><td class="num">${money(agent)}</td><td class="num">${(agent.inputTokens + agent.outputTokens).toLocaleString('en-US')}</td><td class="num">${agent.sessions}</td><td>${cites('records', agent.cites, links)}</td></tr>`,
+      )
+      .join('') ||
+    '<tr><td colspan="5" class="dim">no agent session recorded</td></tr>';
+
+  const humanRows =
+    humans
+      .map(
+        ([id, human]) =>
+          `<tr><td>${escapeHtml(id)}</td><td class="num">${human.hours.toFixed(1)} h</td><td class="num">${human.sessions}</td><td>${cites('records', human.cites, links)}</td></tr>`,
+      )
+      .join('') ||
+    '<tr><td colspan="4" class="dim">no operator hours recorded yet</td></tr>';
+
+  const excluded = [
+    `${operators.excluded.humanOnly} human-only`,
+    `${operators.excluded.noOperator} without an operator identifier`,
+  ].join(', ');
+
+  return panel(
+    'Spend by operator',
+    `<div class="scroll"><table><thead><tr><th>agent</th><th class="num">allocated</th><th class="num">tokens</th><th class="num">sessions</th><th>cites</th></tr></thead><tbody>${agentRows}</tbody></table></div>` +
+      `<div class="scroll"><table><thead><tr><th>operator</th><th class="num">hours</th><th class="num">sessions</th><th>cites</th></tr></thead><tbody>${humanRows}</tbody></table></div>` +
+      `<p class="meta">Hours and currency are different units and are never summed; no rate exists in any record to convert one into the other.</p>`,
+    `${trustBadges(operators.trust)} agents in the subscription's currency and tokens, humans in hours, each identified by a pseudonymous identifier alone; excluded: ${escapeHtml(excluded)} (counted, never zeroed)`,
+  );
+}
+
 type ChangeRow = {
   id: string;
   subject: string;
@@ -820,6 +877,7 @@ ${changesTable(changes, signals.spend.byChange, links, signals.allocation)}
 ${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.bySpec)}
 ${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byProvider)}
 ${spendTable('Spend by model', signals.spend.byModel, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byModel)}
+${operatorPanel(signals.operators, links)}
 ${panel(
   'Cost per unit of effort',
   effortRows
