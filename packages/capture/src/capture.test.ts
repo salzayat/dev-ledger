@@ -3,13 +3,14 @@ import test from 'node:test';
 import { DEFAULT_CONFIG, parseConfig } from './config.ts';
 import {
   buildSessionFile,
+  attributeTranscriptTime,
   computeOperatorActiveSeconds,
   sessionFilePath,
   validateSessionFile,
 } from './session.ts';
 import { formatTrailers, parseTrailers, validateMessage } from './trailers.ts';
 import { gitEnvironment, sessionSummary } from './cli.ts';
-import { sumTranscriptUsage } from './figures.ts';
+import { operatorPromptTimes, sumTranscriptUsage } from './figures.ts';
 import {
   buildSubscriptionFile,
   subscriptionFilePath,
@@ -51,6 +52,160 @@ const baseSession = {
   commits: ['abc'],
   localCheck: { outcome: 'passed', command: 'npm run check' },
 };
+
+test('time between prompts splits into operator, autonomous, and idle', () => {
+  // 10:00 prompt; the agent works until 10:40; the operator reads and replies at 10:45.
+  // Then a second prompt at 11:30 with no agent activity between: the thread sat open.
+  const events = [
+    { timestamp: '2026-09-18T10:00:00Z', kind: 'prompt' as const },
+    { timestamp: '2026-09-18T10:20:00Z', kind: 'agent' as const },
+    { timestamp: '2026-09-18T10:40:00Z', kind: 'agent' as const },
+    { timestamp: '2026-09-18T10:45:00Z', kind: 'prompt' as const },
+    { timestamp: '2026-09-18T11:30:00Z', kind: 'prompt' as const },
+  ];
+  const split = attributeTranscriptTime(events, 900);
+
+  // First gap: 40 minutes autonomous, then 5 minutes of a person reading and typing.
+  // Second gap: 45 minutes with nobody producing — 15 capped as the operator, 30 idle.
+  assert.equal(split.agentAutonomousSeconds, 40 * 60);
+  assert.equal(split.operatorActiveSeconds, 5 * 60 + 15 * 60);
+  assert.equal(split.idleSeconds, 30 * 60);
+
+  // The three account for the whole span between first and last prompt, which is what makes them checkable.
+  const span = 90 * 60;
+  assert.equal(
+    split.agentAutonomousSeconds +
+      split.operatorActiveSeconds +
+      split.idleSeconds,
+    span,
+  );
+
+  // A flat cap over the same gaps cannot tell the agent's 40 minutes from the person's 5.
+  assert.equal(
+    computeOperatorActiveSeconds(
+      events.filter((event) => event.kind === 'prompt').map((e) => e.timestamp),
+      900,
+    ),
+    30 * 60,
+    'the flat cap charges the unattended agent run to the operator',
+  );
+  assert.ok(
+    split.operatorActiveSeconds < 30 * 60,
+    'attribution reports less man time than the flat cap, because it knows who was producing',
+  );
+});
+
+test('operator hours count prompts and never tool results', () => {
+  // Shaped like a real transcript: a prompt, a long unattended agent turn whose tool results come back as
+  // user-addressed records, then the next prompt. Only the two prompts are operator events.
+  const lines = [
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:00:00Z',
+      message: { content: 'do the thing' },
+    }),
+  ];
+  for (let index = 0; index < 40; index += 1) {
+    lines.push(
+      JSON.stringify({
+        type: 'user',
+        timestamp: `2026-09-18T10:${String(index + 1).padStart(2, '0')}:00Z`,
+        message: {
+          content: [{ type: 'tool_result', content: 'file contents here' }],
+        },
+      }),
+    );
+    lines.push(
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: `2026-09-18T10:${String(index + 1).padStart(2, '0')}:30Z`,
+        message: { content: [{ type: 'text', text: 'working' }] },
+      }),
+    );
+  }
+  lines.push(
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:50:00Z',
+      message: { content: [{ type: 'text', text: 'now the next thing' }] },
+    }),
+  );
+  const text = lines.join('\n');
+
+  const times = operatorPromptTimes(text);
+  assert.deepEqual(times, ['2026-09-18T10:00:00Z', '2026-09-18T10:50:00Z']);
+
+  // Fifty minutes apart, capped at fifteen: the operator was away while the agent worked.
+  assert.equal(computeOperatorActiveSeconds(times, 900), 900);
+  // Uncapped it would have been the whole span, which is what counting tool results would have produced.
+  assert.equal(computeOperatorActiveSeconds(times, 86_400), 3000);
+});
+
+test('a transcript with one prompt records no operator time at all', () => {
+  const one = JSON.stringify({
+    type: 'user',
+    timestamp: '2026-09-18T10:00:00Z',
+    message: { content: 'only this' },
+  });
+  assert.equal(operatorPromptTimes(one).length, 1);
+  const config = {
+    ...DEFAULT_CONFIG,
+    costAllocation: {
+      ...DEFAULT_CONFIG.costAllocation,
+      enabled: true,
+      operators: ['op-1'],
+    },
+  };
+  const file = buildSessionFile({ ...baseSession, operatorEvents: [] }, config);
+  assert.equal(
+    file.operatorActiveSeconds,
+    undefined,
+    'no events measures no engagement, and an absent figure is not a zero',
+  );
+  assert.deepEqual(validateSessionFile(file, config), []);
+});
+
+test('a present operator figure is still checked', () => {
+  const config = {
+    ...DEFAULT_CONFIG,
+    costAllocation: {
+      ...DEFAULT_CONFIG.costAllocation,
+      enabled: true,
+      operators: ['op-1'],
+    },
+  };
+  const file = buildSessionFile(
+    {
+      ...baseSession,
+      operatorEvents: ['2026-09-18T10:00:00Z', '2026-09-18T10:05:00Z'],
+    },
+    config,
+  );
+  assert.equal(file.operatorActiveSeconds, 300);
+  assert.match(String(file.operatorActiveAlgorithm), /^idle-cap-v1:/);
+  assert.deepEqual(validateSessionFile(file, config), []);
+  assert.deepEqual(
+    validateSessionFile({ ...file, operatorActiveSeconds: -1 }, config),
+    ['operatorActiveSeconds must be a non-negative number when present'],
+  );
+});
+
+test('only timestamps leave a transcript when operator hours are derived', () => {
+  const text = [
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:00:00Z',
+      message: { content: 'my secret prompt text' },
+    }),
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:10:00Z',
+      message: { content: [{ type: 'text', text: 'another secret' }] },
+    }),
+  ].join('\n');
+  const serialized = JSON.stringify(operatorPromptTimes(text));
+  assert.doesNotMatch(serialized, /secret/);
+});
 
 test('a valid session file passes', () => {
   assert.deepEqual(validateSessionFile(baseSession, DEFAULT_CONFIG), []);
