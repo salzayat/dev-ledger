@@ -1,0 +1,32 @@
+{
+  "agentAutonomousSeconds": 14711,
+  "agentRunSeconds": 900,
+  "billingKind": "subscription",
+  "branch": "docs/readme-lean",
+  "cacheReadTokens": 206923969,
+  "cacheWriteTokens": 2030776,
+  "cachedTokens": 208954745,
+  "commits": [
+    "9a1f0a36a64c1453793f28ef428451e8ae436d15"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T18:33:34.053Z",
+  "figuresSource": "summed from 423 messages in the session transcript",
+  "idleSeconds": 57368,
+  "inputTokens": 11872,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorActiveAlgorithm": "prompt-attribution-v1:900",
+  "operatorActiveSeconds": 14637,
+  "operatorId": null,
+  "outputTokens": 776017,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-readme-lean",
+  "startedAt": "2026-09-18T18:32:09.659Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 84
+}
