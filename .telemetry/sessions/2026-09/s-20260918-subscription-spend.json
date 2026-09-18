@@ -1,0 +1,26 @@
+{
+  "agentRunSeconds": 3600,
+  "billingKind": "subscription",
+  "branch": "flow/subscription-spend",
+  "cachedTokens": 149671096,
+  "commits": [
+    "820755093b23a7365d9bd51974c4a3f44e5e514c"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T04:10:00Z",
+  "figuresSource": "summed from 310 messages in the session transcript",
+  "inputTokens": 8666,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 606865,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-subscription-spend",
+  "spec": "add-subscription-spend",
+  "startedAt": "2026-09-18T02:50:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 4800
+}
