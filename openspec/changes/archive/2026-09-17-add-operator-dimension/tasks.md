@@ -39,4 +39,4 @@
 - [x] 5.2 Test that changes carrying `Session: none` are excluded from human hours with their count stated.
 - [x] 5.3 Test that no name or email address appears on the rendered page and that each human operator is
       identified by its pseudonymous identifier alone.
-- [ ] 5.4 `npm run check`, and `board --html` end to end, recording the result in the pull request.
+- [x] 5.4 `npm run check`, and `board --html` end to end, recording the result in the pull request.

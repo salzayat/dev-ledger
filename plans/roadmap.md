@@ -26,14 +26,14 @@ contract.
 | Session trailer default (defect)                  | `fix-session-none-default`                                    | Pending  |
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
-| Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
-| Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Blocked  |
-| Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Pending  |
+| Operator dimension (phase one addendum)           | `add-operator-dimension`                                      | Complete |
+| Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Complete |
+| Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Complete |
 | Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Pending  |
-| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Blocked  |
+| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Pending  |
 | Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Blocked  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
-| Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Pending  |
+| Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
 | Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
@@ -155,8 +155,8 @@ that closes each, because it reads only from the projection and its page carries
 The provider neutral spend row closes the three places multi-provider work stops short: the rate covers only
 allocated spend and not the metered spend a pay-per-token provider reports directly, the reported cost names
 a currency in its field name, and cached tokens are one number defined as one provider's reads plus writes.
-It is `Blocked` behind the allocated token rate row, which it sits beside and whose denominator rule it
-follows, and which is now an active change on the default branch.
+It follows the allocated token rate row, which it sits beside and whose denominator rule it follows, and
+which is now archived.
 
 The local configuration surface row gives an operator running this repository on their own machine what the
 published page cannot have. The Board's configuration panel names gaps and the commands that close them

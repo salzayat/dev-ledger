@@ -36,4 +36,4 @@
 - [x] 5.1 Test that velocity excludes changes recording no points and states the count.
 - [x] 5.2 Test that the written page contains no script element, no external resource, and no form control.
 - [x] 5.3 Test that the DORA panels and the flow panels are in different tabs, each with its own fragment.
-- [ ] 5.4 Run `npm run check` and the ledger end to end, recording the result in the pull request.
+- [x] 5.4 Run `npm run check` and the ledger end to end, recording the result in the pull request.

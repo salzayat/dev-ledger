@@ -5,7 +5,7 @@
 Turn the commit histories of one or more repositories, fetched over the git access a developer already
 has, into the signals an engineer needs to find where work waits: cycle and wait time, the unmerged queue,
 batch size, rework, escapes, and spend per change, rebuilt into a projection that is byte-identical on any
-machine holding the same ref tips and rendered on one read surface, The Board. Reviews, checks, and
+machine holding the same ref tips and rendered on one read surface, The Ledger. Reviews, checks, and
 platform timestamps are out of scope here and belong to phase two.
 
 ## Requirements
@@ -400,122 +400,6 @@ that it did so.
 - THEN it MUST reset to the nearest reachable ancestor and replay forward
 - AND it MUST record that the reset happened
 
-### Requirement: The Board
-
-The system SHALL provide one read surface, The Board, rendering the projection per repository and across the
-registry: the flow signals and any thresholds exceeded, spend per spec reference, per provider, and per
-model, cost per unit of recorded effort, the unmerged queue, undeclared, unreported, and out-of-band changes,
-and unreachable repositories. Every figure SHALL show the trust classes it was computed from and its excluded
-count, and SHALL be traceable to the changes and records it was computed from. The Board SHALL NOT present
-any figure keyed to an operator identifier, SHALL read only from the projection, and SHALL render an explicit
-empty state when the projection has no records. The Board SHALL be available as a terminal render and as a
-static HTML dashboard written by `telemetry board --html`: one self-contained page with inline styles and
-inline SVG, containing no script element and loading no external resource, readable from a file URL, laid out
-per repository with each figure's trust classes and excluded count beside it and its citations expandable
-beneath it, working in light and dark color schemes and at phone width. On the HTML dashboard every cited
-commit SHALL render as its abbreviated hash beside the change's subject, and SHALL link to that commit on the
-hosting platform when the repository's web URL is recorded; a cited pull request SHALL link to that pull
-request and a cited session record to that file on the default branch. A hyperlink to the hosting platform is
-navigation and SHALL NOT be treated as an external resource; when no web URL is recorded the same text SHALL
-render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show each pull request's spend beside its age, and the recent-changes table SHALL show each change's spend, each rendering what the records say rather than a zero when figures are missing, with every session record cited. The Board SHALL show the four DORA
-reads as a strip of cards, each with its approximation note and its citations, a spend-over-time chart with
-the same weekly buckets as merge activity, a spend-by-cost-class panel, and the coverage counts, on both the
-HTML dashboard and the terminal render. The Board SHALL show allocated subscription spend where reported
-spend is shown: an allocated figure in the summary strip, a subscription spend panel listing each period
-with its plan, amount, overage, sessions allocated over, sessions excluded for no agent seconds, and
-whether it is closed, provisional, or unallocated, an allocated column on the spend tables, and the
-allocated share beside the reported spend in the queue and changes tables. Every allocated figure SHALL
-carry the trust class `allocated`, SHALL be marked provisional when its period has not closed, and SHALL
-cite the period record behind it; two currencies SHALL NOT be summed.
-
-#### Scenario: The Board with an empty projection
-
-- GIVEN a projection with no records
-- WHEN an operator opens The Board
-- THEN it MUST render with an explicit empty state rather than failing
-
-#### Scenario: A figure enumerates its inputs
-
-- GIVEN a panel showing cost for a spec reference
-- WHEN an operator inspects the figure
-- THEN it MUST list the changes and session records that produced it
-
-#### Scenario: The Board shows no per-operator figure
-
-- GIVEN a projection whose session records carry operator identifiers
-- WHEN an operator opens The Board
-- THEN no panel MUST group, rank, or trend any figure by operator identifier
-
-#### Scenario: The dashboard is one self-contained page
-
-- GIVEN a projection with records
-- WHEN `telemetry board --html` runs
-- THEN it MUST write one HTML file that contains no script element, no stylesheet or resource reference, and
-  no style rule loading a resource
-- AND opening that file from a file URL MUST show every panel with its trust classes, excluded count, and
-  citations without a network request
-
-#### Scenario: The dashboard renders in both color schemes and at phone width
-
-- GIVEN the written page
-- WHEN it is viewed with a dark color scheme, or in a viewport 400 pixels wide
-- THEN every panel MUST remain readable with its figures and citations visible
-
-#### Scenario: A cited commit names its change and reaches the platform
-
-- GIVEN a repository whose registry URL is a GitHub remote and a panel citing a change
-- WHEN an operator expands that panel's citations
-- THEN each citation MUST show the abbreviated hash and that change's subject
-- AND the hash MUST link to that commit under the repository's web URL
-
-#### Scenario: A repository with no web URL renders the same citations unlinked
-
-- GIVEN a repository whose registry URL is a local path
-- WHEN the dashboard is rendered
-- THEN its citations MUST still show the abbreviated hash and the change's subject
-- AND the page MUST contain no hyperlink for that repository
-
-#### Scenario: The queue shows what each pull request has cost
-
-- GIVEN an unmerged pull request with a session record carrying figures
-- WHEN an operator opens the dashboard
-- THEN that pull request's row MUST show its cost, tokens, and session count
-- AND the row MUST cite the session records behind them
-
-#### Scenario: A pull request whose records carry no figures shows no cost
-
-- GIVEN an unmerged pull request whose every session record carries `figuresMissing`
-- WHEN an operator opens the dashboard
-- THEN that pull request's row MUST say its figures are missing rather than showing a currency figure
-- AND it MUST still cite those records
-
-#### Scenario: A change with no declared session shows why, not a zero
-
-- GIVEN a change on the default branch carrying no `Session:` trailer
-- WHEN an operator opens the dashboard
-- THEN that change's row in the recent-changes table MUST read `undeclared` in place of a spend figure
-
-#### Scenario: The DORA strip names its approximations
-
-- GIVEN a repository with release tags
-- WHEN an operator opens the dashboard
-- THEN four cards MUST show deployment frequency, lead time to release, change failure rate, and time to
-  fix, each with a note naming the release tag as the approximation and each citing its tags or changes
-
-#### Scenario: An allocated figure shows its class, its period, and its provisional state
-
-- GIVEN a subscription cost record for the period of the newest commit and a session in it with agent seconds
-- WHEN an operator opens The Board
-- THEN the subscription spend panel MUST list that period as provisional citing the record
-- AND the session's change MUST show its allocated share beside its reported spend, carrying `allocated`
-
-#### Scenario: No period record renders as absence, not as zero
-
-- GIVEN a repository with subscription sessions and no subscription cost record
-- WHEN an operator opens The Board
-- THEN the allocated figure MUST read as no period record
-- AND every subscription session MUST be counted as excluded for lacking one
-
 ### Requirement: Scripts and hooks
 
 The repository SHALL provide `scripts/telemetry.sh` with `session`, `validate`, `sync`, `rebuild`, `cursor`,
@@ -600,3 +484,235 @@ projection stays a function of the ref tips.
 - WHEN the allocation is computed
 - THEN that session MUST take no share
 - AND it MUST be reported in the excluded count for lacking a period record
+
+### Requirement: The operator dimension covers agents and humans alike
+
+The projection and The Ledger SHALL offer the operator as a dimension, covering agent operators identified by
+provider and model and human operators identified by the pseudonymous `operatorId`. Agent effort SHALL be
+reported in the currency of the subscription allocation and in tokens where reported; human effort SHALL be
+reported in hours derived from `operatorActiveSeconds`. No read and no rendered figure SHALL multiply a
+human operator's hours by any rate, express a human operator's effort in currency, or sum a figure in hours
+with a figure in currency. No read SHALL resolve an `operatorId` to a name or an email address. A change
+whose commits carry `Session: none`, and a session recorded before operator capture was enabled, SHALL be
+excluded from the human-hours figure with their counts stated, and SHALL NOT be counted as zero hours.
+
+#### Scenario: Agent and human effort are reported in their own units
+
+- GIVEN a change with a session carrying both `agentRunSeconds` and `operatorActiveSeconds`
+- WHEN the operator dimension is requested
+- THEN the agent figure MUST be in currency and tokens
+- AND the human figure MUST be in hours
+- AND no figure MUST combine the two units
+
+#### Scenario: Human effort is never priced
+
+- GIVEN a projection whose session records carry `operatorActiveSeconds`
+- WHEN any read or rendered page is produced
+- THEN none MUST multiply those seconds by a rate
+- AND none MUST express a human operator's effort as a currency amount
+
+#### Scenario: Human-only work is excluded from hours, not zeroed
+
+- GIVEN a change whose commits carry `Session: none`
+- WHEN human hours are requested
+- THEN that change MUST be reported in the excluded count
+- AND it MUST NOT be counted as zero hours
+
+#### Scenario: An operator identifier is never resolved to a person
+
+- GIVEN a projection whose session records carry pseudonymous operator identifiers
+- WHEN the operator dimension is rendered
+- THEN no name or email address MUST appear
+- AND each human operator MUST be identified by its pseudonymous identifier alone
+
+### Requirement: The allocated amount is reported per token
+
+The projection SHALL report, per currency, the allocated subscription amount divided by the input and output
+tokens of the sessions that took a share of it, and SHALL report the same amount divided by those sessions'
+cache reads as a separate figure. Input and output SHALL be the headline denominator and cache reads SHALL
+NOT be added to it. A session that took a share and reported no tokens SHALL be counted and that count
+stated, so a rate computed over fewer records than it covers says so rather than reading low. A rate whose
+denominator is zero SHALL be reported as not computable rather than as zero. The rate SHALL carry the trust
+class `allocated`, SHALL cite the records behind it, and SHALL be marked provisional whenever any share
+behind it came from a period that has not closed. No read SHALL present the rate as a price, and no figure
+SHALL be derived from a price table.
+
+#### Scenario: Cache reads stay out of the headline denominator
+
+- GIVEN an allocated period whose sessions report 1,000,000 input and output tokens and 100,000,000 cache
+  reads
+- WHEN the rate is computed
+- THEN the headline rate MUST divide the amount by the 1,000,000 input and output tokens
+- AND the cache-read rate MUST be reported separately
+- AND the two MUST NOT be combined into one denominator
+
+#### Scenario: A session reporting no tokens is counted, not dropped
+
+- GIVEN an allocated period of three sessions of which one carries `figuresMissing`
+- WHEN the rate is computed
+- THEN the denominator MUST be the tokens of the two that reported them
+- AND the figure MUST state that one session reported none
+
+#### Scenario: No tokens yields no rate
+
+- GIVEN an allocated period in which no session that took a share reported tokens
+- WHEN the rate is computed
+- THEN it MUST be reported as not computable
+- AND it MUST NOT be reported as zero
+
+#### Scenario: An open period's rate is provisional
+
+- GIVEN an allocated period whose end has not passed
+- WHEN the rate is rendered
+- THEN it MUST be marked provisional
+
+### Requirement: The Ledger
+
+The system SHALL provide one read surface, The Ledger, rendering the projection per repository and across the
+registry: the flow signals and any thresholds exceeded, spend per spec reference, per provider, and per
+model, cost per unit of recorded effort, the unmerged queue, undeclared, unreported, and out-of-band changes,
+and unreachable repositories. Every figure SHALL show the trust classes it was computed from and its excluded
+count, and SHALL be traceable to the changes and records it was computed from. The Ledger SHALL group its panels
+into tabs navigated without script: each tab SHALL be reachable by a fragment on the same page and
+selected by CSS, so a tab is a URL and a link to one opens it. Flow signals and the DORA keys SHALL occupy
+separate tabs, and the remaining panels SHALL be grouped by the question each answers. The page SHALL
+contain no form control, as it already contains no script element and loads no external resource. The Ledger SHALL read only from the projection, and SHALL render an explicit
+empty state when the projection has no records. The Ledger SHALL be available as a terminal render and as a
+static HTML dashboard written by `telemetry ledger --html`: one self-contained page with inline styles and
+inline SVG, containing no script element and loading no external resource, readable from a file URL, laid out
+per repository with each figure's trust classes and excluded count beside it and its citations expandable
+beneath it, working in light and dark color schemes and at phone width. On the HTML dashboard every cited
+commit SHALL render as its abbreviated hash beside the change's subject, and SHALL link to that commit on the
+hosting platform when the repository's web URL is recorded; a cited pull request SHALL link to that pull
+request and a cited session record to that file on the default branch. A hyperlink to the hosting platform is
+navigation and SHALL NOT be treated as an external resource; when no web URL is recorded the same text SHALL
+render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show each pull request's spend beside its age, and the recent-changes table SHALL show each change's spend, each rendering what the records say rather than a zero when figures are missing, with every session record cited. The Ledger SHALL show the four DORA
+reads as a strip of cards, each with its approximation note and its citations, a spend-over-time chart with
+the same weekly buckets as merge activity, a spend-by-cost-class panel, and the coverage counts, on both the
+HTML dashboard and the terminal render. The Ledger SHALL show allocated subscription spend where reported
+spend is shown: an allocated figure in the summary strip, a subscription spend panel listing each period
+with its plan, amount, overage, sessions allocated over, sessions excluded for no agent seconds, and
+whether it is closed, provisional, or unallocated, an allocated column on the spend tables, and the
+allocated share beside the reported spend in the queue and changes tables. Every allocated figure SHALL
+carry the trust class `allocated`, SHALL be marked provisional when its period has not closed, and SHALL
+cite the period record behind it; two currencies SHALL NOT be summed.
+
+#### Scenario: The Ledger with an empty projection
+
+- GIVEN a projection with no records
+- WHEN an operator opens The Ledger
+- THEN it MUST render with an explicit empty state rather than failing
+
+#### Scenario: A figure enumerates its inputs
+
+- GIVEN a panel showing cost for a spec reference
+- WHEN an operator inspects the figure
+- THEN it MUST list the changes and session records that produced it
+
+#### Scenario: The dashboard is one self-contained page
+
+- GIVEN a projection with records
+- WHEN `telemetry ledger --html` runs
+- THEN it MUST write one HTML file that contains no script element, no stylesheet or resource reference, and
+  no style rule loading a resource
+- AND opening that file from a file URL MUST show every panel with its trust classes, excluded count, and
+  citations without a network request
+
+#### Scenario: The dashboard renders in both color schemes and at phone width
+
+- GIVEN the written page
+- WHEN it is viewed with a dark color scheme, or in a viewport 400 pixels wide
+- THEN every panel MUST remain readable with its figures and citations visible
+
+#### Scenario: A cited commit names its change and reaches the platform
+
+- GIVEN a repository whose registry URL is a GitHub remote and a panel citing a change
+- WHEN an operator expands that panel's citations
+- THEN each citation MUST show the abbreviated hash and that change's subject
+- AND the hash MUST link to that commit under the repository's web URL
+
+#### Scenario: A repository with no web URL renders the same citations unlinked
+
+- GIVEN a repository whose registry URL is a local path
+- WHEN the dashboard is rendered
+- THEN its citations MUST still show the abbreviated hash and the change's subject
+- AND the page MUST contain no hyperlink for that repository
+
+#### Scenario: The queue shows what each pull request has cost
+
+- GIVEN an unmerged pull request with a session record carrying figures
+- WHEN an operator opens the dashboard
+- THEN that pull request's row MUST show its cost, tokens, and session count
+- AND the row MUST cite the session records behind them
+
+#### Scenario: A pull request whose records carry no figures shows no cost
+
+- GIVEN an unmerged pull request whose every session record carries `figuresMissing`
+- WHEN an operator opens the dashboard
+- THEN that pull request's row MUST say its figures are missing rather than showing a currency figure
+- AND it MUST still cite those records
+
+#### Scenario: A change with no declared session shows why, not a zero
+
+- GIVEN a change on the default branch carrying no `Session:` trailer
+- WHEN an operator opens the dashboard
+- THEN that change's row in the recent-changes table MUST read `undeclared` in place of a spend figure
+
+#### Scenario: The DORA strip names its approximations
+
+- GIVEN a repository with release tags
+- WHEN an operator opens the dashboard
+- THEN four cards MUST show deployment frequency, lead time to release, change failure rate, and time to
+  fix, each with a note naming the release tag as the approximation and each citing its tags or changes
+
+#### Scenario: An allocated figure shows its class, its period, and its provisional state
+
+- GIVEN a subscription cost record for the period of the newest commit and a session in it with agent seconds
+- WHEN an operator opens The Ledger
+- THEN the subscription spend panel MUST list that period as provisional citing the record
+- AND the session's change MUST show its allocated share beside its reported spend, carrying `allocated`
+
+#### Scenario: No period record renders as absence, not as zero
+
+- GIVEN a repository with subscription sessions and no subscription cost record
+- WHEN an operator opens The Ledger
+- THEN the allocated figure MUST read as no period record
+- AND every subscription session MUST be counted as excluded for lacking one
+
+#### Scenario: Tabs need no script and no form
+
+- GIVEN a projection with records
+- WHEN `telemetry ledger --html` runs
+- THEN the written page MUST group its panels into tabs
+- AND it MUST contain no script element, no external resource, and no form control
+- AND selecting a tab MUST work from a `file:` URL
+
+#### Scenario: DORA and flow are separate tabs
+
+- GIVEN a projection carrying release tags and flow signals
+- WHEN an operator opens The Ledger
+- THEN the DORA keys and the flow signals MUST appear in different tabs
+- AND a link carrying a tab's fragment MUST open that tab
+
+### Requirement: Velocity per week
+
+The projection SHALL report velocity over the measured window: story points and changes merged per week,
+computed from the effort trailers already recorded and the weekly buckets the trends read already uses. It
+SHALL be available per repository and across the registry, SHALL state the trust classes it included, and
+SHALL exclude changes recording no points with their count stated rather than counting them as zero points.
+The Ledger SHALL render it in the flow tab with its trend as inline SVG. No velocity figure SHALL be keyed
+to an operator or to any person.
+
+#### Scenario: Velocity excludes what it cannot measure
+
+- GIVEN a window of ten merged changes of which four recorded story points
+- WHEN velocity is computed
+- THEN it MUST be computed over those four only
+- AND it MUST report that six were excluded for recording no points
+- AND it MUST NOT count them as zero points
+
+#### Scenario: Velocity is not keyed to a person
+
+- GIVEN a projection whose session records carry operator identifiers
+- WHEN velocity is computed
+- THEN it MUST NOT group, rank, or trend by operator or by person

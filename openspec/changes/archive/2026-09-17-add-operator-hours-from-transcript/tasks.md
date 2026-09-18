@@ -39,4 +39,4 @@
       negative figure still fails.
 - [x] 5.4 Test that no transcript content other than timestamps reaches the session record.
 - [x] 5.5 Run `./scripts/telemetry.sh validate` over the committed corpus and confirm it reports no error.
-- [ ] 5.6 Run `npm run check` and record the result in the pull request.
+- [x] 5.6 Run `npm run check` and record the result in the pull request.
