@@ -26,6 +26,7 @@
   ],
   "type": "module",
   "scripts": {
+    "board": "./scripts/board.sh",
     "build": "nx run-many -t build",
     "check": "./scripts/check.sh",
     "format": "prettier --write .",
