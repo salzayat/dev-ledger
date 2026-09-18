@@ -54,6 +54,11 @@ runs against the local mirrors. Two machines that fetched the same ref tips prin
   or a rate. `pre-push` refuses to push while a finished session file is uncommitted.
 - **Sessions on unmerged pull requests**, read from the pull head refs, so a failed experiment keeps its
   cost.
+- **One subscription cost record per billing period and plan**, written by
+  `./scripts/telemetry.sh subscription record --plan <id> --period <YYYY-MM> --amount <n> --currency <code>`
+  and committed. A subscription session records no marginal cost; the period record is what the plan cost,
+  and the projection apportions it across the period's sessions by agent run seconds under the trust class
+  `allocated`.
 
 The harness hook is a command: at the end of a session, pipe the harness's figures as JSON to
 `./scripts/telemetry.sh session end --payload -`. The payload fields are listed in
@@ -67,7 +72,9 @@ squash does not erase them), the unmerged queue with each pull request's age and
 frequency, rework, escapes after the newest release, local check outcomes, spend per change, per unmerged
 pull request, per spec, provider, model, and per unit of effort,
 the four DORA keys approximated to the release tag with the approximation named on each card, spend over time
-and by cost class, with every figure naming its trust classes, its excluded count, and the changes behind it. The dashboard is one
+and by cost class, and subscription spend allocated across each period's sessions by agent run seconds
+(marked `allocated`, provisional while the month is open, never summed across currencies), with every
+figure naming its trust classes, its excluded count, and the changes behind it. The dashboard is one
 self-contained HTML page with inline SVG charts, no script, and no loaded resource, readable from a file URL, in light and
 dark. Every cited commit shows the change's subject beside its abbreviated hash and links to the commit on GitHub when the
 registry URL is a GitHub remote; with any other remote the same citations render unlinked. Undeclared and
@@ -99,42 +106,44 @@ repository turns it on, every control that needs them reads as not observable.
 
 ## Key Commands
 
-| Command                                    | What it does                                                                                                      |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `npm run check`                            | The complete local quality gate: specs, harness, governance, docs, secrets, formatting, Nx checks, tests, builds. |
-| `./scripts/telemetry.sh sync`              | Mirror-fetch every registered repository over SSH. `--entry NAME --fetch-url URL` fetches one entry elsewhere.    |
-| `./scripts/telemetry.sh rebuild`           | Rebuild the projection and print its content hash.                                                                |
-| `./scripts/telemetry.sh board`             | Render The Board from the projection.                                                                             |
-| `./scripts/telemetry.sh board --html`      | Write the dashboard to `.telemetry/board.html` and print its path.                                                |
-| `npm run board`                            | Sync, rebuild, write the dashboard, and open it. The one command that goes from nothing to the page.              |
-| `npm run board -- --no-open`               | The same without opening a browser; `--output PATH` writes somewhere other than `.telemetry/board.html`.          |
-| `./scripts/telemetry.sh cursor <consumer>` | Replay changes since the consumer's cursor and advance it.                                                        |
-| `./scripts/telemetry.sh validate`          | Validate session files against the schema.                                                                        |
-| `./scripts/telemetry.sh session`           | Record a session start, or write and commit a session file at session end.                                        |
-| `./scripts/telemetry.sh session summary`   | Print the session records this branch adds, as the Markdown the PR helper embeds.                                 |
-| `./scripts/telemetry.sh session figures`   | Sum a session transcript's token figures, to pass to `session end`.                                               |
-| `npm exec nx run capture:test`             | Run the capture package's tests.                                                                                  |
-| `npm exec nx run flow:test`                | Run the flow package's tests over fixture repositories built in a temporary directory.                            |
-| `./scripts/spec-status.sh`                 | Report each capability with an active OpenSpec change and its task completion.                                    |
+| Command                                      | What it does                                                                                                      |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                              | The complete local quality gate: specs, harness, governance, docs, secrets, formatting, Nx checks, tests, builds. |
+| `./scripts/telemetry.sh sync`                | Mirror-fetch every registered repository over SSH. `--entry NAME --fetch-url URL` fetches one entry elsewhere.    |
+| `./scripts/telemetry.sh rebuild`             | Rebuild the projection and print its content hash.                                                                |
+| `./scripts/telemetry.sh board`               | Render The Board from the projection.                                                                             |
+| `./scripts/telemetry.sh board --html`        | Write the dashboard to `.telemetry/board.html` and print its path.                                                |
+| `npm run board`                              | Sync, rebuild, write the dashboard, and open it. The one command that goes from nothing to the page.              |
+| `npm run board -- --no-open`                 | The same without opening a browser; `--output PATH` writes somewhere other than `.telemetry/board.html`.          |
+| `./scripts/telemetry.sh cursor <consumer>`   | Replay changes since the consumer's cursor and advance it.                                                        |
+| `./scripts/telemetry.sh validate`            | Validate session files against the schema.                                                                        |
+| `./scripts/telemetry.sh session`             | Record a session start, or write and commit a session file at session end.                                        |
+| `./scripts/telemetry.sh session summary`     | Print the session records this branch adds, as the Markdown the PR helper embeds.                                 |
+| `./scripts/telemetry.sh session figures`     | Sum a session transcript's token figures, to pass to `session end`.                                               |
+| `./scripts/telemetry.sh subscription record` | Write and commit what a plan cost for one billing period, the input to allocated spend.                           |
+| `npm exec nx run capture:test`               | Run the capture package's tests.                                                                                  |
+| `npm exec nx run flow:test`                  | Run the flow package's tests over fixture repositories built in a temporary directory.                            |
+| `./scripts/spec-status.sh`                   | Report each capability with an active OpenSpec change and its task completion.                                    |
 
 `capture` and `flow` are source-only: `build` emits `.d.ts` files, and consumers resolve the source
 through the `@dev-ledger/source` export condition, so no build step is needed to run anything.
 
 ## Repository Map
 
-| Directory or file         | Purpose                                                                                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `packages/capture`        | Session file schema, configuration, trailer parsing and validation                                                        |
-| `packages/flow`           | Registry, sync, change grouping, association, timing, releases, signals, projection, cursors, The Board, the command line |
-| `.githooks/`              | `prepare-commit-msg`, `commit-msg`, `pre-commit`, `pre-push`                                                              |
-| `scripts/telemetry.sh`    | Entry point for every telemetry command                                                                                   |
-| `scripts/board.sh`        | Sync, rebuild, render, and open The Board in one step; backs `npm run board`                                              |
-| `telemetry.config.json`   | Effort vocabulary, spec pattern, cost allocation (off by default)                                                         |
-| `registry.json`           | The repositories the projection covers                                                                                    |
-| `.telemetry/sessions/`    | Session files, tracked, one per session                                                                                   |
-| `.telemetry/` (untracked) | Mirrors, the projection, cursors: rebuilt, never committed                                                                |
-| `openspec/`               | Accepted specs and the two phase changes                                                                                  |
-| `docs/`                   | [`contract.md`](docs/contract.md), [`methodology.md`](docs/methodology.md), governance, orientation                       |
+| Directory or file           | Purpose                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `packages/capture`          | Session file schema, configuration, trailer parsing and validation                                                        |
+| `packages/flow`             | Registry, sync, change grouping, association, timing, releases, signals, projection, cursors, The Board, the command line |
+| `.githooks/`                | `prepare-commit-msg`, `commit-msg`, `pre-commit`, `pre-push`                                                              |
+| `scripts/telemetry.sh`      | Entry point for every telemetry command                                                                                   |
+| `scripts/board.sh`          | Sync, rebuild, render, and open The Board in one step; backs `npm run board`                                              |
+| `telemetry.config.json`     | Effort vocabulary, spec pattern, cost allocation (off by default)                                                         |
+| `registry.json`             | The repositories the projection covers                                                                                    |
+| `.telemetry/sessions/`      | Session files, tracked, one per session                                                                                   |
+| `.telemetry/subscriptions/` | Subscription cost records, tracked, one per billing period and plan                                                       |
+| `.telemetry/` (untracked)   | Mirrors, the projection, cursors: rebuilt, never committed                                                                |
+| `openspec/`                 | Accepted specs and the two phase changes                                                                                  |
+| `docs/`                     | [`contract.md`](docs/contract.md), [`methodology.md`](docs/methodology.md), governance, orientation                       |
 
 See [`docs/repository-orientation.md`](docs/repository-orientation.md) for the agent loop, the harness
 layout, and the MCP boundary, and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the change workflow.

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Entry point for the capture and flow tooling. Runs the flow package's command line against this
-# working copy: session, validate, validate-message, sync, rebuild, cursor, board, hash.
+# working copy: session, subscription, validate, validate-message, sync, rebuild, cursor, board, hash.
 set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
@@ -12,7 +12,7 @@ if [ ! -d node_modules ]; then
 fi
 
 case "${1:-}" in
-  session | validate | validate-message)
+  session | subscription | validate | validate-message)
     exec node --conditions=@dev-ledger/source --experimental-strip-types \
       "$repo_root/packages/capture/src/cli.ts" "$@"
     ;;

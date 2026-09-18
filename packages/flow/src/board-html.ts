@@ -1,5 +1,7 @@
 import type { Projection, RepositoryProjection } from './projection.ts';
 import type {
+  AllocatedSpend,
+  Allocation,
   CostClassSpend,
   Coverage,
   Distribution,
@@ -107,6 +109,33 @@ function spendCell(spend: Spend | undefined, absent: string): string {
     : `<span class="dim">${escapeHtml(absent)}</span>`;
 }
 
+/** An amount in its currency: `$12.34` for USD, `12.34 EUR` for anything else. */
+function money(amount: number, currency: string): string {
+  return currency === 'USD'
+    ? `$${amount.toFixed(2)}`
+    : `${amount.toFixed(2)} ${currency}`;
+}
+
+/** The allocated share beside a reported figure, marked when its period has not closed. */
+function allocatedCell(
+  allocation: Allocation,
+  pick: (
+    aggregates: Allocation['currencies'][string],
+  ) => AllocatedSpend | undefined,
+): string {
+  const parts = Object.entries(allocation.currencies)
+    .map(([currency, aggregates]) => [currency, pick(aggregates)] as const)
+    .filter(
+      (entry): entry is readonly [string, AllocatedSpend] =>
+        entry[1] !== undefined && entry[1].sessions > 0,
+    )
+    .map(
+      ([currency, spend]) =>
+        `<span class="alloc">${escapeHtml(money(spend.amount + spend.overage, currency))} allocated${spend.provisional ? ' <span class="dim">provisional</span>' : ''}</span>`,
+    );
+  return parts.length ? ` ${parts.join(' ')}` : '';
+}
+
 function href(links: Links, path: string, text: string, extra = ''): string {
   const inner = `<code>${escapeHtml(text)}</code>`;
   return links.web === null
@@ -152,6 +181,39 @@ function cites(label: string, ids: string[], links: Links): string {
   }
   const items = ids.map((id) => `<li>${cite(id, links)}</li>`).join('');
   return `<details class="cites"><summary>${escapeHtml(label)}: ${ids.length}</summary><ul>${items}</ul></details>`;
+}
+
+/** The allocated total across currencies, or what stands in its place. */
+function allocatedTotal(allocation: Allocation): string {
+  const totals = Object.entries(allocation.currencies)
+    .filter(([, aggregates]) => aggregates.total.sessions > 0)
+    .map(
+      ([currency, aggregates]) =>
+        `${money(aggregates.total.amount + aggregates.total.overage, currency)}${aggregates.total.provisional ? ' ~' : ''}`,
+    );
+  if (totals.length > 0) {
+    return totals.join(' + ');
+  }
+  return allocation.periods.length > 0 ? 'unallocated' : 'no period record';
+}
+
+function allocationPanel(allocation: Allocation, links: Links): string {
+  const rows = allocation.periods
+    .map(
+      (period) =>
+        `<tr><td class="mono">${escapeHtml(period.period)}</td><td><code>${escapeHtml(period.planId)}</code></td><td class="num">${escapeHtml(money(period.amount, period.currency))}</td><td class="num">${escapeHtml(money(period.overageAmount, period.currency))}</td><td class="num">${period.allocated}</td><td class="num">${period.excludedNoAgentSeconds}</td><td>${period.unallocated ? '<span class="warn">unallocated</span>' : period.provisional ? '<span class="dim">provisional</span>' : 'closed'}</td><td>${cites('records', period.cites, links)}</td></tr>`,
+    )
+    .join('');
+  const excluded = allocation.excluded;
+  const excludedLine = `${excluded.noAgentSeconds} with no agent seconds, ${excluded.noPeriodRecord} with no period record, ${excluded.invalidSession} invalid sessions, ${excluded.invalidRecord} invalid records`;
+  const body = rows
+    ? `<div class="scroll"><table><thead><tr><th>period</th><th>plan</th><th class="num">amount</th><th class="num">overage</th><th class="num">allocated over</th><th class="num">no agent seconds</th><th>status</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : `<p class="empty">No subscription cost record yet. Record one with <code>telemetry subscription record</code>; until then every subscription session reads as excluded for lacking a period record.</p>`;
+  return panel(
+    'Subscription spend',
+    `${figure(escapeHtml(allocatedTotal(allocation)), 'allocated across the sessions of each recorded period, by agent run seconds; ~ marks a period that has not closed')}${body}`,
+    `${trustBadges(allocation.trust)} ${escapeHtml(allocation.note)}; excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
+  );
 }
 
 // --- Chrome ----------------------------------------------------------------------------------------
@@ -323,8 +385,9 @@ function spendRow(
   spend: Spend,
   largest: number,
   links: Links,
+  allocated: string,
 ): string {
-  return `<tr><td>${escapeHtml(label)}</td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')}</td><td class="num">${spend.cachedTokens.toLocaleString('en-US')}</td><td class="num">${spend.sessions}</td><td>${cites('records', spend.cites, links)}</td></tr>`;
+  return `<tr><td>${escapeHtml(label)}</td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num nowrap">${allocated.trim() || '<span class="dim">none</span>'}</td><td class="num">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')}</td><td class="num">${spend.cachedTokens.toLocaleString('en-US')}</td><td class="num">${spend.sessions}</td><td>${cites('records', spend.cites, links)}</td></tr>`;
 }
 
 function spendTable(
@@ -332,10 +395,32 @@ function spendTable(
   rows: Record<string, Spend>,
   missingFigures: number,
   links: Links,
+  allocation: Allocation,
+  allocatedRows: (
+    aggregates: Allocation['currencies'][string],
+  ) => Record<string, AllocatedSpend>,
 ): string {
   const entries = Object.entries(rows);
   const key = title.replace('Spend by ', '');
-  const meta = `${trustBadges(['reported'])} keyed to ${escapeHtml(key)}, never to a person`;
+  const meta = `${trustBadges(['reported', 'allocated'])} keyed to ${escapeHtml(key)}, never to a person; reported cost beside the allocated subscription share`;
+  // A label with an allocated share but no reported figures still gets a row: the share is a figure.
+  for (const aggregates of Object.values(allocation.currencies)) {
+    for (const label of Object.keys(allocatedRows(aggregates))) {
+      if (!rows[label]) {
+        entries.push([
+          label,
+          {
+            inputTokens: 0,
+            outputTokens: 0,
+            cachedTokens: 0,
+            costUsd: 0,
+            sessions: 0,
+            cites: [],
+          },
+        ]);
+      }
+    }
+  }
   if (entries.length === 0) {
     const note =
       missingFigures > 0
@@ -346,11 +431,22 @@ function spendTable(
   const sorted = entries.sort(([, a], [, b]) => b.costUsd - a.costUsd);
   const largest = sorted[0][1].costUsd;
   const body = sorted
-    .map(([label, spend]) => spendRow(label, spend, largest, links))
+    .map(([label, spend]) =>
+      spendRow(
+        label,
+        spend,
+        largest,
+        links,
+        allocatedCell(
+          allocation,
+          (aggregates) => allocatedRows(aggregates)[label],
+        ),
+      ),
+    )
     .join('');
   return panel(
     title,
-    `<div class="scroll"><table><thead><tr><th>${escapeHtml(key)}</th><th class="num">cost</th><th class="num">tokens</th><th class="num">cached</th><th class="num">sessions</th><th>cites</th></tr></thead><tbody>${body}</tbody></table></div>`,
+    `<div class="scroll"><table><thead><tr><th>${escapeHtml(key)}</th><th class="num">cost</th><th class="num">allocated</th><th class="num">tokens</th><th class="num">cached</th><th class="num">sessions</th><th>cites</th></tr></thead><tbody>${body}</tbody></table></div>`,
     meta,
   );
 }
@@ -381,6 +477,7 @@ function changesTable(
   changes: ChangeRow[],
   byChange: Record<string, Spend>,
   links: Links,
+  allocation: Allocation,
 ): string {
   const recent = [...changes].reverse().slice(0, 15);
   const rows = recent
@@ -400,7 +497,7 @@ function changesTable(
           : change.sessions.sessions.length === 0
             ? 'unreported'
             : 'figures missing';
-      const spend = spendCell(byChange[change.id], absent);
+      const spend = `${spendCell(byChange[change.id], absent)}${allocatedCell(allocation, (aggregates) => aggregates.byChange[change.id])}`;
       const gaps = change.gaps
         .map((gap) => `<span class="gap">${escapeHtml(gap.type)}</span>`)
         .join(' ');
@@ -595,6 +692,7 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
     ['queue', `${signals.queue.count}`, 'observed'],
     ['merges / day', `${signals.mergeFrequency.perDay ?? 'n/a'}`, 'observed'],
     ['spend', `$${signals.spend.total.costUsd.toFixed(2)}`, 'reported'],
+    ['allocated', allocatedTotal(signals.allocation), 'allocated'],
     ['out-of-band', `${outOfBand.length}`, 'observed'],
   ]
     .map(
@@ -637,7 +735,7 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
       const records = perPull
         ? cites('records', perPull.cites, links)
         : '<span class="dim">none</span>';
-      return `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="num nowrap">${spendCell(perPull?.spend, absent)}</td><td class="num">${perPull?.spend.sessions ?? 0}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td><td>${records}</td></tr>`;
+      return `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="num nowrap">${spendCell(perPull?.spend, absent)}${allocatedCell(signals.allocation, (aggregates) => aggregates.perUnmergedPullRequest[String(entry.number)])}</td><td class="num">${perPull?.spend.sessions ?? 0}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td><td>${records}</td></tr>`;
     })
     .join('');
   const excludedLine = `${excluded.undeclared} undeclared, ${excluded.unreported} unreported, ${excluded.humanOnly} human-only, ${excluded.invalidSession} invalid, ${excluded.missingFigures} with figures missing`;
@@ -665,6 +763,7 @@ ${panel(
   trustBadges(signals.mergeFrequency.trust),
 )}
 ${spendOverTime(signals.trends)}
+${allocationPanel(signals.allocation, links)}
 ${costClassPanel(signals.costClasses, signals.coverage, links)}
 ${distributionPanel('Wait time', signals.waitTime, 'From the last commit on the pull request to the merge: how long finished work sat.', links)}
 ${distributionPanel('Cycle time', signals.cycleTime, 'From the first commit on the pull request to the merge.', links)}
@@ -716,11 +815,11 @@ ${panel(
   trustBadges(['observed']),
 )}
 </div>
-${changesTable(changes, signals.spend.byChange, links)}
+${changesTable(changes, signals.spend.byChange, links, signals.allocation)}
 <div class="grid wide">
-${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, links)}
-${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links)}
-${spendTable('Spend by model', signals.spend.byModel, excluded.missingFigures, links)}
+${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.bySpec)}
+${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byProvider)}
+${spendTable('Spend by model', signals.spend.byModel, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byModel)}
 ${panel(
   'Cost per unit of effort',
   effortRows
@@ -749,7 +848,7 @@ const STYLE = `
   color-scheme: light dark;
   --bg: #f4f5f3; --bg-accent: #e9ece7; --panel: #ffffff; --ink: #16181a; --muted: #5f6368;
   --line: #e0e2dd; --line-strong: #cbcec8; --accent: #2f6f9f; --accent-soft: #d8e6f1;
-  --observed: #2f6f9f; --reported: #92611d; --signal: #b23a3a; --added: #2f7d4f; --removed: #a2453f;
+  --observed: #2f6f9f; --reported: #92611d; --allocated: #6b4c9a; --signal: #b23a3a; --added: #2f7d4f; --removed: #a2453f;
   --gap: #fdf0df; --gap-ink: #7a4a10;
   --shadow: 0 1px 2px rgba(16, 20, 24, 0.05), 0 10px 24px -16px rgba(16, 20, 24, 0.24);
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 36px;
@@ -762,7 +861,7 @@ const STYLE = `
   :root {
     --bg: #111312; --bg-accent: #1a1d1b; --panel: #1d201e; --ink: #ecece7; --muted: #a2a49d;
     --line: #2e322f; --line-strong: #3d423e; --accent: #7fb3d9; --accent-soft: #24384b;
-    --observed: #7fb3d9; --reported: #d9b37f; --signal: #e58a8a; --added: #7fc79b; --removed: #e08d87;
+    --observed: #7fb3d9; --reported: #d9b37f; --allocated: #b89ad9; --signal: #e58a8a; --added: #7fc79b; --removed: #e08d87;
     --gap: #3a2a12; --gap-ink: #e8c48a; --shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
   }
 }
@@ -862,6 +961,8 @@ h3 {
 }
 .badge-observed { color: var(--observed); }
 .badge-reported { color: var(--reported); }
+.badge-allocated { color: var(--allocated); }
+.alloc { color: var(--allocated); font-size: 12px; white-space: nowrap; }
 .gap {
   display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px;
   background: var(--gap); color: var(--gap-ink);

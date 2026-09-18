@@ -10,6 +10,11 @@ import {
 import { formatTrailers, parseTrailers, validateMessage } from './trailers.ts';
 import { gitEnvironment, sessionSummary } from './cli.ts';
 import { sumTranscriptUsage } from './figures.ts';
+import {
+  buildSubscriptionFile,
+  subscriptionFilePath,
+  validateSubscriptionFile,
+} from './subscription.ts';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -566,4 +571,71 @@ test('a session recorded with a transcript carries its figures, and a stated fig
     ],
     [5, 6, 7, 'harness'],
   );
+});
+
+test('a subscription cost record validates, and a rate cannot enter it', () => {
+  const file = buildSubscriptionFile({
+    planId: 'plan-max',
+    period: '2026-09',
+    amount: 200,
+    currency: 'usd',
+  });
+  assert.deepEqual(validateSubscriptionFile(file), []);
+  assert.equal(file.currency, 'USD');
+  assert.equal(file.overageAmount, 0);
+  assert.equal(
+    subscriptionFilePath('plan-max', '2026-09'),
+    '.telemetry/subscriptions/2026-09/plan-max.json',
+  );
+  const errors = validateSubscriptionFile({
+    ...file,
+    hourlyRate: 90,
+    period: '2026-13',
+    amount: -1,
+    currency: 'dollars',
+  });
+  assert.ok(errors.some((error) => error.startsWith('hourlyRate')));
+  assert.ok(errors.some((error) => error.startsWith('period')));
+  assert.ok(errors.some((error) => error.startsWith('amount')));
+  assert.ok(errors.some((error) => error.startsWith('currency')));
+  assert.throws(() => subscriptionFilePath('plan', '2026-9'));
+});
+
+test('subscription record writes the period file and validate reads both record kinds', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  const runCli = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+    );
+  const written = runCli([
+    'subscription',
+    'record',
+    '--plan',
+    'plan-max',
+    '--period',
+    '2026-09',
+    '--amount',
+    '200',
+    '--currency',
+    'USD',
+    '--overage',
+    '12.5',
+  ]).trim();
+  assert.equal(written, '.telemetry/subscriptions/2026-09/plan-max.json');
+  const record = JSON.parse(readFileSync(join(dir, written), 'utf8'));
+  assert.equal(record.overageAmount, 12.5);
+  assert.match(
+    fixtureGit(dir, ['log', '-1', '--format=%s']),
+    /record subscription plan-max 2026-09/,
+  );
+  writeRecord(dir, 's-ok', {});
+  assert.match(runCli(['validate']), /2 records valid/);
+  writeFileSync(
+    join(dir, '.telemetry/subscriptions/2026-09/bad.json'),
+    JSON.stringify({ ...record, planId: 'bad', salary: 1 }),
+  );
+  assert.throws(() => runCli(['validate']), /salary is not allowed/);
 });

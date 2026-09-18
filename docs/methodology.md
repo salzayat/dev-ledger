@@ -109,6 +109,23 @@ the session's own transcript on this machine, and either way it is `reported`, n
 not derived: on a subscription the contract fixes `costUsd` at zero, so a subscription session reports real
 token counts and no dollar figure, and that is the honest reading rather than a price guess.
 
+## Subscription cost is a period record
+
+A subscription session has no marginal cost, and its record says so: `costUsd` is zero and stays zero.
+What the plan cost is a fact of the billing period, so the period is the record: `telemetry subscription
+record` writes what a plan cost for a month, in its currency, with any overage apart. The projection joins
+each record to the sessions that ended in that month on that plan and apportions the amount by agent run
+seconds, because tokens are dominated by cache reads and an even split would charge a ten-minute session
+and a two-hour one the same.
+
+The result is a third trust class, `allocated`: weaker than `reported`, because it is arithmetic over an
+operator-entered amount and a basis this repository chose, and every allocated figure names that basis and
+cites the period record. A session with no agent seconds takes no share and is counted, never given zero;
+a period in which no session has any is reported as unallocated; a session whose period has no record is
+counted as lacking one. A month that has not closed, as of the newest commit the mirror holds, is
+provisional, because a change merged early in it holds a larger share than it will once the rest of the
+month's sessions land. Two currencies are never summed.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It

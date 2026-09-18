@@ -23,7 +23,12 @@ export type { Timing } from './timing.ts';
 export { computeReleases } from './releases.ts';
 export type { Release, ReleaseView } from './releases.ts';
 export { computeSignals } from './signals.ts';
+export { collectSubscriptions } from './subscriptions.ts';
+export type { SubscriptionRecord } from './subscriptions.ts';
 export type {
+  Allocation,
+  AllocatedSpend,
+  AllocationPeriod,
   ChangeFacts,
   Distribution,
   RepositorySignals,

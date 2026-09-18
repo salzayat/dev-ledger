@@ -229,6 +229,29 @@ export function sessionJson(
   );
 }
 
+export function subscriptionJson(
+  planId: string,
+  period: string,
+  amount: number,
+  overrides: Record<string, unknown> = {},
+): string {
+  return (
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        planId,
+        period,
+        amount,
+        currency: 'USD',
+        overageAmount: 0,
+        ...overrides,
+      },
+      null,
+      2,
+    ) + '\n'
+  );
+}
+
 export function trailered(
   subject: string,
   trailers: Record<string, string>,
