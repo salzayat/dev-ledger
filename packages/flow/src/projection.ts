@@ -23,6 +23,7 @@ import {
 } from './registry.ts';
 import { computeReleases } from './releases.ts';
 import { collectSessions, collectUnmergedSessions } from './sessions.ts';
+import { collectSubscriptions } from './subscriptions.ts';
 import {
   computeSignals,
   type ChangeFacts,
@@ -31,7 +32,7 @@ import {
 import { mirrorPath, refTips } from './sync.ts';
 import { timingFor } from './timing.ts';
 
-export const PROJECTION_SCHEMA_VERSION = 4;
+export const PROJECTION_SCHEMA_VERSION = 5;
 export const CONFIG_PATH = 'telemetry.config.json';
 
 export type RepositoryProjection = {
@@ -45,6 +46,7 @@ export type RepositoryProjection = {
   refTips: Record<string, string>;
   changes: Record<string, unknown>[];
   sessions: Record<string, unknown>[];
+  subscriptions: Record<string, unknown>[];
   unmerged: unknown[];
   releases: unknown[];
   unreleased: string[];
@@ -149,6 +151,7 @@ export function buildRepositoryProjection(
       refTips: {},
       changes: [],
       sessions: [],
+      subscriptions: [],
       unmerged: [],
       releases: [],
       unreleased: [],
@@ -240,6 +243,7 @@ export function buildRepositoryProjection(
       deletions,
     };
   });
+  const subscriptions = collectSubscriptions(dir, branch);
   const signals = computeSignals(
     facts,
     sessions,
@@ -249,6 +253,7 @@ export function buildRepositoryProjection(
       changes: release.changes,
       at: releaseDates.get(release.commit) ?? null,
     })),
+    subscriptions,
     entry.thresholds,
     configAt,
     asOf ?? '1970-01-01T00:00:00Z',
@@ -285,6 +290,7 @@ export function buildRepositoryProjection(
     sessions: [...sessions.values()]
       .sort((a, b) => a.sessionId.localeCompare(b.sessionId))
       .map((record) => ({ ...record })),
+    subscriptions: subscriptions.map((record) => ({ ...record })),
     unmerged,
     releases: releaseView.releases,
     unreleased: releaseView.unreleased,

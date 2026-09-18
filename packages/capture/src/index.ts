@@ -39,6 +39,18 @@ export {
   sessionSummary,
 } from './cli.ts';
 export {
+  SUBSCRIPTIONS_PATH,
+  SUBSCRIPTION_SCHEMA_VERSION,
+  buildSubscriptionFile,
+  periodOf,
+  subscriptionFilePath,
+  validateSubscriptionFile,
+} from './subscription.ts';
+export type {
+  SubscriptionCostFile,
+  SubscriptionInput,
+} from './subscription.ts';
+export {
   sumTranscriptUsage,
   transcriptFiguresSource,
   type Figures,

@@ -25,7 +25,8 @@ contract.
 | Review fixes (session figures, Board links)       | `fix-transcript-figures-and-board-links`                      | Complete |
 | Session trailer default (defect)                  | `fix-session-none-default`                                    | Pending  |
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
-| Subscription and operator spend (phase one)       | `add-subscription-and-operator-spend`                         | Blocked  |
+| Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
+| Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
@@ -102,15 +103,16 @@ session is recorded — a review fix, a follow-up, a revert — is silently decl
 falsifies the coverage counts the flow efficiency row accepts. The fix writes no trailer when nothing is
 known, leaving the change `undeclared`, and makes the human-only declaration something an operator states.
 
-The subscription and operator spend row comes before board publication because every currency figure The
-Board renders is `$0.00` today: validation requires a subscription session to record no marginal cost, and
-every recorded session is a subscription session, so what a plan costs is a fact no record holds. It adds a
-subscription cost record per billing period, allocates that amount across the period's sessions in
-proportion to agent run seconds, and admits the operator as a dimension covering agents and humans alike —
-agents in currency, humans in hours, never summed and never priced. It supersedes the accepted prohibition
-on operator-keyed figures; pseudonymity stays enforced where it always was, in the record schema. It follows
-the flow efficiency and work mix row because both modify `Flow signals per repository and in aggregate`, and
-whichever archives second is rebased onto the first.
+The subscription spend row exists because every currency figure The Board rendered was `$0.00`: validation
+requires a subscription session to record no marginal cost, and every recorded session is a subscription
+session, so what a plan costs was a fact no record held. It adds a subscription cost record per billing
+period and plan, allocates that amount across the period's sessions in proportion to agent run seconds
+under the trust class `allocated`, marks an open period provisional, and excludes and counts a session with
+no agent seconds rather than giving it zero. It was drafted together with the operator dimension as
+`add-subscription-and-operator-spend` and split, because the dimension reverses the accepted rule that no
+figure is keyed to an operator and the published position that the tool ranks nobody. The operator
+dimension row holds that half, `Blocked` on the flow efficiency row it shares a requirement with and on the
+repository owner's decision, and not started; its first task is recording the decision.
 
 The board publication row builds The Board on every pull request as a run artifact and a job summary, and
 deploys it to Pages from the default branch only, gated on the repository being public; the gate lives in

@@ -6,7 +6,7 @@ set -eu
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
-pending=$(git status --porcelain --untracked-files=all -- .telemetry/sessions 2>/dev/null | grep '\.json$' || true)
+pending=$(git status --porcelain --untracked-files=all -- .telemetry/sessions .telemetry/subscriptions 2>/dev/null | grep '\.json$' || true)
 [ -n "$pending" ] || exit 0
 
 finished=""
@@ -15,7 +15,8 @@ IFS='
 '
 for line in $pending; do
   path=$(printf '%s' "$line" | cut -c4-)
-  if [ -f "$path" ] && grep -q '"endedAt"' "$path"; then
+  # A session file is finished once it carries endedAt; a subscription record is finished as written.
+  if [ -f "$path" ] && grep -Eq '"(endedAt|period)"' "$path"; then
     finished="${finished}${path}
 "
   fi
