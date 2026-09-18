@@ -75,7 +75,10 @@ The harness hook is a command: at the end of a session, pipe the harness's figur
 a transcript on disk: `session end --transcript <file>` sums the token counts from it and says so in the
 record. The payload fields are listed in [`docs/contract.md`](docs/contract.md). At session start,
 `./scripts/telemetry.sh session start --id <id>` records the identifier the commit hook writes as
-`Session:`. Order matters: start the session, commit the work, then end the session and commit the record.
+`Session:` and the clock, so a payload may leave `startedAt` and `endedAt` to the commands. Order matters:
+start the session, commit the work, then end the session and commit the record. `scripts/pr.sh` refuses to
+open a pull request with no active session and no declaration; `--human-only` declares the branch, and
+`--allow-undeclared` opens it as undeclared on purpose.
 A commit made with no active session (before one starts, or after `session end` unsets it) carries no
 `Session:` trailer at all, so its change reads `undeclared`: a gap the projection counts rather than a claim
 about who did the work. `Session: none` means something narrower and is never written by default: it says a
@@ -136,8 +139,8 @@ The published page is a real ledger over a young repository, and several of its 
 behind them. Figures as of 2026-09-18, 71 changes on `main`:
 
 - **44 changes read as undeclared.** 37 are the template's history from before the capture hooks existed.
-  The rest were committed with no active session since the hook stopped defaulting `Session:`, which is
-  the gap the projection is built to show; a change made through the hooks with a session records one.
+  The rest were committed with no active session after the hook stopped defaulting `Session:`, which is
+  the gap the projection is built to show. `scripts/pr.sh` now refuses that by default.
 - **11 read as human-only**, including the three committed under the old default. A record says what was
   reported at the time, so they stand.
 - **Reported spend is $0.00 over 3.4 million tokens; allocated spend is $100.00.** Every session is on a
@@ -147,15 +150,17 @@ behind them. Figures as of 2026-09-18, 71 changes on `main`:
   because three of the six reported no tokens.
 - **Flow efficiency reads 200%.** The earliest session records carry hand-entered start and end times that
   do not sit inside the change's cycle window. The figure is reported as it stands rather than clamped,
-  because rounding it down would hide that two recorded figures disagree.
-- **Work mix is 61% `other`.** Changes that arrived as merge commits carry the merge subject, which has no
-  conventional type. Squash merges read their type.
+  because rounding it down would hide that two recorded figures disagree. Records written since take
+  their times from `session start` and `session end`.
+- **Work mix.** A merge commit's subject carries no type, so those changes take the most common type
+  among their branch commits; `other` is left for changes whose commits carry no type at all.
 - **Spec lead time is 13 minutes typical.** Specs here are archived in the same pull request that
   implements them, so the archive merge follows the first commit by about one cycle.
 - **Releases per week is n/a.** One tag, `v0.1.0`. Lead time to release is 20.7 days, all of it merge to
   tag: the release lag, not the review queue.
-- **Rework shows 754 pairs**, led by `plans/roadmap.md`, `README.md`, and `docs/methodology.md`. The
-  registry's `rework.ignore` list can exclude paths that every change edits.
+- **Rework.** With the default ignore list it showed 754 pairs led by `plans/roadmap.md`, `README.md`, and
+  `docs/methodology.md`, which every change here edits by design. The registry entry now ignores the
+  roadmap, the README, `docs/`, and `openspec/`, so the pairs that remain are in code.
 - **The queue lists a closed pull request.** Its pull head ref still exists, and git cannot say it was
   closed. The panel says so beside the number.
 

@@ -21,6 +21,7 @@ Options:
   --spec NAME        OpenSpec change this work serves; written as a Spec: trailer on commits and the PR body
   --story-points N   Reported effort; written as a Story-Points: trailer when the unit is enabled
   --human-only       Declare this branch human-only, so its commits carry Session: none
+  --allow-undeclared Open the pull request although no session is active and none is declared
   --all             Stage all tracked and untracked changes
   --reuse-branch    Reuse an existing local branch instead of requiring a new one
   --skip-checks     Skip ./scripts/check.sh after staging. Use only for documented tool outages.
@@ -51,6 +52,7 @@ body_file=
 spec_name=
 story_points=
 human_only=false
+allow_undeclared=false
 paths=
 
 while [ "$#" -gt 0 ]; do
@@ -95,6 +97,9 @@ while [ "$#" -gt 0 ]; do
       shift
       [ "$#" -gt 0 ] || die "--spec requires a value"
       spec_name=$1
+      ;;
+    --allow-undeclared)
+      allow_undeclared=true
       ;;
     --human-only)
       human_only=true
@@ -226,6 +231,16 @@ fi
 # A declaration, never a default: without it a commit with no active session carries no Session: trailer and
 # the change reads undeclared, which is the honest classification when nobody knows who did the work.
 [ "$human_only" = true ] && git config "branch.$pr_branch.telemetry-human-only" "true"
+
+# The ledger this repository keeps is only as good as its own records, so a pull request is not opened
+# blind: the commit about to be made needs an active session, a human-only declaration on the branch, or
+# an explicit override. Commits already on the branch that carry a Session: trailer count as well.
+declared_session=$(git config --get telemetry.session 2>/dev/null || true)
+declared_human=$(git config --get "branch.$pr_branch.telemetry-human-only" 2>/dev/null || true)
+prior_sessions=$(git log --format=%B "${base_branch}..${pr_branch}" 2>/dev/null | grep -c '^Session: ' || true)
+if [ -z "$declared_session" ] && [ "$declared_human" != "true" ] && [ "${prior_sessions:-0}" -eq 0 ] && [ "$allow_undeclared" != true ]; then
+  die "No session is active and this branch declares nothing: run ./scripts/telemetry.sh session start --id <id> before the work, pass --human-only if a person did this without an agent, or --allow-undeclared to open it as undeclared on purpose."
+fi
 
 if [ "$stage_all" = true ]; then
   git add -A

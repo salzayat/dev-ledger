@@ -347,8 +347,9 @@ export type SessionInput = {
   costUsd?: number;
   notionalCostUsd?: number;
   figuresSource: string;
-  startedAt: string;
-  endedAt: string;
+  /** Omitted, the start is the clock `session start` recorded and the end is when `session end` ran. */
+  startedAt?: string;
+  endedAt?: string;
   billingKind: BillingKind;
   subscriptionId?: string;
   branch: string;
@@ -371,11 +372,11 @@ export function buildSessionFile(
   input: SessionInput,
   config: TelemetryConfig,
 ): SessionFile {
+  const startedAt = input.startedAt ?? '';
+  const endedAt = input.endedAt ?? '';
   const wallClockSeconds = Math.max(
     0,
-    Math.round(
-      (Date.parse(input.endedAt) - Date.parse(input.startedAt)) / 1000,
-    ),
+    Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000) || 0,
   );
   const figuresMissing =
     input.inputTokens === undefined ||
@@ -391,8 +392,8 @@ export function buildSessionFile(
     cachedTokens: input.cachedTokens ?? 0,
     costUsd: input.billingKind === 'subscription' ? 0 : (input.costUsd ?? 0),
     figuresSource: input.figuresSource,
-    startedAt: input.startedAt,
-    endedAt: input.endedAt,
+    startedAt,
+    endedAt,
     wallClockSeconds,
     agentRunSeconds: input.agentRunSeconds ?? 0,
     billingKind: input.billingKind,

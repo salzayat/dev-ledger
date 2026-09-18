@@ -9,6 +9,16 @@
       "thresholds": {
         "waitTimeP50Seconds": 172800,
         "reworkWindowDays": 14
+      },
+      "rework": {
+        "ignore": [
+          "plans/roadmap.md",
+          "README.md",
+          "docs/**",
+          "openspec/**",
+          "package-lock.json",
+          ".telemetry/**"
+        ]
       }
     }
   ]

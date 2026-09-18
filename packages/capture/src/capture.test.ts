@@ -1041,3 +1041,52 @@ test('subscription record writes the period file and validate reads both record 
   );
   assert.throws(() => runCli(['validate']), /salary is not allowed/);
 });
+
+test('session start records the clock and session end fills the times a payload leaves out', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  const runCli = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+    );
+  runCli(['session', 'start', '--id', 's-clock']);
+  const started = fixtureGit(dir, [
+    'config',
+    '--get',
+    'telemetry.session-started',
+  ]).trim();
+  assert.ok(!Number.isNaN(Date.parse(started)));
+  writeFileSync(
+    join(dir, 'payload.json'),
+    JSON.stringify({
+      sessionId: 's-clock',
+      provider: 'provider-a',
+      model: 'model-x',
+      figuresSource: 'harness',
+      inputTokens: 1,
+      outputTokens: 1,
+      cachedTokens: 0,
+      billingKind: 'subscription',
+      subscriptionId: 'plan',
+      branch: 'work',
+      commits: [],
+      localCheck: { outcome: 'passed', command: 'npm run check' },
+    }),
+  );
+  const written = runCli([
+    'session',
+    'end',
+    '--payload',
+    'payload.json',
+    '--no-commit',
+  ]).trim();
+  const record = JSON.parse(readFileSync(join(dir, written), 'utf8'));
+  assert.equal(record.startedAt, started);
+  assert.ok(Date.parse(record.endedAt) >= Date.parse(started));
+  assert.ok(record.wallClockSeconds >= 0);
+  assert.throws(() =>
+    fixtureGit(dir, ['config', '--get', 'telemetry.session-started']),
+  );
+});

@@ -248,6 +248,9 @@ export function buildRepositoryProjection(
       files: filesOf(change),
       insertions,
       deletions,
+      branchSubjects: change.branchCommits
+        .map((hash) => commits.get(hash)?.subject)
+        .filter((subject): subject is string => subject !== undefined),
     };
   });
   const subscriptions = collectSubscriptions(dir, branch);

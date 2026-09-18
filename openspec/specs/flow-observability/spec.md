@@ -235,8 +235,9 @@ merge of the escape. It SHALL provide weekly trends of changes merged and sessio
 window, spend by cost class (`rd`, `production`, `unclassified`, taken from the session's cost class, then
 the change's `Cost-Class:` trailer, never defaulted), and coverage counts of changes with an agent session,
 human-only, undeclared, and unreported. It SHALL further provide: work mix, the changes and spend per weekly
-bucket by the conventional commit type of the change's subject, with `other` for a subject that does not
-parse; flow efficiency, the distribution over changes of active seconds (the sum of the change's sessions'
+bucket by the conventional commit type of the change's subject, taking for a change merged by a merge
+commit the most common type among its branch commits with a telemetry record commit not voting, and `other`
+only when no subject carries a type; flow efficiency, the distribution over changes of active seconds (the sum of the change's sessions'
 agent run and operator active seconds) divided by cycle seconds, excluding by reason changes with no timing,
 no sessions, or no active seconds, and reporting a value above one as it stands; iterations, distributions
 of sessions per change and commits per change; abandonment, the count and spend of unmerged pull heads
@@ -328,6 +329,14 @@ SHALL NOT offer a person as a dimension.
 - GIVEN a week with two `feat` changes, one `fix` change, and one change whose subject has no type prefix
 - WHEN the work mix is computed
 - THEN that week MUST report two `feat`, one `fix`, and one `other`, each citing its changes
+
+#### Scenario: A merge commit takes its type from what it merged
+
+- GIVEN a change merged by a merge commit whose branch carries two `feat` commits, one `fix` commit, and a
+  telemetry record commit
+- WHEN the work mix is computed
+- THEN that change MUST read `feat`
+- AND a merge commit whose branch commits carry no type MUST read `other`
 
 #### Scenario: Flow efficiency excludes what it cannot divide
 
