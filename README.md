@@ -180,6 +180,7 @@ repository turns it on, every control that needs them reads as not observable.
 | `./scripts/telemetry.sh validate`            | Validate session and subscription records against their schemas.                                                  |
 | `./scripts/telemetry.sh session`             | Record a session start, write and commit a session file at session end, or declare a branch human-only.           |
 | `./scripts/telemetry.sh session summary`     | Print the session records this branch adds, as the Markdown the PR helper embeds.                                 |
+| `./scripts/telemetry.sh configure`           | Serve the configuration surface on the loopback interface only; writes configuration, never commits.              |
 | `./scripts/telemetry.sh subscription close`  | Propose one cost record per declared plan for a period, from `plans.json`; you check it and commit.               |
 | `./scripts/telemetry.sh session figures`     | Sum a session transcript's token figures and the operator's active seconds, to pass to `session end`.             |
 | `./scripts/telemetry.sh subscription record` | Write and commit what a plan cost for one billing period, the input to allocated spend.                           |
