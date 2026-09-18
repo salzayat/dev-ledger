@@ -410,6 +410,50 @@ test('two states synced from the same repository rebuild byte-identically', () =
   assert.deepEqual(first.repo.refTips, second.repo.refTips);
 });
 
+test('an overridden fetch URL changes the transport and nothing else', () => {
+  const fixture = makeFixtureRepo();
+  const other = makeFixtureRepo();
+  const registryJson = JSON.stringify({
+    schemaVersion: 1,
+    repositories: [
+      { name: 'primary', url: join(tmpdir(), 'dev-ledger-unreachable-url') },
+      { name: 'other', url: other.dir },
+    ],
+  });
+  const registry = parseRegistry(registryJson).registry;
+
+  // Without the override the registry URL is unreachable; with it, the same repository is fetched from
+  // somewhere else and the ref tips recorded are the ones that source advertises.
+  const plain = syncAll(stateRoot(), registry);
+  assert.equal(plain.find((r) => r.name === 'primary')!.reachable, false);
+
+  const overridden = syncAll(stateRoot(), registry, {
+    name: 'primary',
+    url: fixture.dir,
+  });
+  const primary = overridden.find((r) => r.name === 'primary')!;
+  assert.equal(primary.reachable, true);
+
+  // The same source fetched without an override records byte-identical tips.
+  const direct = syncAll(
+    stateRoot(),
+    parseRegistry(
+      JSON.stringify({
+        schemaVersion: 1,
+        repositories: [{ name: 'primary', url: fixture.dir }],
+      }),
+    ).registry,
+  );
+  assert.deepEqual(primary.refTips, direct[0].refTips);
+
+  // The override applies to the named entry alone, and the registry itself is untouched.
+  assert.equal(overridden.find((r) => r.name === 'other')!.reachable, true);
+  assert.equal(
+    JSON.stringify(parseRegistry(registryJson).registry),
+    JSON.stringify(registry),
+  );
+});
+
 test('an unreachable repository is named and the rest still build', () => {
   const fixture = makeFixtureRepo();
   const registry = parseRegistry(

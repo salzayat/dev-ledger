@@ -25,15 +25,29 @@ export function mirrorPath(root: string, entry: RegistryEntry): string {
   return join(root, 'mirrors', `${entry.name}.git`);
 }
 
-export function syncRepository(root: string, entry: RegistryEntry): SyncResult {
+// A fetch URL for one named entry, for an environment that reaches the same repository over a different
+// transport than the registry records — continuous integration over HTTPS where an operator uses SSH. It
+// changes where the mirror fetches from and nothing else: the registry file is untouched, and the ref tips
+// recorded afterwards are read from the mirror, so they are the same tips either transport would produce.
+export type FetchOverride = {
+  name: string;
+  url: string;
+};
+
+export function syncRepository(
+  root: string,
+  entry: RegistryEntry,
+  fetchUrl?: string,
+): SyncResult {
   const mirror = mirrorPath(root, entry);
+  const url = fetchUrl ?? entry.url;
   try {
     if (!existsSync(mirror)) {
       mkdirSync(mirror, { recursive: true });
       git(mirror, ['init', '--bare', '--quiet']);
-      git(mirror, ['remote', 'add', 'origin', entry.url]);
+      git(mirror, ['remote', 'add', 'origin', url]);
     } else {
-      git(mirror, ['remote', 'set-url', 'origin', entry.url]);
+      git(mirror, ['remote', 'set-url', 'origin', url]);
     }
     git(mirror, ['fetch', '--quiet', '--prune', 'origin', ...REFSPECS]);
     return {
@@ -57,8 +71,18 @@ export function syncRepository(root: string, entry: RegistryEntry): SyncResult {
   }
 }
 
-export function syncAll(root: string, registry: Registry): SyncResult[] {
-  return registry.repositories.map((entry) => syncRepository(root, entry));
+export function syncAll(
+  root: string,
+  registry: Registry,
+  override?: FetchOverride,
+): SyncResult[] {
+  return registry.repositories.map((entry) =>
+    syncRepository(
+      root,
+      entry,
+      override && override.name === entry.name ? override.url : undefined,
+    ),
+  );
 }
 
 export function refTips(mirror: string): Record<string, string> {
