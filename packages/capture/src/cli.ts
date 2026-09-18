@@ -420,6 +420,8 @@ export function captureMain(argv: string[]): number {
           : null;
         process.stdout.write(
           canonicalJson({
+            cacheReadTokens: figures.cacheReadTokens,
+            cacheWriteTokens: figures.cacheWriteTokens,
             cachedTokens: figures.cachedTokens,
             figuresSource: transcriptFiguresSource(figures),
             inputTokens: figures.inputTokens,
@@ -459,6 +461,8 @@ export function captureMain(argv: string[]): number {
             input.inputTokens ??= figures.inputTokens;
             input.outputTokens ??= figures.outputTokens;
             input.cachedTokens ??= figures.cachedTokens;
+            input.cacheReadTokens ??= figures.cacheReadTokens;
+            input.cacheWriteTokens ??= figures.cacheWriteTokens;
             if (filled) {
               input.figuresSource = transcriptFiguresSource(figures);
             }

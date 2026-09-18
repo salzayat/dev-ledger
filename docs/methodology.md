@@ -69,6 +69,31 @@ request, the most-reworked files, and the spend bars — are folds over the same
 page is rendered. Nothing on the page can compute a figure the projection does not hold, so the citation
 rule holds for the page as well as for the data.
 
+## Two rates, never one
+
+A metered provider reports its own cost, so dividing it by its own tokens involves no assumption: that rate
+carries `reported`. A subscription's rate divides an amount apportioned by agent run seconds, so it inherits
+that basis and carries `allocated`. Both are shown and neither is summed with the other — a measured cost and
+a consequence of an allocation choice are different kinds of number.
+
+Neither shares a denominator across providers. Providers do not count tokens the same way, so a combined
+rate would divide by a quantity with no single meaning.
+
+## Cache reads and cache writes
+
+`cachedTokens` was one number defined as reads plus writes, which is one provider's shape. A provider that
+reports only cache hits has no write figure, and recording a zero for it would claim it wrote nothing — a
+reading it never made. Reads and writes are now recorded apart when a harness reports them apart, the
+combined figure stays for every record already committed, and a read including such a record says its
+components are unknown rather than implying a split it does not have.
+
+## Currency lives in a field
+
+`costUsd` was defensible while every record came from one plan in one currency. The allocation has been
+multi-currency for a while; the reported figure was the last part that was not. A record may now carry its
+cost with a currency, the historical field is read as USD so every committed record stays valid, and a record
+carrying both with different values is rejected — one session reports one cost, not two.
+
 ## A declaration is an intention; a record is what happened
 
 A plan declaration says what a plan is arranged to cost. A period record says what was actually paid. They

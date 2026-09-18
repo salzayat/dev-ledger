@@ -18,6 +18,12 @@ export type SessionFile = {
   inputTokens: number;
   outputTokens: number;
   cachedTokens: number;
+  /** Cache reads, when the harness reports them apart from writes. */
+  cacheReadTokens?: number;
+  /** Cache writes, when the harness reports them; absent is unknown, never zero. */
+  cacheWriteTokens?: number;
+  /** The reported cost with its currency, for a provider not billing in USD. */
+  cost?: { amount: number; currency: string };
   costUsd: number;
   notionalCostUsd?: number;
   figuresSource: string;
@@ -252,6 +258,45 @@ export function validateSessionFile(
       `${operatorFields.join(', ')} must be absent when cost allocation is disabled`,
     );
   }
+  // A currency-named cost may accompany the historical field, but not disagree with it: two costs for one
+  // session would leave every read choosing between them.
+  if (file.cost !== undefined) {
+    const cost = file.cost as Record<string, unknown>;
+    if (
+      typeof cost !== 'object' ||
+      cost === null ||
+      typeof cost.amount !== 'number' ||
+      !Number.isFinite(cost.amount) ||
+      cost.amount < 0
+    ) {
+      errors.push('cost.amount must be a non-negative number');
+    }
+    if (
+      typeof cost.currency !== 'string' ||
+      !/^[A-Z]{3}$/.test(cost.currency)
+    ) {
+      errors.push('cost.currency must be an ISO 4217 code in upper case');
+    }
+    if (
+      typeof cost.amount === 'number' &&
+      cost.currency === 'USD' &&
+      typeof file.costUsd === 'number' &&
+      cost.amount !== file.costUsd
+    ) {
+      errors.push(
+        'cost.amount and costUsd disagree; a session reports one cost, not two',
+      );
+    }
+  }
+  for (const key of ['cacheReadTokens', 'cacheWriteTokens'] as const) {
+    const value = file[key];
+    if (
+      value !== undefined &&
+      (typeof value !== 'number' || !Number.isInteger(value) || value < 0)
+    ) {
+      errors.push(`${key} must be a non-negative integer when present`);
+    }
+  }
   if (config.costAllocation.enabled) {
     // Absence is counted by the reads, not rejected here. A harness that cannot supply the figure — every
     // harness before this was derived, and any transcript with fewer than two prompts — writes a record of
@@ -296,6 +341,9 @@ export type SessionInput = {
   inputTokens?: number;
   outputTokens?: number;
   cachedTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  cost?: { amount: number; currency: string };
   costUsd?: number;
   notionalCostUsd?: number;
   figuresSource: string;
@@ -354,6 +402,18 @@ export function buildSessionFile(
   };
   if (figuresMissing) {
     file.figuresMissing = true;
+  }
+  // Cache reads and writes travel apart when the harness reports them apart. A provider that reports only
+  // hits records only hits: writing a zero for the other would claim it wrote nothing, which is a reading
+  // it never made.
+  if (input.cacheReadTokens !== undefined) {
+    file.cacheReadTokens = input.cacheReadTokens;
+  }
+  if (input.cacheWriteTokens !== undefined) {
+    file.cacheWriteTokens = input.cacheWriteTokens;
+  }
+  if (input.cost !== undefined) {
+    file.cost = input.cost;
   }
   if (input.billingKind === 'subscription') {
     file.subscriptionId = input.subscriptionId;
