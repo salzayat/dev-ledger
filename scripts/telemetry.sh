@@ -1,6 +1,6 @@
 #!/bin/sh
 # Entry point for the capture and flow tooling. Runs the flow package's command line against this
-# working copy: session, subscription, validate, validate-message, sync, rebuild, cursor, board, hash.
+# working copy: session, subscription, validate, validate-message, sync, rebuild, cursor, ledger, hash.
 set -eu
 
 repo_root=$(git rev-parse --show-toplevel)

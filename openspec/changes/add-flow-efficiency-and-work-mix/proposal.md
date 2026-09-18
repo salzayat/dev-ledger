@@ -30,7 +30,7 @@ captured.
 - Check compliance: the share of changes that recorded a local check outcome, and the pass rate among
   them.
 - A rework ignore list per registry entry, so lockfiles and generated files stop dominating the pairs.
-- The Board gains a work-mix chart on the weekly buckets, a flow-efficiency card, an iterations panel, an
+- The Ledger gains a work-mix chart on the weekly buckets, a flow-efficiency card, an iterations panel, an
   abandonment line in the queue panel, a spec lead time panel, the three cost figures, and a check
   compliance line; the terminal render gains the same lines; the methodology page explains each read.
 - `PROJECTION_SCHEMA_VERSION` goes to 5.

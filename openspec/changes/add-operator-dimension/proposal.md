@@ -4,7 +4,7 @@
 
 The session record is symmetric about who did the work: `agentRunSeconds` and `operatorActiveSeconds` sit
 beside each other in one record. The accepted contract admits only the first to a read. Provider and model
-are dimensions of the flow signals and of The Board; `No read SHALL be keyed to a person` and `The Board
+are dimensions of the flow signals and of The Ledger; `No read SHALL be keyed to a person` and `The Ledger
 SHALL NOT present any figure keyed to an operator identifier` exclude the human. So agent labour is
 observable and the human labour it substitutes for is not, and measuring the substitution is a question
 this repository was built to answer.
@@ -16,7 +16,7 @@ tool will not rank anyone. It waits for the repository owner's decision. It is n
 
 ## What Changes
 
-- Admit the operator as a dimension of the flow signals and of The Board, covering agent operators
+- Admit the operator as a dimension of the flow signals and of The Ledger, covering agent operators
   (provider and model) and human operators (the pseudonymous `operatorId`) alike.
 - Report human effort in hours from `operatorActiveSeconds` and agent effort in currency and tokens, side
   by side, never summed into one figure and never priced.
@@ -40,5 +40,5 @@ aggregate` as this change does; whichever archives second is rebased onto the fi
   whoever implements it, after this decision.
 - No hourly rate, salary, or currency figure for a human operator; the forbidden keys stay forbidden.
 - No name or email address in any record, and no resolution of a pseudonymous `operatorId` to a person.
-- No conversion of human hours into money anywhere in the projection or on The Board.
+- No conversion of human hours into money anywhere in the projection or on The Ledger.
 - No backfill: the existing records carry no `operatorId` and none is invented for them.

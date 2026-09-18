@@ -448,7 +448,7 @@ description SHALL assert coverage of a standard.
 
 The governance configuration for a repository (base level, packs, independence level and path scopes,
 approved reviewer list, collector setting) SHALL be a version-controlled file in this repository under
-`config/<repository>.json`, changed only through a pull request. The Board SHALL render the effective
+`config/<repository>.json`, changed only through a pull request. The Ledger SHALL render the effective
 rule set before a change is applied, SHALL express a change as a proposed edit to that file, and SHALL
 present a repository with no file as `hygiene` with an explicit statement that no level has been chosen.
 
@@ -456,19 +456,19 @@ present a repository with no file as `hygiene` with an explicit statement that n
 
 - GIVEN an operator selects base level `change-control` and enables the `pci-dss` pack
 - WHEN the change is previewed
-- THEN The Board MUST list the rules that would run, their severities, and their controls
+- THEN The Ledger MUST list the rules that would run, their severities, and their controls
 - AND the change MUST NOT be applied until it is committed through a pull request
 
 #### Scenario: An unconfigured repository states its default
 
 - GIVEN a repository in the registry with no configuration file
-- WHEN an operator opens The Board
+- WHEN an operator opens The Ledger
 - THEN it MUST present the level as `hygiene`
 - AND it MUST state that no level has been chosen
 
-### Requirement: The Board gains a governance view
+### Requirement: The Ledger gains a governance view
 
-The Board SHALL gain a governance view beside its flow views, and the productivity rule set's
+The Ledger SHALL gain a governance view beside its flow views, and the productivity rule set's
 reads SHALL join its spend panels. The governance view SHALL present, per repository and across the
 registry, the change population and any out-of-band change first, then controls in one of four states
 (evidenced, evidenced-with-exception, not evidenced, not-observable) scoped to a selected release, each with
@@ -495,7 +495,7 @@ standard satisfied, or any figure keyed to a person.
 
 #### Scenario: The flow views survive the extension
 
-- GIVEN the phase one Board rendering wait time and the unmerged queue
+- GIVEN the phase one Ledger rendering wait time and the unmerged queue
 - WHEN the governance view is added
 - THEN those panels MUST render exactly as phase one rendered them
 

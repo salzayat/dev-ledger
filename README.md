@@ -8,11 +8,11 @@ machine that fetched the same ref tips. No platform API, no token, no workflow, 
 
 Phase one, `add-flow-observability`, is observability: capture hooks and session files, a registry of
 repositories, the projection, the flow signals (cycle time, wait time, the unmerged queue, batch size,
-rework, escapes, spend per change), the four DORA keys approximated to the release tag, and The Board,
+rework, escapes, spend per change), the four DORA keys approximated to the release tag, and The Ledger,
 published for this repository at [salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/). Phase two, `add-change-audit`, is compliance as a layer
 over the same records: rules, levels and packs, findings you can quote by identifier, decisions you cannot
 quietly edit, evidence packs that hash the same on any machine, and a governance view added to the same
-Board. Its baseline needs nothing but git and says plainly which controls git alone cannot see; an
+Ledger. Its baseline needs nothing but git and says plainly which controls git alone cannot see; an
 optional collector, running in this repository's own continuous integration with one read-only credential,
 adds reviews, checks, protection, and deployments for the repositories that turn it on. It never claims
 compliance and never resolves an identifier to a person.
@@ -36,11 +36,11 @@ pattern, thresholds, and a `webUrl` when the SSH URL uses a host alias), then:
 ```bash
 ./scripts/telemetry.sh sync      # mirror-fetch every registered repository over SSH
 ./scripts/telemetry.sh rebuild   # rebuild .telemetry/projection.json and print its hash
-./scripts/telemetry.sh board     # render The Board in the terminal
-./scripts/telemetry.sh board --html   # write .telemetry/board.html, the dashboard, and open it from a file URL
+./scripts/telemetry.sh ledger     # render The Ledger in the terminal
+./scripts/telemetry.sh ledger --html   # write .telemetry/ledger.html, the dashboard, and open it from a file URL
 ```
 
-Or run all four as one: `npm run board`. `sync` is the only step that touches the network, and it uses
+Or run all four as one: `npm run ledger`. `sync` is the only step that touches the network, and it uses
 `git fetch` and nothing else. `rebuild` runs against the local mirrors. Two machines that fetched the same
 ref tips print the same hash.
 
@@ -71,7 +71,7 @@ record. The payload fields are listed in [`docs/contract.md`](docs/contract.md).
 A commit made after `session end` carries `Session: none` today and reads as human-only work, a defect
 drafted as `fix-session-none-default`.
 
-## What The Board Shows
+## What The Ledger Shows
 
 Per repository and across the registry: cycle time and wait time (from the pull head ref, so a rebase or
 squash does not erase them), the unmerged queue with each pull request's age and spend, batch size, merge
@@ -90,19 +90,19 @@ model in the subscription's currency, humans by a pseudonymous identifier in hou
 priced, and never resolved to a name or an email address.
 [`docs/methodology.md`](docs/methodology.md) explains each figure.
 
-## The Published Board
+## The Published Ledger
 
 This repository's own board is published to GitHub Pages at
 [salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/), rebuilt on every push to `main` by
-the `Board` workflow. It is built by the same `telemetry board --html` that writes the local page, so what
-is published is what `npm run board` shows you.
+the `Ledger` workflow. It is built by the same `telemetry ledger --html` that writes the local page, so what
+is published is what `npm run ledger` shows you.
 
 Every pull request builds the same page without publishing it: the run uploads it as a `board` artifact and
-writes the terminal render into the run's job summary, so a reviewer sees what a change does to the board
+writes the terminal render into the run's job summary, so a reviewer sees what a change does to the ledger
 before it merges. Only a push to `main` deploys, and only while the repository is public; the deploy job
 checks that itself rather than relying on anyone to remember.
 
-Nothing generated is committed. `.telemetry/board.html` is untracked, the published page is built in the
+Nothing generated is committed. `.telemetry/ledger.html` is untracked, the published page is built in the
 workflow rather than stored in the tree, and the workflow uses no credential beyond the token the platform
 issues to its own run.
 
@@ -138,10 +138,10 @@ repository turns it on, every control that needs them reads as not observable.
 | `npm run check`                              | The complete local quality gate: specs, harness, governance, docs, secrets, formatting, Nx checks, tests, builds. |
 | `./scripts/telemetry.sh sync`                | Mirror-fetch every registered repository over SSH. `--entry NAME --fetch-url URL` fetches one entry elsewhere.    |
 | `./scripts/telemetry.sh rebuild`             | Rebuild the projection and print its content hash.                                                                |
-| `./scripts/telemetry.sh board`               | Render The Board from the projection.                                                                             |
-| `./scripts/telemetry.sh board --html`        | Write the dashboard to `.telemetry/board.html` and print its path.                                                |
-| `npm run board`                              | Sync, rebuild, write the dashboard, and open it. The one command that goes from nothing to the page.              |
-| `npm run board -- --no-open`                 | The same without opening a browser; `--output PATH` writes somewhere other than `.telemetry/board.html`.          |
+| `./scripts/telemetry.sh ledger`              | Render The Ledger from the projection.                                                                            |
+| `./scripts/telemetry.sh ledger --html`       | Write the dashboard to `.telemetry/ledger.html` and print its path.                                               |
+| `npm run ledger`                             | Sync, rebuild, write the dashboard, and open it. The one command that goes from nothing to the page.              |
+| `npm run ledger -- --no-open`                | The same without opening a browser; `--output PATH` writes somewhere other than `.telemetry/ledger.html`.         |
 | `./scripts/telemetry.sh cursor <consumer>`   | Replay changes since the consumer's cursor and advance it.                                                        |
 | `./scripts/telemetry.sh validate`            | Validate session files against the schema.                                                                        |
 | `./scripts/telemetry.sh session`             | Record a session start, or write and commit a session file at session end.                                        |
@@ -157,20 +157,20 @@ through the `@dev-ledger/source` export condition, so no build step is needed to
 
 ## Repository Map
 
-| Directory or file           | Purpose                                                                                                                   |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `packages/capture`          | Session file schema, configuration, trailer parsing and validation                                                        |
-| `packages/flow`             | Registry, sync, change grouping, association, timing, releases, signals, projection, cursors, The Board, the command line |
-| `.githooks/`                | `prepare-commit-msg`, `commit-msg`, `pre-commit`, `pre-push`                                                              |
-| `scripts/telemetry.sh`      | Entry point for every telemetry command                                                                                   |
-| `scripts/board.sh`          | Sync, rebuild, render, and open The Board in one step; backs `npm run board`                                              |
-| `telemetry.config.json`     | Effort vocabulary, spec pattern, cost allocation (off by default)                                                         |
-| `registry.json`             | The repositories the projection covers                                                                                    |
-| `.telemetry/sessions/`      | Session files, tracked, one per session                                                                                   |
-| `.telemetry/subscriptions/` | Subscription cost records, tracked, one per billing period and plan                                                       |
-| `.telemetry/` (untracked)   | Mirrors, the projection, cursors: rebuilt, never committed                                                                |
-| `openspec/`                 | Accepted specs and the two phase changes                                                                                  |
-| `docs/`                     | [`contract.md`](docs/contract.md), [`methodology.md`](docs/methodology.md), governance, orientation                       |
+| Directory or file           | Purpose                                                                                                                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `packages/capture`          | Session file schema, configuration, trailer parsing and validation                                                         |
+| `packages/flow`             | Registry, sync, change grouping, association, timing, releases, signals, projection, cursors, The Ledger, the command line |
+| `.githooks/`                | `prepare-commit-msg`, `commit-msg`, `pre-commit`, `pre-push`                                                               |
+| `scripts/telemetry.sh`      | Entry point for every telemetry command                                                                                    |
+| `scripts/ledger.sh`         | Sync, rebuild, render, and open The Ledger in one step; backs `npm run ledger`                                             |
+| `telemetry.config.json`     | Effort vocabulary, spec pattern, cost allocation (off by default)                                                          |
+| `registry.json`             | The repositories the projection covers                                                                                     |
+| `.telemetry/sessions/`      | Session files, tracked, one per session                                                                                    |
+| `.telemetry/subscriptions/` | Subscription cost records, tracked, one per billing period and plan                                                        |
+| `.telemetry/` (untracked)   | Mirrors, the projection, cursors: rebuilt, never committed                                                                 |
+| `openspec/`                 | Accepted specs and the two phase changes                                                                                   |
+| `docs/`                     | [`contract.md`](docs/contract.md), [`methodology.md`](docs/methodology.md), governance, orientation                        |
 
 See [`docs/repository-orientation.md`](docs/repository-orientation.md) for the agent loop, the harness
 layout, and the MCP boundary, and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the change workflow.

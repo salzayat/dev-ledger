@@ -1,4 +1,4 @@
-name: Board
+name: Ledger
 
 on:
   pull_request:
@@ -42,16 +42,16 @@ jobs:
             --fetch-url "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
       - name: Rebuild the projection
         run: ./scripts/telemetry.sh rebuild
-      - name: Render The Board
+      - name: Render The Ledger
         run: |
           mkdir -p site
-          ./scripts/telemetry.sh board --html site/index.html
+          ./scripts/telemetry.sh ledger --html site/index.html
       - name: Write the terminal render into the run summary
         run: |
           {
-            printf '## The Board\n\n'
+            printf '## The Ledger\n\n'
             printf '```\n'
-            ./scripts/telemetry.sh board
+            ./scripts/telemetry.sh ledger
             printf '```\n'
           } >>"$GITHUB_STEP_SUMMARY"
       - name: Upload the page

@@ -5,7 +5,7 @@
 This change is the second phase of `dev-ledger`, built one week after `add-flow-observability` tagged
 `v0.1.0`, and it answers the question phase one deliberately does not: can the records a team already keeps
 stand as evidence for a named control. Phase one gives it the `capture` and `flow` packages, the registry,
-the SSH sync, the projection, the flow signals, and The Board. None of that has a consumer: nothing reads
+the SSH sync, the projection, the flow signals, and The Ledger. None of that has a consumer: nothing reads
 the projection against a rule, records a finding someone has to answer for, or produces a document an
 assessor can read. The `.githooks` and `scripts/pr.sh` phase one extended are not changed here.
 
@@ -50,12 +50,12 @@ Every control that needs the collector says so when it is off, rather than being
 - Metadata only: a record carrying an unclassified free-text payload is rejected.
 - A governance configuration file per repository (`config/<repository>.json`), changed only through a pull
   request, with the effective rule set rendered before a change is applied.
-- The Board gains a governance view beside the flow views: controls in four states, exceptions,
+- The Ledger gains a governance view beside the flow views: controls in four states, exceptions,
   run history, pack generation, and the configuration preview, with a citation on every figure, no score,
   and no person dimension. The productivity rule set's reads join the existing spend panels with excluded
   counts beside each figure and refusals rendered as content.
 - `scripts/audit.sh` (`run`, `findings`, `ack`, `resolve`, `except`, `pack`, `verify`, `rebuild`), with
-  `scripts/telemetry.sh board` rendering the extended Board.
+  `scripts/telemetry.sh ledger` rendering the extended Ledger.
 
 ## Dependencies
 
@@ -74,7 +74,7 @@ tagged).
   off until a repository's configuration turns it on and a maintainer provisions the credential.
 - No workflow in any audited repository. Producing agent reviews inside an audited repository is a later
   change; this one only records reviews the platform already holds.
-- No change to the `capture` and `flow` packages' schemas or to the flow views of The Board beyond adding
+- No change to the `capture` and `flow` packages' schemas or to the flow views of The Ledger beyond adding
   the governance view. Anything the audit layer needs from them is a follow-on change to phase one's
   capabilities, not a silent edit inside this one.
 - No ingestion of regulated data. Findings and packs cite identifiers, paths, and timestamps, never
@@ -82,6 +82,6 @@ tagged).
 - No operator-authored rule language, extension declarations, or pack-upgrade diffing. Rules are code; a
   team extends by configuration and exceptions.
 - No `distinct-session` independence level. Two sessions of one model share the same failure modes.
-- No second read surface. The Board is the one surface, here extended with a governance view.
+- No second read surface. The Ledger is the one surface, here extended with a governance view.
 - No standard beyond `pci-dss` and `hipaa`. Others are packs a later change or a team authors against the
   same seed format.

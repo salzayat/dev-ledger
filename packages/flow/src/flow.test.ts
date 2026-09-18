@@ -4,8 +4,8 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { renderBoard } from './board.ts';
-import { renderBoardHtml } from './board-html.ts';
+import { renderLedger } from './ledger.ts';
+import { renderLedgerHtml } from './ledger-html.ts';
 import { advanceCursor } from './cursor.ts';
 import {
   commit,
@@ -476,7 +476,7 @@ test('an unreachable repository is named and the rest still build', () => {
   const projection = buildProjection(state, registry);
   assert.equal(projection.repositories.gone.reachable, false);
   assert.equal(projection.repositories.ok.reachable, true);
-  assert.match(renderBoard(projection), /1 unreachable \(gone\)/);
+  assert.match(renderLedger(projection), /1 unreachable \(gone\)/);
 });
 
 test('thresholds raise signals that cite the changes behind them', () => {
@@ -559,13 +559,13 @@ test('a cursor resumes, is idempotent, and resets when its commit is unreachable
   assert.equal(run4.reset!.invalid, second.commits[0]);
 });
 
-test('the board renders an empty state and never a person dimension', () => {
-  assert.match(renderBoard(null), /The Board is empty/);
+test('the ledger renders an empty state and never a person dimension', () => {
+  assert.match(renderLedger(null), /The Ledger is empty/);
   const fixture = makeFixtureRepo();
   const { projection } = build(registryFor(fixture.dir));
-  const text = renderBoard(projection);
+  const text = renderLedger(projection);
   assert.match(text, /no changes on the default branch yet|cycle time/);
-  // The operator dimension is now a read, so the board may name an operator. What it must never do is
+  // The operator dimension is now a read, so the ledger may name an operator. What it must never do is
   // resolve one to a person: no name, no email address, no author.
   assert.doesNotMatch(text, /author|@[a-z0-9.-]+\.[a-z]{2,}/i);
 });
@@ -642,7 +642,7 @@ test('the operator dimension keeps agents in currency, humans in hours, and neit
   assert.equal(operators.excluded.humanOnly, 1);
 
   // No figure crosses the two units, and no identifier resolves to a person.
-  const html = renderBoardHtml(projection);
+  const html = renderLedgerHtml(projection);
   assert.match(html, /op-1/);
   assert.match(html, /1\.5 h/);
   assert.doesNotMatch(html, /\$[0-9.]+\s*(<[^>]*>)?\s*(per hour|\/ ?h\b)/i);
@@ -708,6 +708,49 @@ test('the allocated amount per token leads with input and output, and counts wha
   // The session that reported nothing is counted rather than silently shrinking the denominator.
   assert.equal(rate.sessions, 2);
   assert.equal(rate.withoutFigures, 1);
+});
+
+test('velocity counts points per week and excludes changes that recorded none', () => {
+  const fixture = makeFixtureRepo();
+  const withPoints = openPullRequest(fixture, 'v1', [
+    [
+      trailered('feat(v): pointed', {
+        Session: 'none',
+        Change: 'c-v1',
+        'Story-Points': '5',
+      }),
+      { 'src/v1.ts': 'a' },
+    ],
+  ]);
+  mergeSquash(fixture, withPoints, 'feat(v): pointed', 'Story-Points: 5', {
+    hours: 24,
+  });
+  const without = openPullRequest(fixture, 'v2', [
+    [
+      trailered('feat(v): unpointed', { Session: 'none', Change: 'c-v2' }),
+      { 'src/v2.ts': 'b' },
+    ],
+  ]);
+  mergeSquash(fixture, without, 'feat(v): unpointed', '', { hours: 24 });
+
+  const { repo } = build(registryFor(fixture.dir));
+  const velocity = repo.signals.velocity;
+
+  assert.equal(velocity.storyPoints, 5, 'only the pointed change contributes');
+  assert.ok(
+    velocity.excludedWithoutPoints >= 1,
+    'the unpointed change is counted as excluded',
+  );
+  assert.ok(velocity.weeks >= 1);
+  assert.equal(
+    velocity.pointsPerWeek,
+    Math.round((5 / velocity.weeks) * 100) / 100,
+  );
+  // Never keyed to a person: the read carries no operator dimension at all.
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(velocity, 'byOperator'),
+    false,
+  );
 });
 
 test('a projection built over many synthetic changes stays well under a minute', () => {
@@ -1121,10 +1164,10 @@ test('subscription spend is allocated by agent run seconds, excluded and counted
     ),
   );
   assert.equal(built.repo.subscriptions.length, 4);
-  const board = renderBoard(built.projection);
-  assert.match(board, /subscription spend \(allocated by agentRunSeconds\)/);
+  const ledger = renderLedger(built.projection);
+  assert.match(ledger, /subscription spend \(allocated by agentRunSeconds\)/);
   assert.match(
-    board,
+    ledger,
     /allocated total USD: \$364\.00 over 4 sessions \(provisional\)/,
   );
   // Deterministic: the same records rebuild byte-identically.

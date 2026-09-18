@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { escapeHtml, renderBoardHtml } from './board-html.ts';
+import { escapeHtml, renderLedgerHtml } from './ledger-html.ts';
 import {
   makeFixtureRepo,
   mergeSquash,
@@ -99,19 +99,19 @@ function fixtureProjection() {
       ],
     }),
   ).registry;
-  const state = mkdtempSync(join(tmpdir(), 'dev-ledger-board-'));
+  const state = mkdtempSync(join(tmpdir(), 'dev-ledger-render-'));
   syncAll(state, registry);
   return buildProjection(state, registry);
 }
 
 test('the empty projection renders an explicit empty state', () => {
-  const html = renderBoardHtml(null);
-  assert.match(html, /The Board is empty/);
+  const html = renderLedgerHtml(null);
+  assert.match(html, /The Ledger is empty/);
   assert.match(html, /<!doctype html>/);
 });
 
 test('the page loads no resource: no script, no src, no stylesheet, both color schemes, narrow layout', () => {
-  const html = renderBoardHtml(fixtureProjection());
+  const html = renderLedgerHtml(fixtureProjection());
   assert.doesNotMatch(html, /<script/i);
   assert.doesNotMatch(html, /<link/i);
   assert.doesNotMatch(html, /\ssrc=/i);
@@ -124,7 +124,7 @@ test('the page loads no resource: no script, no src, no stylesheet, both color s
 });
 
 test('a repository with no web URL renders its citations unlinked', () => {
-  const html = renderBoardHtml(fixtureProjection());
+  const html = renderLedgerHtml(fixtureProjection());
   assert.doesNotMatch(html, /<a class="ref"/);
   assert.doesNotMatch(html, /https?:\/\//);
   assert.match(html, /feat\(one\)/);
@@ -133,7 +133,7 @@ test('a repository with no web URL renders its citations unlinked', () => {
 test('a cited commit names its change and links to the platform', () => {
   const projection = fixtureProjection();
   projection.repositories.fixture.webUrl = 'https://github.com/acme/fixture';
-  const html = renderBoardHtml(projection);
+  const html = renderLedgerHtml(projection);
   const change = projection.repositories.fixture.changes[0] as {
     id: string;
     subject: string;
@@ -216,7 +216,7 @@ test('the projection records the derived web URL, never the registry path', () =
 });
 
 test('every panel carries trust classes, excluded counts, and citations', () => {
-  const html = renderBoardHtml(fixtureProjection());
+  const html = renderLedgerHtml(fixtureProjection());
   for (const title of [
     'Cycle time',
     'Wait time',
@@ -256,9 +256,9 @@ test('every panel carries trust classes, excluded counts, and citations', () => 
 });
 
 test('text from the repository is escaped and no identifier resolves to a person', () => {
-  const html = renderBoardHtml(fixtureProjection());
+  const html = renderLedgerHtml(fixtureProjection());
   assert.doesNotMatch(html, /<first>/);
-  const linked = renderBoardHtml(
+  const linked = renderLedgerHtml(
     (() => {
       const projection = fixtureProjection();
       projection.repositories.fixture.webUrl =
@@ -310,7 +310,7 @@ test('spend is attributable to one unmerged pull request, citing every record', 
 
 test('the queue and changes tables show spend, or say why there is none', () => {
   const projection = fixtureProjection();
-  const html = renderBoardHtml(projection);
+  const html = renderLedgerHtml(projection);
   const rows = html.match(/<tr>(?:(?!<\/tr>)[\s\S])*<\/tr>/g) ?? [];
   const queueRow = rows.find(
     (row) => row.includes('#3') && row.includes('$0.50'),
@@ -325,8 +325,57 @@ test('the queue and changes tables show spend, or say why there is none', () => 
   assert.ok(undeclaredRow, 'the undeclared change has a row');
   assert.match(undeclaredRow!, /undeclared/);
   assert.doesNotMatch(undeclaredRow!, /\$0\.00/);
-  const declaredRow = rows.find((row) => row.includes('feat(one)'));
+  // Scoped to the recent-changes row rather than the first row naming the change: the effort-unit table
+  // cites the same change and now renders in the spend tab, ahead of this one in document order.
+  const declaredRow = rows.find(
+    (row) => row.includes('feat(one)') && row.includes('class="subject"'),
+  );
+  assert.ok(declaredRow, 'the declared change has a recent-changes row');
   assert.match(declaredRow!, /\$0\.50/);
+});
+
+test('tabs need no script and no form, and separate DORA from flow', () => {
+  const html = renderLedgerHtml(fixtureProjection());
+
+  // The page may not execute anything and may not carry a control that submits: the published artifact is
+  // static, and the configuration surface it must never become lives elsewhere.
+  assert.doesNotMatch(html, /<script/i);
+  assert.doesNotMatch(html, /<form/i);
+  assert.doesNotMatch(html, /<input/i);
+  assert.doesNotMatch(html, /<button/i);
+  assert.doesNotMatch(html, /<select/i);
+
+  // Every tab is a fragment on this page, so a tab is a URL and a link to one opens it.
+  const tabIds = [
+    ...html.matchAll(/<section class="tab[^"]*" id="([^"]+)"/g),
+  ].map((match) => match[1]);
+  assert.ok(tabIds.length >= 4, 'four tabs per repository');
+  for (const name of ['flow', 'dora', 'spend', 'records']) {
+    assert.ok(
+      tabIds.some((id) => id.endsWith(`-${name}`)),
+      `${name} has its own tab`,
+    );
+    assert.match(html, new RegExp(`href="#[^"]*-${name}"`));
+  }
+
+  // DORA and flow are different tabs, not two panels in one scroll.
+  const section = (name: string) => {
+    const open = html.indexOf(
+      `id="${tabIds.find((id) => id.endsWith(`-${name}`))}"`,
+    );
+    const rest = html.slice(open);
+    // Panels are sections too, so slice to the next tab rather than to the next closing tag.
+    const next = rest.indexOf('<section class="tab', 1);
+    return next === -1 ? rest : rest.slice(0, next);
+  };
+  assert.match(section('dora'), /DORA keys/);
+  assert.doesNotMatch(section('dora'), /Merge frequency/);
+  assert.match(section('flow'), /Merge frequency/);
+  assert.doesNotMatch(section('flow'), /DORA keys/);
+
+  // One tab renders without a fragment, chosen by CSS rather than by a script.
+  assert.match(html, /class="tab tab--default"/);
+  assert.match(html, /\.tabbed > \.tab:target ~ \.tab--default/);
 });
 
 test('allocated subscription spend renders beside reported spend, with its class and provisional mark', () => {
@@ -378,9 +427,9 @@ test('allocated subscription spend renders beside reported spend, with its class
       repositories: [{ name: 'fixture', url: fixture.dir }],
     }),
   ).registry;
-  const state = mkdtempSync(join(tmpdir(), 'dev-ledger-board-sub-'));
+  const state = mkdtempSync(join(tmpdir(), 'dev-ledger-render-sub-'));
   syncAll(state, registry);
-  const html = renderBoardHtml(buildProjection(state, registry));
+  const html = renderLedgerHtml(buildProjection(state, registry));
   assert.match(html, /<h3>Subscription spend<\/h3>/);
   assert.match(html, /badge-allocated/);
   assert.match(

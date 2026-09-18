@@ -1,6 +1,6 @@
 # Methodology
 
-What the numbers on The Board mean, where they come from, and what they cannot see.
+What the numbers on The Ledger mean, where they come from, and what they cannot see.
 
 ## A change, not a commit
 
@@ -38,7 +38,7 @@ has both figures absent with a reason, never zero.
 
 ## Typical, nine in ten, slowest
 
-The Board never shows an average, because one very slow change would drag it. Each timing panel shows
+The Ledger never shows an average, because one very slow change would drag it. Each timing panel shows
 three figures instead. Typical is the median: half the changes were faster than it, half slower. Nine in
 ten is the value nine out of ten changes came in under, which is where a slow tail shows. Slowest is the
 single worst change, always cited so it can be looked at. In the projection file these are `p50`, `p90`,
@@ -58,9 +58,9 @@ Git observed the commit graph and its dates: `observed`. The harness reported wh
 `reported`. Every figure names the classes it was computed from, and no read promotes a reported figure
 to observed. There is no third class here; platform facts belong to phase two's optional collector.
 
-## The Board is a page rendered from the projection
+## The Ledger is a page rendered from the projection
 
-`telemetry board --html` writes one self-contained HTML page from the projection: inline styles, inline
+`telemetry ledger --html` writes one self-contained HTML page from the projection: inline styles, inline
 SVG charts, no script, and no loaded resource. Each repository opens with a summary strip (typical wait and
 cycle, queue, merges per day, spend, out-of-band), then the panels, then a table of the newest changes with
 each one's pull request, wait, cycle, lines, session status, and gaps. The charts — merges per day over the
@@ -68,6 +68,29 @@ measured window, the distribution bars, lines added and removed per recent chang
 request, the most-reworked files, and the spend bars — are folds over the same records, computed when the
 page is rendered. Nothing on the page can compute a figure the projection does not hold, so the citation
 rule holds for the page as well as for the data.
+
+## Velocity, and what it is not
+
+The Ledger reports story points and changes merged per week over the measured window, from the effort
+trailers already recorded. Changes recording no points are excluded and counted, never read as zero points,
+so a window in which half the work carried no estimate reports the half it could measure and says how much
+it could not.
+
+It is per repository and per week. There is no velocity per operator and there will not be: the operator
+dimension exists to compare agent labour with human labour on the same change, not to rank people by
+throughput, and a per-person velocity is the one figure this methodology was built to avoid producing.
+
+## Tabs, and why they carry no script
+
+The Ledger groups its panels into four tabs — flow, DORA, spend, and records — navigated by a fragment per
+tab and selected with CSS. The page carries no script element, loads no external resource, and contains no
+form control, so tabs could not be built from either of the usual techniques. The fragment approach has a
+property the others lack: a tab is a URL, so a link to the DORA tab opens the DORA tab, and a figure stays
+citable in a review.
+
+DORA and flow are separate because they answer different questions. The four keys are approximations named
+as such on every card; the flow signals are computed directly. One scroll had been quietly inviting a reader
+to trust both equally.
 
 ## A citation names its change and reaches the commit
 
@@ -133,7 +156,7 @@ has no state and nobody acknowledges it. Rules, findings, exceptions, and eviden
 
 ## What the plan worked out to per token
 
-The Board divides an allocated period's amount by the input and output tokens of the sessions that took a
+The Ledger divides an allocated period's amount by the input and output tokens of the sessions that took a
 share of it. Input plus output leads because those are the tokens the work asked for. Cache reads are
 reported beside it and never added to that denominator: over this repository's own September records they
 run 892,856,906 against 3,440,144, so a combined denominator reads about two hundred and sixty times better
@@ -146,7 +169,7 @@ it, and a period with no tokens behind it reports no rate rather than a rate of 
 
 ## Nothing resolved to a person
 
-The Board reads by change, spec, repository, provider, model, and operator. An operator is either an agent,
+The Ledger reads by change, spec, repository, provider, model, and operator. An operator is either an agent,
 identified by its provider and model, or a human, identified by a pseudonymous identifier. Both are
 measured, because the question this tool exists to answer is how agent labour and human labour divide across
 a change, and you cannot see that division while instrumenting one side of it.
@@ -174,7 +197,7 @@ change reads as undeclared.
 
 ## DORA, approximated to the release tag
 
-The four DORA keys are defined against deployments, and git holds releases, not deployments. The Board
+The four DORA keys are defined against deployments, and git holds releases, not deployments. The Ledger
 shows all four anyway, each computed to the release tag and labeled that way:
 
 - Deployment frequency is release tags per week over the measured window.

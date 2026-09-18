@@ -41,12 +41,12 @@
       records, and the flow projection; byte-identical rebuild; payload-bearing records rejected.
 - [ ] 2.14 `src/productivity.ts`: reads over the flow projection's spend and effort reads with excluded counts and
       the minimum-sample refusal.
-- [ ] 2.15 `src/board.ts`: the governance view added to the phase one Board (controls in four states,
+- [ ] 2.15 `src/board.ts`: the governance view added to the phase one Ledger (controls in four states,
       exceptions, run history, pack generation, configuration preview expressed as a file edit) and the
       productivity rule set's panels beside the spend panels; citations on every figure, no score,
       no person dimension.
 - [ ] 2.16 `scripts/audit.sh` with `run`, `findings`, `ack`, `resolve`, `except`, `pack`, `verify`,
-      `rebuild`; `scripts/telemetry.sh board` renders the extended Board.
+      `rebuild`; `scripts/telemetry.sh ledger` renders the extended Ledger.
 - [ ] 2.17 Unit tests over fixture projections: every scenario in `specs/change-audit/spec.md`, and a test
       asserting no rendered output carries a per-person total.
 
@@ -89,5 +89,5 @@
       by a different provider's agent and confirm `distinct-provider` passes, merge one reviewed by the same
       provider and confirm the finding names both levels, push after review and confirm the change reads
       unreviewed, hand-edit a record and confirm the restatement on the next run.
-- [ ] 5.6 Run phase one's Board tests unchanged against the extended Board and confirm the flow views render
+- [ ] 5.6 Run phase one's Ledger tests unchanged against the extended Ledger and confirm the flow views render
       as before.

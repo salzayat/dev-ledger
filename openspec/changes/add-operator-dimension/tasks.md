@@ -2,7 +2,7 @@
 
 ## 1. Decision
 
-- [x] 1.1 The repository owner accepts that a pseudonymous operator becomes a Board dimension, reversing the
+- [x] 1.1 The repository owner accepts that a pseudonymous operator becomes a Ledger dimension, reversing the
       accepted prohibition, the README's "never aggregates by person", the methodology's "Nothing keyed to
       a person", and the published position. Record the decision here before starting any task below.
       **Decision, recorded:** the repository owner directed this explicitly — "the idea is to track agents
@@ -19,7 +19,7 @@
 - [x] 2.3 Exclude changes carrying `Session: none` and sessions predating `costAllocation` from the
       human-hours figure with their counts stated.
 
-## 3. The Board
+## 3. The Ledger
 
 - [x] 3.1 An operator panel with human hours and agent currency side by side, no summed total across the
       two units, each human operator identified by its pseudonymous identifier alone; terminal render to

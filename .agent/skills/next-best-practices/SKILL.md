@@ -9,7 +9,7 @@ metadata:
 
 # Next.js Best Practices
 
-Use this skill only if a Next.js app is ever added under `apps/`. This repository has none: The Board is a
+Use this skill only if a Next.js app is ever added under `apps/`. This repository has none: The Ledger is a
 static page rendered by `packages/flow`, with no script and no loaded resource, and that stays the default.
 
 ## Repository Boundary

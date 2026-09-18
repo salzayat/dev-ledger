@@ -1,7 +1,7 @@
 import type { Projection, RepositoryProjection } from './projection.ts';
 import type { Distribution, Spend } from './signals.ts';
 
-// The Board: one read surface over the projection. Every figure names its trust classes, its excluded
+// The Ledger: one read surface over the projection. Every figure names its trust classes, its excluded
 // count, and the changes or records behind it. Nothing is keyed to a person.
 
 function seconds(value: number | null): string {
@@ -204,15 +204,15 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   return lines;
 }
 
-export function renderBoard(projection: Projection | null): string {
+export function renderLedger(projection: Projection | null): string {
   if (!projection || Object.keys(projection.repositories).length === 0) {
     return [
-      'The Board is empty.',
+      'The Ledger is empty.',
       'Register a repository in registry.json, then run: telemetry sync && telemetry rebuild',
     ].join('\n');
   }
   const lines: string[] = [
-    `The Board (projection schema ${projection.schemaVersion}, session schema ${projection.sessionSchemaVersion})`,
+    `The Ledger (projection schema ${projection.schemaVersion}, session schema ${projection.sessionSchemaVersion})`,
   ];
   for (const repository of Object.values(projection.repositories)) {
     lines.push('', ...renderRepository(repository));
