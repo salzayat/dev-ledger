@@ -11,7 +11,7 @@ this page is guidance, not a replacement for those contracts.
 ├── apps/                 Future thin, deployable applications
 ├── packages/             Reusable libraries and domain logic
 │   ├── capture/          Session file schema, configuration, trailers (phase one)
-│   └── flow/             Registry, sync, projection, signals, The Board, the command line (phase one)
+│   └── flow/             Registry, sync, projection, signals, The Ledger, the command line (phase one)
 ├── openspec/
 │   ├── specs/            Accepted behavioral requirements and scenarios
 │   └── changes/          Active proposals; archive completed changes
@@ -62,7 +62,7 @@ Open the single governing spec for your task instead of scanning them all. Each 
 | ------------------------------- | -------------------------------------------------------------------------------- |
 | `repository-foundation`         | The small, deterministic Nx starting point: the `capture` and `flow` packages.   |
 | `telemetry-capture`             | Session files, trailers, hooks, and the telemetry configuration (phase one).     |
-| `flow-observability`            | Registry, SSH sync, projection, signals, releases, cursors, and The Board.       |
+| `flow-observability`            | Registry, SSH sync, projection, signals, releases, cursors, and The Ledger.      |
 | `repository-documentation`      | Repository intent, authority boundaries, `AGENTS.md`, and orientation guidance.  |
 | `repository-planning`           | Roadmap sequencing, OpenSpec dependency declarations, and readiness evidence.    |
 | `workflow-governance`           | Executable PR automation and pre-merge dependency-readiness checks.              |
@@ -106,7 +106,7 @@ the agent loop below.
 `@dev-ledger/capture`, declared as both an npm workspace dependency and an Nx `implicitDependencies`
 entry. That import resolves at typecheck and test time through the `@dev-ledger/source` package export
 condition, so no build step is required. [`docs/contract.md`](contract.md) lists the versioned schemas
-`flow` reads and phase two pins; [`docs/methodology.md`](methodology.md) explains every figure on The Board.
+`flow` reads and phase two pins; [`docs/methodology.md`](methodology.md) explains every figure on The Ledger.
 
 When adding a new package that depends on another, follow the same shape: a `package.json` with a matching
 `exports` map, a `project.json` with `implicitDependencies`, and a `node --conditions=@dev-ledger/source`

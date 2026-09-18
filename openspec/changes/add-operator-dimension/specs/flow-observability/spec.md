@@ -4,7 +4,7 @@
 
 ### Requirement: The operator dimension covers agents and humans alike
 
-The projection and The Board SHALL offer the operator as a dimension, covering agent operators identified by
+The projection and The Ledger SHALL offer the operator as a dimension, covering agent operators identified by
 provider and model and human operators identified by the pseudonymous `operatorId`. Agent effort SHALL be
 reported in the currency of the subscription allocation and in tokens where reported; human effort SHALL be
 reported in hours derived from `operatorActiveSeconds`. No read and no rendered figure SHALL multiply a

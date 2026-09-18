@@ -54,10 +54,10 @@ export {
   writeCursor,
 } from './cursor.ts';
 export type { CursorFile, CursorRun } from './cursor.ts';
-export { renderBoard, renderRepository } from './board.ts';
+export { renderLedger, renderRepository } from './ledger.ts';
 export {
   escapeHtml,
-  renderBoardHtml,
+  renderLedgerHtml,
   renderRepositoryHtml,
-} from './board-html.ts';
+} from './ledger-html.ts';
 export { main } from './cli.ts';

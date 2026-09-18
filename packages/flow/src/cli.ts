@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { renderBoard } from './board.ts';
-import { renderBoardHtml } from './board-html.ts';
+import { renderLedger } from './ledger.ts';
+import { renderLedgerHtml } from './ledger-html.ts';
 import { advanceCursor, readCursor, writeCursor } from './cursor.ts';
 import { git } from './git.ts';
 import {
@@ -15,7 +15,7 @@ import { parseRegistry } from './registry.ts';
 import { mirrorPath, syncAll } from './sync.ts';
 
 // `scripts/telemetry.sh` delegates here. Subcommands: sync, rebuild,
-// cursor, board. Everything runs against the working copy and the local mirrors.
+// cursor, ledger. Everything runs against the working copy and the local mirrors.
 
 const USAGE = `Usage: telemetry <command> [options]
 
@@ -23,7 +23,7 @@ const USAGE = `Usage: telemetry <command> [options]
                                            fetching one named entry from a different URL
   rebuild                                  Rebuild the projection from the mirrors and print its hash
   cursor <consumer> [--repo <name>]        Replay changes since the consumer's cursor and advance it
-  board [--html [path]]                    Render The Board in the terminal, or as a static HTML page (default .telemetry/board.html)
+  ledger [--html [path]]                    Render The Ledger in the terminal, or as a static HTML page (default .telemetry/ledger.html)
 `;
 
 function repoRoot(): string {
@@ -139,20 +139,20 @@ export function main(argv: string[]): number {
       writeCursor(state, consumer, cursor);
       return 0;
     }
-    case 'board': {
+    case 'ledger': {
       const projection = readProjection(stateRoot(root));
       const htmlIndex = args.indexOf('--html');
       if (htmlIndex >= 0) {
         const target = resolve(
           root,
-          args[htmlIndex + 1] ?? join('.telemetry', 'board.html'),
+          args[htmlIndex + 1] ?? join('.telemetry', 'ledger.html'),
         );
         mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, renderBoardHtml(projection));
+        writeFileSync(target, renderLedgerHtml(projection));
         process.stdout.write(`${target}\n`);
         return 0;
       }
-      process.stdout.write(renderBoard(projection) + '\n');
+      process.stdout.write(renderLedger(projection) + '\n');
       return 0;
     }
     case 'hash': {

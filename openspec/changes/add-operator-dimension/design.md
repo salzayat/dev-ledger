@@ -15,7 +15,7 @@ and are never summed, because a sum would require exactly the rate the schema re
 ## Where the privacy property lives
 
 Pseudonymity is enforced by `isPseudonymousId` in the capture configuration and by the forbidden-key
-rejection above, both of which survive this change untouched. The Board-level prohibition this change
+rejection above, both of which survive this change untouched. The Ledger-level prohibition this change
 removes was doing something different from those guards: it was withholding a measurement, not protecting
 an identity. That is the argument for the change. The argument against it is the published one: a tool for
 finding your own bottleneck stops being that the moment it can be turned around on the team. The

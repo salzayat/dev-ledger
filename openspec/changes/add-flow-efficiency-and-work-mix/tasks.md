@@ -22,7 +22,7 @@
       archive merge with `open` excluded, the three cost figures, check compliance, and the rework ignore
       list.
 
-## The Board
+## The Ledger
 
 - [ ] 2.1 HTML: work-mix chart on the weekly buckets, flow-efficiency card, iterations panel, abandonment
       line in the queue panel, spec lead time panel, the three cost figures in the spend panel, check

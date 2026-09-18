@@ -8,9 +8,10 @@ import type {
   RepositorySignals,
   Spend,
   Operators,
+  WeeklyBucket,
 } from './signals.ts';
 
-// The Board as one self-contained HTML page: inline styles, inline SVG, no script, no loaded resource.
+// The Ledger as one self-contained HTML page: inline styles, inline SVG, no script, no loaded resource.
 // Same figures as the terminal render, laid out per repository, with trust classes and excluded counts
 // beside every figure and its citations expandable beneath it. Every cited commit shows the change's
 // subject beside its abbreviated hash and links to the hosting platform when the repository records a
@@ -283,6 +284,20 @@ function barChart(bars: Bar[], caption: string): string {
 }
 
 /** Columns over time: one column per bucket, a few dated ticks, no axis library. */
+/**
+ * Velocity over the window: story points per week as columns. Weeks whose changes recorded no points render
+ * as a gap rather than a zero column, because an unmeasured week and an empty week are different facts.
+ */
+function velocityChart(weekly: WeeklyBucket[]): string {
+  if (weekly.length === 0) {
+    return '';
+  }
+  return columnChart(
+    weekly.map((week) => ({ label: week.week, value: week.storyPoints })),
+    'story points merged per week over the measured window',
+  );
+}
+
 function columnChart(
   buckets: { label: string; value: number }[],
   caption: string,
@@ -808,71 +823,28 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
   const recentDiffs = [...changes].slice(-24);
   const unmergedExcluded = signals.spend.unmergedPullRequests.excluded;
   const excludedUnmerged = `${unmergedExcluded.missingFigures} with figures missing, ${unmergedExcluded.invalidSession} unreadable`;
+  const tab = (name: string) => `${label}-${name}`;
   return `${open}${heading}
 <p class="asof">Measured as of ${escapeHtml(dateOnly(repository.asOf))}, the newest commit the mirror holds. Merge times are the merging party's clock.</p>
 <dl class="stats">${summary}</dl>
+<nav class="tabs" aria-label="Sections of ${escapeHtml(repository.name)}">
+<a href="#${tab('flow')}">Flow</a><a href="#${tab('dora')}">DORA</a><a href="#${tab('spend')}">Spend</a><a href="#${tab('records')}">Records</a>
+</nav>
+<div class="tabbed">
+<section class="tab" id="${tab('dora')}" aria-label="DORA keys">
 ${doraStrip(signals, links)}
-${signalPanels}
+</section>
+<section class="tab" id="${tab('spend')}" aria-label="Spend">
 <div class="grid">
-${panel(
-  'Merge frequency',
-  `${figure(String(signals.mergeFrequency.perDay ?? 'n/a'), `merges per day over ${signals.mergeFrequency.days ?? 'n/a'} days, ${count(signals.mergeFrequency.changes, 'change')}`)}${mergeActivity(changes)}`,
-  trustBadges(signals.mergeFrequency.trust),
-)}
 ${spendOverTime(signals.trends)}
 ${allocationPanel(signals.allocation, links)}
 ${costClassPanel(signals.costClasses, signals.coverage, links)}
-${distributionPanel('Wait time', signals.waitTime, 'From the last commit on the pull request to the merge: how long finished work sat.', links)}
-${distributionPanel('Cycle time', signals.cycleTime, 'From the first commit on the pull request to the merge.', links)}
-${panel(
-  'Batch size',
-  `${figure(String(signals.batchSize.medianLines ?? 'n/a'), `median lines changed; ${signals.batchSize.medianFiles ?? 'n/a'} files and ${signals.batchSize.medianCommits ?? 'n/a'} commits per change`)}${diffChart(recentDiffs, 'lines added and removed per recent change')}<p class="help"><span class="added">added</span> above the line, <span class="removed">removed</span> below it: ${escapeHtml(`one column per change, oldest first, over the newest ${recentDiffs.length}; largest ${Math.max(0, ...recentDiffs.map((change) => Math.max(change.insertions, change.deletions))).toLocaleString('en-US')} lines.`)}</p>${cites('changes', signals.batchSize.cites, links)}`,
-  `${trustBadges(['observed'])} over ${count(signals.batchSize.count, 'change')}`,
-)}
-${panel(
-  'Unmerged queue',
-  `${figure(String(signals.queue.count), `pull requests, oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`)}${queueChart}${
-    queueRows
-      ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th class="num">spend</th><th class="num">sessions</th><th>oldest commit</th><th>records</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
-      : '<p class="empty">Nothing waiting.</p>'
-  }`,
-  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report`,
-)}
-${panel(
-  'Rework',
-  `${figure(String(signals.rework.pairs.length), `pairs of changes touching the same file within ${signals.rework.windowDays} days`)}${topFiles(signals.rework.pairs)}${cites(
-    'pairs',
-    signals.rework.pairs.map((pair) => `${pair.later}<-${pair.earlier}`),
-    links,
-  )}`,
-  `${trustBadges(['observed'])} most-touched files first`,
-)}
-${panel(
-  'Escapes',
-  `${figure(String(signals.escapes.changes.length), `reverts or fixes after ${escapeHtml(signals.escapes.release ?? 'no release')} touching released files`)}${cites(
-    'changes',
-    signals.escapes.changes.map((entry) => entry.change),
-    links,
-  )}`,
-  trustBadges(['observed']),
-)}
-${panel('Local checks', figure(checks || 'none', checks ? 'session records with a check outcome' : 'no session recorded a check outcome yet'), `${trustBadges(['reported'])} from session records`)}
 ${panel(
   'Spend',
   `${figure(`$${signals.spend.total.costUsd.toFixed(2)}`, `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens over ${signals.spend.total.sessions} sessions with figures`)}${cites('records', signals.spend.total.cites, links)}`,
   `${trustBadges(signals.spend.trust)} excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
 )}
-${panel(
-  'Population',
-  `${figure(String(outOfBand.length), `out-of-band changes of ${changes.length}; ${repository.unreleased.length} unreleased${repository.movedTags.length ? `; moved tags: ${escapeHtml((repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', '))}` : ''}`)}${cites(
-    'out-of-band',
-    outOfBand.map((change) => change.id),
-    links,
-  )}`,
-  trustBadges(['observed']),
-)}
 </div>
-${changesTable(changes, signals.spend.byChange, links, signals.allocation)}
 <div class="grid wide">
 ${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.bySpec)}
 ${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byProvider)}
@@ -898,7 +870,101 @@ ${
     : ''
 }
 </div>
+</section>
+<section class="tab" id="${tab('records')}" aria-label="Records">
+${changesTable(changes, signals.spend.byChange, links, signals.allocation)}
+<div class="grid">
+${panel(
+  'Unmerged queue',
+  `${figure(String(signals.queue.count), `pull requests, oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`)}${queueChart}${
+    queueRows
+      ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th class="num">spend</th><th class="num">man hours</th><th class="num">sessions</th><th>oldest commit</th><th>records</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
+      : '<p class="empty">Nothing waiting.</p>'
+  }`,
+  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report`,
+)}
+${panel(
+  'Population',
+  `${figure(String(outOfBand.length), `out-of-band changes of ${changes.length}; ${repository.unreleased.length} unreleased${repository.movedTags.length ? `; moved tags: ${escapeHtml((repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', '))}` : ''}`)}${cites(
+    'out-of-band',
+    outOfBand.map((change) => change.id),
+    links,
+  )}`,
+  trustBadges(['observed']),
+)}
+${panel('Local checks', figure(checks || 'none', checks ? 'session records with a check outcome' : 'no session recorded a check outcome yet'), `${trustBadges(['reported'])} from session records`)}
+</div>
+</section>
+<section class="tab tab--default" id="${tab('flow')}" aria-label="Flow">
+${signalPanels}
+<div class="grid">
+${panel(
+  'Velocity',
+  `${figure(
+    signals.velocity.pointsPerWeek === null
+      ? 'n/a'
+      : String(signals.velocity.pointsPerWeek),
+    `story points per week over ${count(signals.velocity.weeks, 'week')}; ${signals.velocity.changesPerWeek ?? 'n/a'} changes per week`,
+  )}${velocityChart(signals.trends.weekly)}<p class="help">${escapeHtml(signals.velocity.note)}${signals.velocity.excludedWithoutPoints > 0 ? ` ${signals.velocity.excludedWithoutPoints} of ${signals.velocity.changes} changes recorded no points and are excluded, never counted as zero.` : ''}</p>`,
+  `${trustBadges(signals.velocity.trust)} per repository and per week, never keyed to a person`,
+)}
+${panel(
+  'Merge frequency',
+  `${figure(String(signals.mergeFrequency.perDay ?? 'n/a'), `merges per day over ${signals.mergeFrequency.days ?? 'n/a'} days, ${count(signals.mergeFrequency.changes, 'change')}`)}${mergeActivity(changes)}`,
+  trustBadges(signals.mergeFrequency.trust),
+)}
+${distributionPanel('Wait time', signals.waitTime, 'From the last commit on the pull request to the merge: how long finished work sat.', links)}
+${distributionPanel('Cycle time', signals.cycleTime, 'From the first commit on the pull request to the merge.', links)}
+${panel(
+  'Batch size',
+  `${figure(String(signals.batchSize.medianLines ?? 'n/a'), `median lines changed; ${signals.batchSize.medianFiles ?? 'n/a'} files and ${signals.batchSize.medianCommits ?? 'n/a'} commits per change`)}${diffChart(recentDiffs, 'lines added and removed per recent change')}<p class="help"><span class="added">added</span> above the line, <span class="removed">removed</span> below it: ${escapeHtml(`one column per change, oldest first, over the newest ${recentDiffs.length}; largest ${Math.max(0, ...recentDiffs.map((change) => Math.max(change.insertions, change.deletions))).toLocaleString('en-US')} lines.`)}</p>${cites('changes', signals.batchSize.cites, links)}`,
+  `${trustBadges(['observed'])} over ${count(signals.batchSize.count, 'change')}`,
+)}
+${panel(
+  'Rework',
+  `${figure(String(signals.rework.pairs.length), `pairs of changes touching the same file within ${signals.rework.windowDays} days`)}${topFiles(signals.rework.pairs)}${cites(
+    'pairs',
+    signals.rework.pairs.map((pair) => `${pair.later}<-${pair.earlier}`),
+    links,
+  )}`,
+  `${trustBadges(['observed'])} most-touched files first`,
+)}
+${panel(
+  'Escapes',
+  `${figure(String(signals.escapes.changes.length), `reverts or fixes after ${escapeHtml(signals.escapes.release ?? 'no release')} touching released files`)}${cites(
+    'changes',
+    signals.escapes.changes.map((entry) => entry.change),
+    links,
+  )}`,
+  trustBadges(['observed']),
+)}
+</div>
+</section>
+</div>
 </section>`;
+}
+
+/**
+ * The nav cannot know which tab is showing without a script, so the rules that mark it are generated per
+ * repository: `:has` lets the page react to the section the URL names. A browser without `:has` simply shows
+ * no active mark, which costs a cue and breaks nothing.
+ */
+function tabNavRules(labels: string[]): string {
+  return labels
+    .flatMap((label) =>
+      ['flow', 'dora', 'spend', 'records'].map((name) => {
+        const id = `${label}-${name}`;
+        const on = `body:has(#${id}:target) nav.tabs a[href="#${id}"]`;
+        const off =
+          name === 'flow'
+            ? `body:not(:has(.tab:target)) nav.tabs a[href="#${id}"]`
+            : null;
+        const rule =
+          'background: var(--panel); border-color: var(--line); color: var(--ink);';
+        return off ? `${on}, ${off} { ${rule} }` : `${on} { ${rule} }`;
+      }),
+    )
+    .join('\n');
 }
 
 const STYLE = `
@@ -930,6 +996,30 @@ body {
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
 .wrap { max-width: 1320px; margin: 0 auto; padding-inline: var(--gutter); }
+
+/* Tabs without a script and without a form control. Each tab is a fragment on this page and CSS selects the
+   one the URL names, so a tab is a URL: a link to the DORA tab opens the DORA tab, which is what makes a
+   figure citable. The default tab is last in the document so the sibling selector below can hide it once any
+   other tab is targeted, and the order property puts it back first on screen. */
+nav.tabs {
+  display: flex; gap: var(--s1); flex-wrap: wrap;
+  margin: var(--s4) 0 var(--s3); border-bottom: 1px solid var(--line);
+}
+nav.tabs a {
+  padding: var(--s2) var(--s4); border: 1px solid transparent; border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0; margin-bottom: -1px;
+  color: var(--muted); text-decoration: none; font-weight: 600; letter-spacing: -0.01em;
+}
+nav.tabs a:hover { color: var(--ink); background: var(--bg-accent); }
+nav.tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tabbed { display: flex; flex-direction: column; }
+.tabbed > .tab { display: none; }
+.tabbed > .tab:target { display: block; }
+.tabbed > .tab--default { display: block; order: -1; }
+.tabbed > .tab:target ~ .tab--default { display: none; }
+@media (max-width: 560px) {
+  nav.tabs a { padding: var(--s2) var(--s3); }
+}
 header.band {
   background: var(--bg-accent); border-bottom: 1px solid var(--line);
   padding-block: var(--s5) var(--s4); margin-bottom: var(--s5);
@@ -1095,14 +1185,14 @@ footer {
 }
 `;
 
-export function renderBoardHtml(projection: Projection | null): string {
+export function renderLedgerHtml(projection: Projection | null): string {
   const repositories = projection ? Object.values(projection.repositories) : [];
   const unreachable = repositories.filter(
     (repository) => !repository.reachable,
   );
   const body =
     repositories.length === 0
-      ? `<p class="empty">The Board is empty. Register a repository in <code>registry.json</code>, then run <code>telemetry sync</code> and <code>telemetry rebuild</code>.</p>`
+      ? `<p class="empty">The Ledger is empty. Register a repository in <code>registry.json</code>, then run <code>telemetry sync</code> and <code>telemetry rebuild</code>.</p>`
       : repositories.map(renderRepositoryHtml).join('\n');
   const nav = repositories
     .map(
@@ -1118,12 +1208,12 @@ export function renderBoardHtml(projection: Projection | null): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The Board</title>
-<style>${STYLE}</style>
+<title>The Ledger</title>
+<style>${STYLE}\n${tabNavRules(repositories.filter((repository) => repository.reachable).map((repository) => `${escapeHtml(repository.name)}-heading`))}</style>
 </head>
 <body>
 <header class="band"><div class="wrap">
-<h1>The Board<span class="dot">.</span></h1>
+<h1>The Ledger<span class="dot">.</span></h1>
 <p class="meta">${escapeHtml(versions)} · ${count(repositories.length, 'repository', 'repositories')} registered, ${unreachable.length} unreachable${unreachable.length ? ' (' + escapeHtml(unreachable.map((repository) => repository.name).join(', ')) + ')' : ''}</p>
 ${nav ? `<nav class="nav">${nav}</nav>` : ''}
 </div></header>

@@ -26,7 +26,7 @@
   ],
   "type": "module",
   "scripts": {
-    "board": "./scripts/board.sh",
+    "ledger": "./scripts/ledger.sh",
     "build": "nx run-many -t build",
     "check": "./scripts/check.sh",
     "format": "prettier --write .",

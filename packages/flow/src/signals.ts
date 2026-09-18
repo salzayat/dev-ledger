@@ -110,6 +110,7 @@ export type RepositorySignals = {
   };
   dora: DoraSignals;
   trends: { weekly: WeeklyBucket[]; note: string };
+  velocity: Velocity;
   costClasses: CostClassSpend;
   coverage: Coverage;
   allocation: Allocation;
@@ -239,8 +240,30 @@ export type DoraSignals = {
   timeToFix: Distribution & { note: string };
 };
 
+/**
+ * Throughput over the measured window, per repository and per week. Story points lead because they are the
+ * unit the configuration enables and the unit cost per effort already uses; changes per week sit beside
+ * them for anyone whose points are patchy. Never keyed to a person: velocity per operator is the figure this
+ * methodology exists not to produce.
+ */
+export type Velocity = {
+  trust: string[];
+  weeks: number;
+  storyPoints: number;
+  changes: number;
+  pointsPerWeek: number | null;
+  changesPerWeek: number | null;
+  /** Changes merged in the window recording no points, counted rather than read as zero. */
+  excludedWithoutPoints: number;
+  note: string;
+};
+
 export type WeeklyBucket = {
   week: string;
+  /** Story points merged that week, from the changes that recorded them. */
+  storyPoints: number;
+  /** Changes merged that week recording no points: excluded from velocity, never read as zero points. */
+  withoutPoints: number;
   changes: number;
   costUsd: number;
   sessions: number;
@@ -1084,6 +1107,8 @@ export function computeSignals(
       const week = new Date(cursor).toISOString().slice(0, 10);
       weeklyMap.set(week, {
         week,
+        storyPoints: 0,
+        withoutPoints: 0,
         changes: 0,
         costUsd: 0,
         sessions: 0,
@@ -1093,6 +1118,12 @@ export function computeSignals(
     for (const fact of facts) {
       const bucket = weeklyMap.get(weekOf(fact.change.mergeTime))!;
       bucket.changes += 1;
+      const points = numberOr(fact.change.trailers['Story-Points']);
+      if (points === null) {
+        bucket.withoutPoints += 1;
+      } else {
+        bucket.storyPoints += points;
+      }
       bucket.cites.push(fact.change.id);
       const changeSpend = spend.byChange[fact.change.id];
       if (changeSpend) {
@@ -1102,8 +1133,35 @@ export function computeSignals(
       }
     }
   }
+  const weekly = [...weeklyMap.values()];
+  const velocityPoints = weekly.reduce(
+    (sum, week) => sum + week.storyPoints,
+    0,
+  );
+  const velocityChanges = weekly.reduce((sum, week) => sum + week.changes, 0);
+  const withoutPoints = weekly.reduce(
+    (sum, week) => sum + week.withoutPoints,
+    0,
+  );
+  const velocity: Velocity = {
+    trust: ['observed'],
+    weeks: weekly.length,
+    storyPoints: velocityPoints,
+    changes: velocityChanges,
+    // No weeks means no rate. A zero would claim nothing shipped over a window that does not exist.
+    pointsPerWeek:
+      weekly.length > 0
+        ? Math.round((velocityPoints / weekly.length) * 100) / 100
+        : null,
+    changesPerWeek:
+      weekly.length > 0
+        ? Math.round((velocityChanges / weekly.length) * 100) / 100
+        : null,
+    excludedWithoutPoints: withoutPoints,
+    note: 'story points and changes merged per week over the measured window; changes recording no points are excluded and counted',
+  };
   const trends = {
-    weekly: [...weeklyMap.values()],
+    weekly,
     note: 'weeks start on Monday; cost is the session cost of changes merged that week, records without figures excluded',
   };
 
@@ -1219,6 +1277,7 @@ export function computeSignals(
     spend,
     dora,
     trends,
+    velocity,
     costClasses,
     operators,
     coverage,

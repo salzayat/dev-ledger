@@ -1,12 +1,12 @@
 # Design: Add Change Audit
 
-## Two phases, one repository, one Board
+## Two phases, one repository, one Ledger
 
 Phase one records what git can see and turns it into flow signals. This phase judges those same records
 against rules and produces evidence someone outside the team can read. Keeping them as two phases of one
-repository is what keeps observability one codebase: an engineer installs `dev-ledger` and gets The Board
+repository is what keeps observability one codebase: an engineer installs `dev-ledger` and gets The Ledger
 whether or not any rule set is enabled, and a team that needs evidence sets a governance level and gets the
-same Board with a governance view. Nobody buys an auditor first, and this shape means nobody has to. The
+same Ledger with a governance view. Nobody buys an auditor first, and this shape means nobody has to. The
 `capture` and `flow` packages are not edited by this change; anything the audit layer needs from them is a
 follow-on change to their capabilities.
 
@@ -82,11 +82,11 @@ Pointing this at a payment or clinical system is the point, and it is also the r
 identifiers, paths, commit references, actors, timestamps, and outcomes; a record with an unclassified
 free-text payload is rejected at load. Findings and packs cite; they do not quote.
 
-## One Board, extended
+## One Ledger, extended
 
-The earlier plan had a console section, a dashboard, and a board. There is one Board, from phase
+The earlier plan had a console section, a dashboard, and a board. There is one Ledger, from phase
 one, and this phase adds a governance view to it and the productivity rule set's panels
 beside its spend panels. The flow views render exactly as phase one rendered them, which phase one's own
-tests assert against the extended Board. Three surfaces over one
-stream were ceremony; one Board that grows a view when a team needs evidence is the shape both audiences
+tests assert against the extended Ledger. Three surfaces over one
+stream were ceremony; one Ledger that grows a view when a team needs evidence is the shape both audiences
 can live with.

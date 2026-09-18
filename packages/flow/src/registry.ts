@@ -136,7 +136,7 @@ export function parseRegistry(text: string): {
 /**
  * The browsable web URL for a registry URL, when that URL is a GitHub remote: `git@host:owner/repo.git`,
  * `ssh://git@host/owner/repo.git`, or `https://host/owner/repo`. A local path, a non-GitHub host, or any
- * other form yields null, and The Board then renders hashes with no link. Never returns a local path, so a
+ * other form yields null, and The Ledger then renders hashes with no link. Never returns a local path, so a
  * projection built from a local mirror stays machine-independent. A registry entry whose remote host is an
  * SSH alias (`git@github.com-work:owner/repo.git`) names its browsable URL explicitly in `webUrl` instead.
  */
