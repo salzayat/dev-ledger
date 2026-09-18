@@ -102,6 +102,13 @@ all, and the change reads `undeclared`. The distinction matters because `none` i
 worked without an agent, and a missing trailer is the absence of a claim; defaulting one to the other turned
 an unset variable into an assertion about who did the work.
 
+### Registry keys added for flow efficiency and work mix
+
+| Key                                | Meaning                                                               |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| `thresholds.abandonedAfterSeconds` | The age past which an unmerged pull head is reported as older than it |
+| `rework.ignore`                    | Globs whose files never make a rework pair; replaces the default list |
+
 ## Registry (schema version 1)
 
 `registry.json` at the repository root.

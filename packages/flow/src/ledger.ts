@@ -153,6 +153,49 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   if (Object.keys(operators.humans).length === 0) {
     lines.push('  operator hours: none recorded');
   }
+  // The reads the flow frameworks ask for after DORA, as lines rather than cards.
+  const mix = Object.values(signals.workMix.weekly).reduce(
+    (totals: Record<string, number>, week) => {
+      for (const [type, entry] of Object.entries(week)) {
+        totals[type] = (totals[type] ?? 0) + entry.changes;
+      }
+      return totals;
+    },
+    {},
+  );
+  const mixLine = Object.entries(mix)
+    .sort(([, a], [, b]) => b - a)
+    .map(([type, changes]) => `${type} ${changes}`)
+    .join(', ');
+  lines.push(`  work mix: ${mixLine || 'none'} [observed]`);
+  const share = (value: number | null) =>
+    value === null ? 'n/a' : `${Math.round(value * 100)}%`;
+  lines.push(
+    `  flow efficiency: ${share(signals.flowEfficiency.p50)} typical over ${signals.flowEfficiency.count} changes; excluded: ${
+      Object.entries(signals.flowEfficiency.excluded)
+        .map(([reason, n]) => `${n} ${reason}`)
+        .join(', ') || 'none'
+    } [${signals.flowEfficiency.trust.join(', ')}]`,
+  );
+  lines.push(
+    `  iterations: ${signals.iterations.sessionsPerChange.p50 ?? 'n/a'} sessions and ${signals.iterations.commitsPerChange.p50 ?? 'n/a'} commits per change, typical`,
+  );
+  lines.push(
+    `  older than ${seconds(signals.abandonment.afterSeconds)}: ${signals.abandonment.count} pull requests, ${signals.abandonment.tokens.toLocaleString('en-US')} tokens${signals.abandonment.withoutFigures ? `, ${signals.abandonment.withoutFigures} records without figures` : ''} [${signals.abandonment.trust.join(', ')}]`,
+  );
+  lines.push(
+    `  spec lead time: ${seconds(signals.specLeadTime.p50)} typical over ${signals.specLeadTime.count} specs; excluded: ${
+      Object.entries(signals.specLeadTime.excluded)
+        .map(([reason, n]) => `${n} ${reason}`)
+        .join(', ') || 'none'
+    }`,
+  );
+  lines.push(
+    `  check compliance: ${share(signals.checkCompliance.recordedShare)} of ${signals.checkCompliance.changes} changes recorded a check, ${share(signals.checkCompliance.passRate)} of those passed [${signals.checkCompliance.trust.join(', ')}]`,
+  );
+  lines.push(
+    `  rework ignore: ${signals.rework.ignored} pairs removed by ${signals.rework.ignore.length} globs`,
+  );
   lines.push(
     `  operator excluded: ${operators.excluded.humanOnly} human-only changes, ${operators.excluded.noOperator} sessions without an operator identifier (counted, never zeroed) [${operators.trust.join(', ')}]`,
   );

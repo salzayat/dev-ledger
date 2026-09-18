@@ -69,6 +69,60 @@ request, the most-reworked files, and the spend bars — are folds over the same
 page is rendered. Nothing on the page can compute a figure the projection does not hold, so the citation
 rule holds for the page as well as for the data.
 
+## Work mix
+
+Each week's changes by the conventional commit type on their subject, with `other` for a subject that does
+not parse. A week of fixes and a week of features are the same count and a different story, and the mix is
+what tells them apart. On this repository `other` is the largest bucket, because most of its history is
+merge commits, which carry no conventional type — that is the honest reading, not a gap.
+
+## Flow efficiency
+
+Per change, the agent's run seconds plus the operator's active seconds, divided by cycle time: how much of
+the elapsed time anyone was actually working. Changes with no timing, no sessions, or no active figures are
+excluded by reason rather than read as nought per cent busy.
+
+A value above one is reported as it stands. It means the sessions ran outside the cycle window — an agent
+that started before the first commit on the pull request, or kept running after the merge — and rounding it
+down to one would hide that two figures disagree rather than showing it.
+
+## Iterations
+
+Sessions per change and commits per change, as distributions. How many attempts a change took, which is the
+question behind "is this getting harder".
+
+## Older than
+
+Unmerged pull heads past a registered age, with their spend. Labelled as older than that age, never as
+abandoned or closed: git does not record whether a pull request was closed, only that its head is not
+merged, and the tool does not guess the difference.
+
+## Spec lead time
+
+From the earliest commit citing a `Spec:` to the merge that archived that spec — an idea's whole life, not
+just its final pull request. A spec still open has no end yet and is excluded as `open`; one whose changes
+carry no pull head timing is excluded as `untimed`.
+
+## Cost per change and per release
+
+Cost per merged change, per released change, and per release, each stating the changes it could not measure.
+Where every contributing session is a subscription session, reported cost is zero by rule, so the figure
+reads in tokens and says so rather than printing a currency amount that would be false.
+
+## Check compliance
+
+The share of changes that recorded a local check outcome, and the pass rate among those that did. The share
+leads deliberately: a pass rate over a tenth of the changes says very little, and reporting the rate alone
+would invite reading it as if it covered everything.
+
+## The rework ignore list
+
+A rework pair is two changes touching the same file inside the window. Without an ignore list the count is
+dominated by lockfiles and generated files — churn nobody chose — and reads as noise. Each registry entry
+carries globs whose files never make a pair, defaulting to the usual lockfiles and generated directories,
+and the read states how many pairs the list removed. An entry naming its own list replaces the default
+rather than extending it, so a repository that wants that churn counted can say so.
+
 ## Velocity, and what it is not
 
 The Ledger reports story points and changes merged per week over the measured window, from the effort
