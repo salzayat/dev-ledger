@@ -25,4 +25,4 @@
 - [x] 3.3 Test the unset case and the empty-directory case, asserting each names its own remedy.
 - [x] 3.4 Confirm the check reports this repository's real state correctly, before and after the main
       checkout is updated.
-- [ ] 3.5 Run `npm run check` and record the result in the pull request.
+- [x] 3.5 Run `npm run check` and record the result in the pull request.

@@ -30,7 +30,8 @@
 - [x] 2.2 `docs/methodology.md`: "Work mix", "Flow efficiency", "Iterations", "Older than", "Spec lead
       time", "Cost per change and per release", "Check compliance", and the rework ignore list.
 - [x] 2.3 `docs/contract.md`: the new projection fields and registry keys; README key figures.
-- [ ] 2.4 `plans/roadmap.md`: this row to `Complete`.
+- [x] 2.4 `plans/roadmap.md`: this row to `Complete`, at archive time — plan freshness refuses a milestone
+      marked complete while its change is still active.
 
 ## Verification
 
