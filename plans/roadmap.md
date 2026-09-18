@@ -29,6 +29,9 @@ contract.
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
 | Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Blocked  |
 | Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Pending  |
+| Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Pending  |
+| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Blocked  |
+| Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Blocked  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
@@ -139,6 +142,28 @@ cost and how many tokens its sessions reported. Input and output lead the denomi
 beside it, because over this repository's own records the two differ by more than two orders of magnitude,
 so a combined denominator would track how long a context stayed warm rather than how much work was asked
 for. It depends on no active change.
+The subscription declarations row answers what a team hits before a solo operator does: one hand-written
+record per plan per month is twelve files a year for one plan and thirty-six for three, with a rate change
+visible nowhere. It separates the standing arrangement from the month's fact — effective-dated intervals say
+what a plan cost and when that changed, and a close command proposes the period's records for an operator to
+review and commit. A declaration never becomes a figure on its own; that is the same failure as the
+`Session: none` default, and it is avoided the same way. The Board reports the gaps and names the command
+that closes each, because it reads only from the projection and its page carries no script and no form.
+
+The provider neutral spend row closes the three places multi-provider work stops short: the rate covers only
+allocated spend and not the metered spend a pay-per-token provider reports directly, the reported cost names
+a currency in its field name, and cached tokens are one number defined as one provider's reads plus writes.
+It is `Blocked` behind the allocated token rate row, which it sits beside and whose denominator rule it
+follows, and which is now an active change on the default branch.
+
+The local configuration surface row gives an operator running this repository on their own machine what the
+published page cannot have. The Board's configuration panel names gaps and the commands that close them
+because a static file on a hosting surface has nothing for a form to submit to; an operator with a working
+copy and a shell has no such limit, and retyping a command in another window is friction with no safety
+behind it. The split is containment rather than visibility: the published artifact carries no editing markup
+at all, so a deployment cannot be made to reveal an editor it never held, and the local server binds
+loopback, writes only plan declarations and cost records, and never commits. It is `Blocked` behind the
+subscription declarations row, which defines what it edits.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
