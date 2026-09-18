@@ -42,7 +42,15 @@ Figures reach a record in one of two ways, both `reported`: the harness states t
 and when it filled any, `figuresSource` names the transcript and the number of messages summed. Records
 are deduplicated by message identifier and the last record for an identifier wins (a streaming transcript
 repeats a message as it grows, each record carrying its usage so far), `cachedTokens` is cache reads plus
-cache writes, and cost is never derived from a price table. A transcript with no usage record leaves the
+cache writes, and cost is never derived from a price table.
+
+The same transcript gives the operator's hours. A human prompt is a user-addressed record whose content is a
+string or whose blocks are all text; a record carrying a tool result is the harness returning its own output
+to the model and is not an operator event, so an unattended agent turn does not read as someone sitting
+there. The gaps between consecutive prompts are summed under the configured idle cap and recorded with the
+algorithm's identifier, which is why a session spanning 1.37 hours with a long agent run in the middle
+records 1.28. Fewer than two prompts leaves the figure absent rather than zero, and nothing but timestamps is
+read. A transcript with no usage record leaves the
 session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
 
 ## Subscription cost record (schema version 1)

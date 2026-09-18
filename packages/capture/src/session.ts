@@ -188,17 +188,26 @@ export function validateSessionFile(
     );
   }
   if (config.costAllocation.enabled) {
+    // Absence is counted by the reads, not rejected here. A harness that cannot supply the figure — every
+    // harness before this was derived, and any transcript with fewer than two prompts — writes a record of
+    // work whose operator time is unknown, which is the same class of fact as `figuresMissing` and is
+    // handled the same way: excluded and counted, never zero and never fatal. A figure that is present and
+    // malformed is still an error.
     if (
-      typeof file.operatorActiveSeconds !== 'number' ||
-      file.operatorActiveSeconds < 0
+      file.operatorActiveSeconds !== undefined &&
+      (typeof file.operatorActiveSeconds !== 'number' ||
+        file.operatorActiveSeconds < 0)
     ) {
       errors.push(
-        'operatorActiveSeconds must be a non-negative number when cost allocation is enabled',
+        'operatorActiveSeconds must be a non-negative number when present',
       );
     }
-    if (typeof file.operatorActiveAlgorithm !== 'string') {
+    if (
+      file.operatorActiveAlgorithm !== undefined &&
+      typeof file.operatorActiveAlgorithm !== 'string'
+    ) {
       errors.push(
-        'operatorActiveAlgorithm must name the algorithm when cost allocation is enabled',
+        'operatorActiveAlgorithm must name the algorithm when present',
       );
     }
     if (file.operatorId !== null && file.operatorId !== undefined) {
@@ -236,6 +245,8 @@ export type SessionInput = {
   costClass?: string;
   agentRunSeconds?: number;
   operatorEvents?: string[];
+  operatorActiveSeconds?: number;
+  operatorActiveAlgorithm?: string;
   operatorId?: string | null;
   corrects?: string;
 };
@@ -295,11 +306,23 @@ export function buildSessionFile(
     if (input.costClass) {
       file.costClass = input.costClass;
     }
-    file.operatorActiveSeconds = computeOperatorActiveSeconds(
-      input.operatorEvents ?? [],
-      config.costAllocation.idleCapSeconds,
-    );
-    file.operatorActiveAlgorithm = `${IDLE_CAP_ALGORITHM}:${config.costAllocation.idleCapSeconds}`;
+    // A stated figure wins; otherwise the events supply one. Fewer than two events measures no engagement,
+    // so the figure is left absent rather than written as a zero the reads would have to trust.
+    const events = input.operatorEvents ?? [];
+    const seconds =
+      input.operatorActiveSeconds ??
+      (events.length >= 2
+        ? computeOperatorActiveSeconds(
+            events,
+            config.costAllocation.idleCapSeconds,
+          )
+        : undefined);
+    if (seconds !== undefined) {
+      file.operatorActiveSeconds = seconds;
+      file.operatorActiveAlgorithm =
+        input.operatorActiveAlgorithm ??
+        `${IDLE_CAP_ALGORITHM}:${config.costAllocation.idleCapSeconds}`;
+    }
     file.operatorId =
       input.operatorId &&
       config.costAllocation.operators.includes(input.operatorId)

@@ -9,7 +9,7 @@ import {
 } from './session.ts';
 import { formatTrailers, parseTrailers, validateMessage } from './trailers.ts';
 import { gitEnvironment, sessionSummary } from './cli.ts';
-import { sumTranscriptUsage } from './figures.ts';
+import { operatorPromptTimes, sumTranscriptUsage } from './figures.ts';
 import {
   buildSubscriptionFile,
   subscriptionFilePath,
@@ -51,6 +51,118 @@ const baseSession = {
   commits: ['abc'],
   localCheck: { outcome: 'passed', command: 'npm run check' },
 };
+
+test('operator hours count prompts and never tool results', () => {
+  // Shaped like a real transcript: a prompt, a long unattended agent turn whose tool results come back as
+  // user-addressed records, then the next prompt. Only the two prompts are operator events.
+  const lines = [
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:00:00Z',
+      message: { content: 'do the thing' },
+    }),
+  ];
+  for (let index = 0; index < 40; index += 1) {
+    lines.push(
+      JSON.stringify({
+        type: 'user',
+        timestamp: `2026-09-18T10:${String(index + 1).padStart(2, '0')}:00Z`,
+        message: {
+          content: [{ type: 'tool_result', content: 'file contents here' }],
+        },
+      }),
+    );
+    lines.push(
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: `2026-09-18T10:${String(index + 1).padStart(2, '0')}:30Z`,
+        message: { content: [{ type: 'text', text: 'working' }] },
+      }),
+    );
+  }
+  lines.push(
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:50:00Z',
+      message: { content: [{ type: 'text', text: 'now the next thing' }] },
+    }),
+  );
+  const text = lines.join('\n');
+
+  const times = operatorPromptTimes(text);
+  assert.deepEqual(times, ['2026-09-18T10:00:00Z', '2026-09-18T10:50:00Z']);
+
+  // Fifty minutes apart, capped at fifteen: the operator was away while the agent worked.
+  assert.equal(computeOperatorActiveSeconds(times, 900), 900);
+  // Uncapped it would have been the whole span, which is what counting tool results would have produced.
+  assert.equal(computeOperatorActiveSeconds(times, 86_400), 3000);
+});
+
+test('a transcript with one prompt records no operator time at all', () => {
+  const one = JSON.stringify({
+    type: 'user',
+    timestamp: '2026-09-18T10:00:00Z',
+    message: { content: 'only this' },
+  });
+  assert.equal(operatorPromptTimes(one).length, 1);
+  const config = {
+    ...DEFAULT_CONFIG,
+    costAllocation: {
+      ...DEFAULT_CONFIG.costAllocation,
+      enabled: true,
+      operators: ['op-1'],
+    },
+  };
+  const file = buildSessionFile({ ...baseSession, operatorEvents: [] }, config);
+  assert.equal(
+    file.operatorActiveSeconds,
+    undefined,
+    'no events measures no engagement, and an absent figure is not a zero',
+  );
+  assert.deepEqual(validateSessionFile(file, config), []);
+});
+
+test('a present operator figure is still checked', () => {
+  const config = {
+    ...DEFAULT_CONFIG,
+    costAllocation: {
+      ...DEFAULT_CONFIG.costAllocation,
+      enabled: true,
+      operators: ['op-1'],
+    },
+  };
+  const file = buildSessionFile(
+    {
+      ...baseSession,
+      operatorEvents: ['2026-09-18T10:00:00Z', '2026-09-18T10:05:00Z'],
+    },
+    config,
+  );
+  assert.equal(file.operatorActiveSeconds, 300);
+  assert.match(String(file.operatorActiveAlgorithm), /^idle-cap-v1:/);
+  assert.deepEqual(validateSessionFile(file, config), []);
+  assert.deepEqual(
+    validateSessionFile({ ...file, operatorActiveSeconds: -1 }, config),
+    ['operatorActiveSeconds must be a non-negative number when present'],
+  );
+});
+
+test('only timestamps leave a transcript when operator hours are derived', () => {
+  const text = [
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:00:00Z',
+      message: { content: 'my secret prompt text' },
+    }),
+    JSON.stringify({
+      type: 'user',
+      timestamp: '2026-09-18T10:10:00Z',
+      message: { content: [{ type: 'text', text: 'another secret' }] },
+    }),
+  ].join('\n');
+  const serialized = JSON.stringify(operatorPromptTimes(text));
+  assert.doesNotMatch(serialized, /secret/);
+});
 
 test('a valid session file passes', () => {
   assert.deepEqual(validateSessionFile(baseSession, DEFAULT_CONFIG), []);

@@ -77,3 +77,51 @@ export function sumTranscriptUsage(text: string): Figures | null {
 export function transcriptFiguresSource(figures: Figures): string {
   return `summed from ${figures.messages} messages in the session transcript`;
 }
+
+/**
+ * The operator's own prompts in a transcript, as timestamps. A transcript's user-addressed records are not
+ * all the human: most of them are `tool_result` blocks, the harness returning its own tool output to the
+ * model through the middle of an agent turn. Counting those would report an engineer as present for every
+ * file the agent read, so a record counts only when its content is a plain string or its blocks are all
+ * text.
+ */
+export function operatorPromptTimes(text: string): string[] {
+  const times: string[] = [];
+  for (const line of text.split('\n')) {
+    if (line.trim().length === 0) {
+      continue;
+    }
+    let record: {
+      type?: unknown;
+      timestamp?: unknown;
+      message?: { content?: unknown };
+    };
+    try {
+      record = JSON.parse(line) as typeof record;
+    } catch {
+      continue;
+    }
+    if (record.type !== 'user' || typeof record.timestamp !== 'string') {
+      continue;
+    }
+    const content = record.message?.content;
+    const prompt =
+      typeof content === 'string' ||
+      (Array.isArray(content) &&
+        content.length > 0 &&
+        content.every(
+          (block) =>
+            typeof block === 'object' &&
+            block !== null &&
+            (block as { type?: unknown }).type === 'text',
+        ));
+    if (!prompt) {
+      continue;
+    }
+    if (Number.isNaN(Date.parse(record.timestamp))) {
+      continue;
+    }
+    times.push(record.timestamp);
+  }
+  return times;
+}
