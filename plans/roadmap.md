@@ -24,7 +24,7 @@ contract.
 | Session figures (telemetry capture)               | `add-session-figures-from-transcript`                         | Complete |
 | Review fixes (session figures, Ledger links)      | `fix-transcript-figures-and-board-links`                      | Complete |
 | Session trailer default (defect)                  | `fix-session-none-default`                                    | Complete |
-| Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
+| Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Complete |
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (phase one addendum)           | `add-operator-dimension`                                      | Complete |
 | Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Complete |
@@ -35,7 +35,7 @@ contract.
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
 | Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
-| Hook drift check (workflow governance)            | `add-hook-drift-check`                                        | Pending  |
+| Hook drift check (workflow governance)            | `add-hook-drift-check`                                        | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and

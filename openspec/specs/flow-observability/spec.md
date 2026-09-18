@@ -13,16 +13,17 @@ platform timestamps are out of scope here and belong to phase two.
 ### Requirement: A registry of repositories synced over SSH
 
 The system SHALL keep a version-controlled registry (`registry.json`) listing each repository with a name,
-its SSH URL, its default branch, its release tag pattern, its signal thresholds, and optionally an explicit
-browsable web URL, which SHALL be an https URL or a registry error. `telemetry sync` SHALL fetch each
-registered repository into a local mirror, including tags and `refs/pull/*/head`, using the operator's own
-git access and nothing else, and SHALL record the ref tips it fetched. A repository that cannot be fetched
-SHALL be recorded as unreachable with the reason, and every read covering it SHALL name it as unreachable
-rather than omitting it silently. A sync MAY be given a fetch URL overriding that of one named registry
-entry, for an environment that reaches the same repository over a different transport; the override SHALL
-apply to that entry alone, SHALL NOT modify `registry.json`, and SHALL NOT change the ref tips recorded,
-so a projection rebuilt from an overridden sync is identical to one rebuilt from a sync without it against
-the same source.
+its SSH URL, its default branch, its release tag pattern, its signal thresholds, optionally an explicit
+browsable web URL, which SHALL be an https URL or a registry error, optionally an abandonment age in seconds
+(default thirty days), and optionally a rework ignore list of path globs (default: lockfiles and the session
+record directory). `telemetry sync` SHALL fetch each registered repository into a local mirror, including
+tags and `refs/pull/*/head`, using the operator's own git access and nothing else, and SHALL record the ref
+tips it fetched. A repository that cannot be fetched SHALL be recorded as unreachable with the reason, and
+every read covering it SHALL name it as unreachable rather than omitting it silently. A sync MAY be given a
+fetch URL overriding that of one named registry entry, for an environment that reaches the same repository
+over a different transport; the override SHALL apply to that entry alone, SHALL NOT modify `registry.json`,
+and SHALL NOT change the ref tips recorded, so a projection rebuilt from an overridden sync is identical to
+one rebuilt from a sync without it against the same source.
 
 #### Scenario: Sync fetches pull head refs
 
@@ -56,6 +57,12 @@ the same source.
 - THEN the recorded ref tips MUST equal those recorded by a sync without the override against the same source
 - AND `registry.json` MUST be unchanged
 - AND no other registry entry MUST be fetched from an overridden URL
+
+#### Scenario: The rework ignore list has a default
+
+- GIVEN a registry entry with no `rework.ignore`
+- WHEN the registry is parsed
+- THEN the entry MUST carry the default list naming lockfiles and the session record directory
 
 ### Requirement: A change is identified for every merge method
 
@@ -213,7 +220,8 @@ clock.
 
 The projection SHALL provide reads for cycle time and wait time distributions, the unmerged queue (count
 and age), batch size (files, lines, and commits per change), merge frequency per day, rework (a change
-touching files a change within the configured window also touched), escapes (a revert, or a change carrying
+touching files a change within the configured window also touched, excluding files matched by the registry
+entry's ignore list and stating how many pairs the list removed), escapes (a revert, or a change carrying
 `fix` in its subject that touches files of a change in the most recent release, after that release's tag),
 local check outcomes per change, and spend (tokens and cost) per change, per unmerged pull request, per
 spec reference, per provider, and per model, computed separately for each enabled effort unit where a unit
@@ -226,7 +234,18 @@ the interval from the merge of the released change an escape targets, resolved b
 merge of the escape. It SHALL provide weekly trends of changes merged and session cost over the measured
 window, spend by cost class (`rd`, `production`, `unclassified`, taken from the session's cost class, then
 the change's `Cost-Class:` trailer, never defaulted), and coverage counts of changes with an agent session,
-human-only, undeclared, and unreported. Each read SHALL be available per repository and across the
+human-only, undeclared, and unreported. It SHALL further provide: work mix, the changes and spend per weekly
+bucket by the conventional commit type of the change's subject, with `other` for a subject that does not
+parse; flow efficiency, the distribution over changes of active seconds (the sum of the change's sessions'
+agent run and operator active seconds) divided by cycle seconds, excluding by reason changes with no timing,
+no sessions, or no active seconds, and reporting a value above one as it stands; iterations, distributions
+of sessions per change and commits per change; abandonment, the count and spend of unmerged pull heads
+older than the registered age, labeled as older than that age rather than as closed; spec lead time, the
+distribution from the earliest commit carrying a `Spec:` reference to the merge that archives that change,
+excluding specs not yet archived as `open` and specs without pull head timing as `untimed`; cost per merged
+change, per released change, and per release, each stating the changes excluded for missing figures and
+reading as tokens where cost is fixed at zero; and check compliance, the share of changes with a recorded
+local check outcome and the pass rate among them. Each read SHALL be available per repository and across the
 registry, SHALL state the trust classes it included and the number of changes excluded for lacking what it
 needs, and SHALL raise a signal when a registered threshold is exceeded, naming the threshold and the
 changes behind it. Spend per unmerged pull request SHALL cite every session record of that pull request,
@@ -303,6 +322,50 @@ SHALL NOT offer a person as a dimension.
 - WHEN spend by cost class is computed
 - THEN the `rd` session's figures MUST be under `rd`, the other under `production`, and the unclassed change
   under `unclassified`
+
+#### Scenario: Work mix reads the subject and never guesses
+
+- GIVEN a week with two `feat` changes, one `fix` change, and one change whose subject has no type prefix
+- WHEN the work mix is computed
+- THEN that week MUST report two `feat`, one `fix`, and one `other`, each citing its changes
+
+#### Scenario: Flow efficiency excludes what it cannot divide
+
+- GIVEN a change with timing and a session carrying 600 active seconds over a 3,000 second cycle, a change
+  with timing and no session, and an out-of-band change
+- WHEN flow efficiency is computed
+- THEN the first MUST read 0.2
+- AND the second MUST be excluded as `no-sessions` and the third as `no-timing`
+
+#### Scenario: Older than the registered age is a total, not a verdict
+
+- GIVEN a registry entry with an abandonment age of thirty days and three unmerged pull heads of which two
+  are older
+- WHEN abandonment is computed
+- THEN it MUST report two pull heads with their combined spend, citing both
+- AND its label MUST say older than thirty days rather than closed or abandoned
+
+#### Scenario: Spec lead time ends at the archive merge
+
+- GIVEN commits carrying `Spec: add-x` on two pull requests and a later merge adding
+  `openspec/changes/archive/<date>-add-x`
+- WHEN spec lead time is computed
+- THEN `add-x` MUST read as the interval from the earliest of those commits to that merge
+- AND a spec with no archive merge MUST be excluded as `open`
+
+#### Scenario: Cost per merged change states its exclusions
+
+- GIVEN four merged changes of which three carry figures
+- WHEN cost per merged change is computed
+- THEN it MUST divide the measured spend by three
+- AND it MUST report one change excluded for missing figures
+
+#### Scenario: A lockfile does not make a rework pair
+
+- GIVEN two changes within the rework window sharing only `package-lock.json`
+- WHEN rework is computed
+- THEN they MUST NOT form a pair
+- AND the read MUST report one pair removed by the ignore list
 
 ### Requirement: Releases and release membership
 
