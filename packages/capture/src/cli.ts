@@ -162,6 +162,9 @@ function validateRecord(
   if (relative.startsWith(`${NOTES_PATH}/`)) {
     return validateNoteFile(value);
   }
+  if (relative === PLANS_PATH) {
+    return validatePlansFile(value);
+  }
   return relative.startsWith(`${SUBSCRIPTIONS_PATH}/`)
     ? validateSubscriptionFile(value)
     : validateSessionFile(value, config);
