@@ -98,7 +98,7 @@ the `Ledger` workflow. It is built by the same `telemetry ledger --html` that wr
 is published is what `npm run ledger` shows you.
 
 Every pull request builds the same page without publishing it: the run uploads it as a `board` artifact and
-writes the terminal render into the run's job summary, so a reviewer sees what a change does to the board
+writes the terminal render into the run's job summary, so a reviewer sees what a change does to the ledger
 before it merges. Only a push to `main` deploys, and only while the repository is public; the deploy job
 checks that itself rather than relying on anyone to remember.
 

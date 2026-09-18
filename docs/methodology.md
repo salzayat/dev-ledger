@@ -154,6 +154,19 @@ month's sessions land. Two currencies are never summed.
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It
 has no state and nobody acknowledges it. Rules, findings, exceptions, and evidence packs are phase two.
 
+## What the plan worked out to per token
+
+The Ledger divides an allocated period's amount by the input and output tokens of the sessions that took a
+share of it. Input plus output leads because those are the tokens the work asked for. Cache reads are
+reported beside it and never added to that denominator: over this repository's own September records they
+run 892,856,906 against 3,440,144, so a combined denominator reads about two hundred and sixty times better
+and moves with how long a context stayed warm rather than with how much was asked for.
+
+It is not a price and not a fraction of the subscription. A plan costs what it costs and has no token
+component; this is what the amount worked out to, over the records that produced it. Sessions that took a
+share and reported no tokens are counted on the figure, because they raise the rate without being visible in
+it, and a period with no tokens behind it reports no rate rather than a rate of zero.
+
 ## Nothing resolved to a person
 
 The Ledger reads by change, spec, repository, provider, model, and operator. An operator is either an agent,

@@ -28,6 +28,7 @@ contract.
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
 | Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Blocked  |
+| Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Pending  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Pending  |
 | Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
@@ -117,7 +118,7 @@ figure is keyed to an operator and the published position that the tool ranks no
 dimension row holds that half, `Blocked` on the flow efficiency row it shares a requirement with and on the
 repository owner's decision, and not started; its first task is recording the decision.
 
-The board publication row builds The Ledger on every pull request as a run artifact and a job summary, and
+The ledger publication row builds The Ledger on every pull request as a run artifact and a job summary, and
 deploys it to Pages from the default branch only, gated on the repository being public; the gate lives in
 the workflow rather than in a sequencing note, so it cannot be forgotten if visibility ever changes back. It
 was first sequenced after the subscription spend row so a published page would not lead with a spend panel
@@ -135,6 +136,12 @@ through an unattended agent run — and it stops treating an absent figure as an
 operator figure is counted the way every other missing figure in this repository already is. It is
 `Blocked` only on archive order: `add-operator-dimension` is implemented and merged but not yet archived, and
 this change amends the requirement that one enabled.
+The allocated token rate row relates the two figures the subscription work left unrelated: what a period
+cost and how many tokens its sessions reported. Input and output lead the denominator and cache reads sit
+beside it, because over this repository's own records the two differ by more than two orders of magnitude,
+so a combined denominator would track how long a context stayed warm rather than how much work was asked
+for. It depends on no active change.
+
 The ledger presentation row renames the read surface and reorganises it. The Board was a status display in a
 repository that keeps an account, and The Ledger says what the page is in the repository's own vocabulary.
 The page had also outgrown one column, with the DORA strip sitting between flow figures that answer a

@@ -231,9 +231,38 @@ function allocationPanel(allocation: Allocation, links: Links): string {
     : `<p class="empty">No subscription cost record yet. Record one with <code>telemetry subscription record</code>; until then every subscription session reads as excluded for lacking a period record.</p>`;
   return panel(
     'Subscription spend',
-    `${figure(escapeHtml(allocatedTotal(allocation)), 'allocated across the sessions of each recorded period, by agent run seconds; ~ marks a period that has not closed')}${body}`,
+    `${figure(escapeHtml(allocatedTotal(allocation)), 'allocated across the sessions of each recorded period, by agent run seconds; ~ marks a period that has not closed')}${body}${rateBlock(allocation)}`,
     `${trustBadges(allocation.trust)} ${escapeHtml(allocation.note)}; excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
   );
+}
+
+/**
+ * What the allocated amount worked out to per token. Input plus output leads because those are the tokens
+ * the work asked for; cache reads follow in their own line rather than joining the denominator, where they
+ * would make the same money look roughly two hundred times cheaper.
+ */
+function rateBlock(allocation: Allocation): string {
+  const blocks = Object.values(allocation.currencies)
+    .filter((aggregates) => aggregates.rate.sessions > 0)
+    .map(({ rate }) => {
+      if (rate.perMillionInputOutput === null) {
+        return `<p class="meta">No session that took a share reported tokens, so no rate can be computed over ${rate.sessions} allocated ${rate.sessions === 1 ? 'session' : 'sessions'}.</p>`;
+      }
+      const cached =
+        rate.perMillionCached === null
+          ? '<span class="dim">no cache reads recorded</span>'
+          : `<span class="dim">${escapeHtml(money(rate.perMillionCached, rate.currency))} per million cache reads, over ${rate.cachedTokens.toLocaleString('en-US')}</span>`;
+      const missing =
+        rate.withoutFigures > 0
+          ? ` ${rate.withoutFigures} of them reported no tokens and are counted, not dropped, so the rate reads high.`
+          : '';
+      return (
+        `<p class="figure">${escapeHtml(money(rate.perMillionInputOutput, rate.currency))}<span class="unit">per million input and output tokens${rate.provisional ? ', provisional' : ''}</span></p>` +
+        `<p class="meta">${escapeHtml(money(rate.amount, rate.currency))} over ${rate.inputOutputTokens.toLocaleString('en-US')} input and output tokens from ${rate.sessions} allocated ${rate.sessions === 1 ? 'session' : 'sessions'}.${escapeHtml(missing)} ${cached}. A subscription has no token component, so this is what the amount worked out to, not a price.</p>`
+      );
+    })
+    .join('');
+  return blocks;
 }
 
 // --- Chrome ----------------------------------------------------------------------------------------
