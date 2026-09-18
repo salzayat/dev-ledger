@@ -27,6 +27,8 @@ contract.
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
+| Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Pending  |
+| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Pending  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
@@ -122,6 +124,20 @@ reading zero; the repository owner decided to publish ahead of that row, and the
 real when it lands. It was archived after its implementation had merged, out of the order the workflow
 asks for; the flow efficiency and work mix draft, which modifies the same registry requirement, was rebased
 onto the accepted text in the same change.
+
+The subscription declarations row answers what a team hits before a solo operator does: one hand-written
+record per plan per month is twelve files a year for one plan and thirty-six for three, with a rate change
+visible nowhere. It separates the standing arrangement from the month's fact — effective-dated intervals say
+what a plan cost and when that changed, and a close command proposes the period's records for an operator to
+review and commit. A declaration never becomes a figure on its own; that is the same failure as the
+`Session: none` default, and it is avoided the same way. The Board reports the gaps and names the command
+that closes each, because it reads only from the projection and its page carries no script and no form.
+
+The provider neutral spend row closes the three places multi-provider work stops short: the rate covers only
+allocated spend and not the metered spend a pay-per-token provider reports directly, the reported cost names
+a currency in its field name, and cached tokens are one number defined as one provider's reads plus writes.
+It is selected after the allocated token rate row, which it sits beside and whose denominator rule it
+follows; that change is still in an open pull request rather than on the default branch.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
