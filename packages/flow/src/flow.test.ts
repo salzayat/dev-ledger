@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -1037,6 +1039,116 @@ test('configuration gaps name each kind and the command that closes it', () => {
   assert.doesNotMatch(html, /<form/i);
   assert.doesNotMatch(html, /<input/i);
   assert.doesNotMatch(html, /<button/i);
+});
+
+test('two providers report metered rates separately and share no denominator', () => {
+  const fixture = makeFixtureRepo();
+  const pull = openPullRequest(fixture, 'metered', [
+    [
+      trailered('feat(m): metered work', {
+        Session: 's-m1',
+        Change: 'c-m',
+      }),
+      {
+        'src/m.ts': 'v1',
+        // One provider billing in USD, another in EUR, plus a session reporting a cost and no tokens.
+        '.telemetry/sessions/2026-09/s-m1.json': sessionJson('s-m1', {
+          provider: 'provider-one',
+          billingKind: 'metered',
+          costUsd: 2,
+          inputTokens: 600_000,
+          outputTokens: 400_000,
+          cachedTokens: 5_000_000,
+        }),
+        '.telemetry/sessions/2026-09/s-m2.json': sessionJson('s-m2', {
+          provider: 'provider-two',
+          billingKind: 'metered',
+          costUsd: 0,
+          cost: { amount: 8, currency: 'EUR' },
+          inputTokens: 1_000_000,
+          outputTokens: 1_000_000,
+          cacheReadTokens: 10,
+          cacheWriteTokens: 5,
+          cachedTokens: 15,
+        }),
+        '.telemetry/sessions/2026-09/s-m3.json': sessionJson('s-m3', {
+          provider: 'provider-one',
+          billingKind: 'metered',
+          costUsd: 1,
+          figuresMissing: true,
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    pull,
+    'feat(m): metered work',
+    'Session: s-m1\nSession: s-m2\nSession: s-m3',
+    { hours: 24 },
+  );
+
+  const { repo, projection } = build(registryFor(fixture.dir));
+  const rates = repo.signals.meteredRates;
+  // One row per provider and currency. The fixture seeds its own metered session, so assert on the pairs
+  // this test created rather than the total.
+  const keys = rates.map((rate) => `${rate.provider}/${rate.currency}`);
+  assert.ok(keys.includes('provider-one/USD'));
+  assert.ok(keys.includes('provider-two/EUR'));
+  assert.equal(new Set(keys).size, keys.length, 'no pair appears twice');
+
+  const one = rates.find((rate) => rate.provider === 'provider-one')!;
+  const two = rates.find((rate) => rate.provider === 'provider-two')!;
+
+  // $3 paid over a million reported tokens. The second session paid $1 and reported no tokens, so it raises
+  // the rate rather than being dropped from it — which is why the count is stated beside the figure.
+  assert.equal(one.currency, 'USD');
+  assert.equal(one.amount, 3, 'both sessions paid');
+  assert.equal(one.inputOutputTokens, 1_000_000, 'only one reported tokens');
+  assert.equal(one.perMillionInputOutput, 3);
+  assert.equal(one.withoutTokens, 1, 'and the read says so');
+
+  // €8 over two million, in its own currency, sharing no denominator with the other provider.
+  assert.equal(two.currency, 'EUR');
+  assert.equal(two.inputOutputTokens, 2_000_000);
+  assert.equal(two.perMillionInputOutput, 4);
+
+  // The record carrying only a combined cache figure is flagged; the one reporting components is not.
+  assert.equal(one.cacheComponentsUnknown, true);
+  assert.equal(two.cacheComponentsUnknown, false);
+
+  // Reported and allocated never become one figure.
+  assert.ok(one.trust.includes('reported'));
+  const html = renderLedgerHtml(projection);
+  assert.match(html, /Metered spend per token/);
+  assert.match(html, /provider-two/);
+  assert.doesNotMatch(html, /<script/i);
+  assert.doesNotMatch(html, /<form/i);
+});
+
+test('no source file branches on a provider identifier', () => {
+  // Provider is data, by accepted requirement. The moment a read says `if (provider === 'x')` the tool has
+  // stopped being provider-neutral, and a provider it has never seen stops flowing through.
+  const root = fileURLToPath(new URL('../../..', import.meta.url));
+  const files = execFileSync('git', ['ls-files', 'packages/*/src/*.ts'], {
+    cwd: root,
+    encoding: 'utf8',
+    env: gitEnvironment(),
+  })
+    .split('\n')
+    .filter(
+      (path) =>
+        path && !path.endsWith('.test.ts') && !path.endsWith('fixture.ts'),
+    );
+  assert.ok(files.length > 0, 'the sweep found source files');
+  for (const path of files) {
+    const text = readFileSync(join(root, path), 'utf8');
+    assert.doesNotMatch(
+      text,
+      /\b(anthropic|openai|claude|gpt-)\b/i,
+      `${path} names a provider outside a data field`,
+    );
+  }
 });
 
 test('a projection built over many synthetic changes stays well under a minute', () => {

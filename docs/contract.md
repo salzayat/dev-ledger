@@ -102,6 +102,17 @@ all, and the change reads `undeclared`. The distinction matters because `none` i
 worked without an agent, and a missing trailer is the absence of a claim; defaulting one to the other turned
 an unset variable into an assertion about who did the work.
 
+### Session record fields added for provider neutrality
+
+| Field              | Type   | Meaning                                                                            |
+| ------------------ | ------ | ---------------------------------------------------------------------------------- |
+| `cost`             | object | `{ amount, currency }` for a provider not billing in USD; `costUsd` is read as USD |
+| `cacheReadTokens`  | number | Cache reads, when the harness reports them apart from writes                       |
+| `cacheWriteTokens` | number | Cache writes; absent means unknown, never zero                                     |
+
+A record carrying both `cost` in USD and a different `costUsd` is rejected. `cachedTokens` remains the
+combined figure every committed record carries, and a read including a record with no components says so.
+
 ## Plan declarations (schema version 1)
 
 Committed to `.telemetry/subscriptions/plans.json`, listing what each plan is arranged to cost.

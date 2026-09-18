@@ -241,6 +241,50 @@ test('a name, email, or rate field is rejected', () => {
   }
 });
 
+test('a cost names its currency, disagrees with none, and cache components stay apart', () => {
+  // The historical field is read as USD, so every committed record stays valid.
+  const historical = buildSessionFile(
+    { ...baseSession, billingKind: 'metered', costUsd: 1.5 },
+    DEFAULT_CONFIG,
+  );
+  assert.equal(historical.costUsd, 1.5);
+  assert.equal(historical.cost, undefined);
+  assert.deepEqual(validateSessionFile(historical, DEFAULT_CONFIG), []);
+
+  // A currency-named cost is carried as given.
+  const euros = buildSessionFile(
+    {
+      ...baseSession,
+      billingKind: 'metered',
+      costUsd: 0,
+      cost: { amount: 2.25, currency: 'EUR' },
+    },
+    DEFAULT_CONFIG,
+  );
+  assert.deepEqual(euros.cost, { amount: 2.25, currency: 'EUR' });
+  assert.deepEqual(validateSessionFile(euros, DEFAULT_CONFIG), []);
+
+  // Two costs for one session would leave every read choosing between them.
+  const contradictory = validateSessionFile(
+    { ...historical, cost: { amount: 9, currency: 'USD' } },
+    DEFAULT_CONFIG,
+  );
+  assert.ok(contradictory.some((error) => error.includes('disagree')));
+
+  // A provider reporting only cache reads is not recorded as having written zero.
+  const readsOnly = buildSessionFile(
+    { ...baseSession, cachedTokens: 400, cacheReadTokens: 400 },
+    DEFAULT_CONFIG,
+  );
+  assert.equal(readsOnly.cacheReadTokens, 400);
+  assert.equal(
+    readsOnly.cacheWriteTokens,
+    undefined,
+    'absent is unknown, never a zero it never measured',
+  );
+  assert.deepEqual(validateSessionFile(readsOnly, DEFAULT_CONFIG), []);
+});
+
 test('a subscription session carries zero cost and a notional figure apart', () => {
   const file = buildSessionFile(
     {

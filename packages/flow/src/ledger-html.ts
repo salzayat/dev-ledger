@@ -617,6 +617,42 @@ function configurationPanel(
   );
 }
 
+/**
+ * The metered rate beside the allocated one, never summed with it: one is a cost the harness reported, the
+ * other a consequence of an allocation basis this repository chose. Never combined across providers either,
+ * because two providers' token counts are not the same measurement.
+ */
+function meteredRatePanel(
+  rates: RepositorySignals['meteredRates'],
+  links: Links,
+): string {
+  if (rates.length === 0) {
+    return '';
+  }
+  const rows = rates
+    .map((rate) => {
+      const figure =
+        rate.perMillionInputOutput === null
+          ? '<span class="dim">no tokens reported</span>'
+          : escapeHtml(money(rate.perMillionInputOutput, rate.currency));
+      const missing =
+        rate.withoutTokens > 0
+          ? ` <span class="dim">${rate.withoutTokens} reporting none</span>`
+          : '';
+      const cache =
+        rate.cacheComponentsUnknown && rate.cachedTokens > 0
+          ? ' <span class="dim">cache components unknown for some records</span>'
+          : '';
+      return `<tr><td>${escapeHtml(rate.provider)}</td><td class="mono">${escapeHtml(rate.currency)}</td><td class="num">${figure}</td><td class="num">${rate.inputOutputTokens.toLocaleString('en-US')}</td><td class="num">${rate.sessions}${missing}</td><td>${cache}${cites('records', rate.cites, links)}</td></tr>`;
+    })
+    .join('');
+  return panel(
+    'Metered spend per token',
+    `<div class="scroll"><table><thead><tr><th>provider</th><th>currency</th><th class="num">per million in+out</th><th class="num">tokens</th><th class="num">sessions</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div><p class="meta">Reported cost over reported tokens, so no apportioning is involved. Never summed with the allocated rate and never sharing a denominator across providers.</p>`,
+    `${trustBadges(['reported'])} one row per provider and currency`,
+  );
+}
+
 function operatorPanel(operators: Operators, links: Links): string {
   const agents = Object.entries(operators.agents).sort(
     ([, a], [, b]) => b.sessions - a.sessions,
@@ -983,6 +1019,7 @@ ${doraStrip(signals, links)}
 <div class="grid">
 ${spendOverTime(signals.trends)}
 ${allocationPanel(signals.allocation, links)}
+${meteredRatePanel(signals.meteredRates, links)}
 ${costClassPanel(signals.costClasses, signals.coverage, links)}
 ${panel(
   'Spend',

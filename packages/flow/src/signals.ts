@@ -9,6 +9,29 @@ import type { Timing } from './timing.ts';
 // The flow signals. Every read states the trust classes it used and how many changes it excluded, cites
 // the changes behind it, and never keys anything to a person.
 
+/**
+ * What metered sessions actually cost per token. Unlike the allocated rate this divides a cost the harness
+ * reported by tokens the same session reported, so it carries `reported` and involves no apportioning.
+ *
+ * Keyed by provider and currency and never combined across either: two providers do not count tokens the
+ * same way, and two currencies do not add.
+ */
+export type MeteredRate = {
+  provider: string;
+  currency: string;
+  amount: number;
+  inputOutputTokens: number;
+  cachedTokens: number;
+  /** True when at least one contributing record carries only the combined cache figure. */
+  cacheComponentsUnknown: boolean;
+  perMillionInputOutput: number | null;
+  sessions: number;
+  /** Metered sessions that reported a cost and no tokens: counted, never shrinking the denominator quietly. */
+  withoutTokens: number;
+  trust: string[];
+  cites: string[];
+};
+
 /** Conventional commit types the work mix reports, plus `other` for a subject that does not parse. */
 export const WORK_MIX_TYPES = [
   'feat',
@@ -190,6 +213,7 @@ export type RepositorySignals = {
   abandonment: Abandonment;
   specLeadTime: Distribution;
   checkCompliance: CheckCompliance;
+  meteredRates: MeteredRate[];
   costClasses: CostClassSpend;
   coverage: Coverage;
   allocation: Allocation;
@@ -1564,6 +1588,68 @@ export function computeSignals(
   spend.perReleasedChange = costPer(releasedChangeIds, 0);
   spend.perRelease = costPer(releasedChangeIds, releases.length);
 
+  // The metered rate: reported cost over reported tokens, per provider and currency. A subscription session
+  // contributes nothing here — its cost is fixed at zero and its rate lives in the allocation.
+  const meteredByKey = new Map<string, MeteredRate>();
+  for (const fact of facts) {
+    for (const id of fact.sessions.sessions) {
+      const record = sessions.get(id);
+      const file = record?.file;
+      if (!file || file.billingKind !== 'metered') {
+        continue;
+      }
+      const currency = file.cost?.currency ?? 'USD';
+      const amount = file.cost?.amount ?? file.costUsd;
+      const key = `${file.provider}/${currency}`;
+      const fresh: MeteredRate = {
+        provider: file.provider,
+        currency,
+        amount: 0,
+        inputOutputTokens: 0,
+        cachedTokens: 0,
+        cacheComponentsUnknown: false,
+        perMillionInputOutput: null,
+        sessions: 0,
+        withoutTokens: 0,
+        trust: ['reported'],
+        cites: [],
+      };
+      const rate =
+        meteredByKey.get(key) ?? meteredByKey.set(key, fresh).get(key)!;
+      rate.sessions += 1;
+      rate.cites.push(record!.path);
+      rate.amount = Math.round((rate.amount + amount) * 1e6) / 1e6;
+      if (file.figuresMissing) {
+        rate.withoutTokens += 1;
+        continue;
+      }
+      rate.inputOutputTokens += file.inputTokens + file.outputTokens;
+      rate.cachedTokens += file.cachedTokens;
+      // A record carrying only the combined figure cannot say how much was read and how much written, and
+      // any cache figure including it has to say so rather than imply a split it does not have.
+      if (
+        file.cacheReadTokens === undefined &&
+        file.cacheWriteTokens === undefined &&
+        file.cachedTokens > 0
+      ) {
+        rate.cacheComponentsUnknown = true;
+      }
+    }
+  }
+  const meteredRates = [...meteredByKey.values()]
+    .map((rate) => ({
+      ...rate,
+      perMillionInputOutput:
+        rate.inputOutputTokens > 0
+          ? Math.round((rate.amount / rate.inputOutputTokens) * 1e6 * 1e4) / 1e4
+          : null,
+    }))
+    .sort((a, b) =>
+      `${a.provider}/${a.currency}`.localeCompare(
+        `${b.provider}/${b.currency}`,
+      ),
+    );
+
   // --- Work mix, flow efficiency, iterations, abandonment, spec lead time, check compliance -------------
 
   // Work mix: what each week actually shipped, by the conventional type on the change's subject. A week of
@@ -1738,6 +1824,7 @@ export function computeSignals(
     abandonment,
     specLeadTime,
     checkCompliance,
+    meteredRates,
     costClasses,
     operators,
     coverage,

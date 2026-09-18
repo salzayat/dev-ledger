@@ -6,6 +6,9 @@ export type Figures = {
   inputTokens: number;
   outputTokens: number;
   cachedTokens: number;
+  /** Cache reads and writes apart, for a provider whose usage object reports them apart. */
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   /** Distinct messages counted, so a caller can say how the figures were arrived at. */
   messages: number;
 };
@@ -60,11 +63,17 @@ export function sumTranscriptUsage(text: string): Figures | null {
     inputTokens: 0,
     outputTokens: 0,
     cachedTokens: 0,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
     messages: 0,
   };
   for (const usage of [...byId.values(), ...anonymous]) {
     figures.inputTokens += whole(usage.input_tokens);
     figures.outputTokens += whole(usage.output_tokens);
+    figures.cacheReadTokens += whole(usage.cache_read_input_tokens);
+    figures.cacheWriteTokens += whole(usage.cache_creation_input_tokens);
+    // The combined figure stays, because every committed record carries it and the reads that sum it must
+    // keep working; the components sit beside it for a provider that reports them apart.
     figures.cachedTokens +=
       whole(usage.cache_read_input_tokens) +
       whole(usage.cache_creation_input_tokens);

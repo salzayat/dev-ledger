@@ -193,6 +193,13 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   lines.push(
     `  check compliance: ${share(signals.checkCompliance.recordedShare)} of ${signals.checkCompliance.changes} changes recorded a check, ${share(signals.checkCompliance.passRate)} of those passed [${signals.checkCompliance.trust.join(', ')}]`,
   );
+  for (const rate of signals.meteredRates) {
+    lines.push(
+      rate.perMillionInputOutput === null
+        ? `  metered rate ${rate.provider} ${rate.currency}: no tokens reported over ${rate.sessions} sessions [reported]`
+        : `  metered rate ${rate.provider} ${rate.currency}: ${money(rate.perMillionInputOutput, rate.currency)} per million input and output tokens over ${rate.inputOutputTokens.toLocaleString('en-US')} tokens from ${rate.sessions} sessions${rate.withoutTokens ? `, ${rate.withoutTokens} reporting none` : ''}${rate.cacheComponentsUnknown ? '; cache components unknown for some records' : ''} [reported]`,
+    );
+  }
   const gaps = repository.configurationGaps ?? [];
   lines.push(
     gaps.length === 0
