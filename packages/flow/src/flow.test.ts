@@ -753,6 +753,58 @@ test('velocity counts points per week and excludes changes that recorded none', 
   );
 });
 
+test('coverage separates an agent session, a declared human-only change, and an undeclared one', () => {
+  const fixture = makeFixtureRepo();
+
+  // A change with an agent session.
+  const agent = openPullRequest(fixture, 'cov-a', [
+    [
+      trailered('feat(cov): agent', { Session: 's-cov', Change: 'c-cov-a' }),
+      {
+        'src/a.ts': 'a',
+        '.telemetry/sessions/2026-09/s-cov.json': sessionJson('s-cov'),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, agent, 'feat(cov): agent', 'Session: s-cov', {
+    hours: 24,
+  });
+
+  // A change an operator declared human-only: the trailer is a claim, not a default.
+  const human = openPullRequest(fixture, 'cov-h', [
+    [
+      trailered('docs(cov): by hand', { Session: 'none', Change: 'c-cov-h' }),
+      { 'docs/h.md': 'h' },
+    ],
+  ]);
+  mergeSquash(fixture, human, 'docs(cov): by hand', 'Session: none', {
+    hours: 24,
+  });
+
+  // A change committed with no active session and no declaration: no Session: trailer at all.
+  const unknown = openPullRequest(fixture, 'cov-u', [
+    [
+      trailered('chore(cov): unknown', { Change: 'c-cov-u' }),
+      { 'src/u.ts': 'u' },
+    ],
+  ]);
+  mergeSquash(fixture, unknown, 'chore(cov): unknown', '', { hours: 24 });
+
+  const { repo } = build(registryFor(fixture.dir));
+  const coverage = repo.signals.coverage;
+
+  assert.equal(coverage.agent, 1, 'the agent-session change is counted once');
+  assert.equal(coverage.humanOnly, 1, 'only the declared change is human-only');
+  assert.ok(
+    coverage.undeclared >= 1,
+    'the change with no trailer reads undeclared, not human-only',
+  );
+  assert.equal(
+    coverage.agent + coverage.humanOnly + coverage.undeclared <= coverage.total,
+    true,
+  );
+});
+
 test('a projection built over many synthetic changes stays well under a minute', () => {
   const fixture = makeFixtureRepo();
   const count = Number(process.env.DEV_LEDGER_SYNTHETIC_CHANGES ?? '60');

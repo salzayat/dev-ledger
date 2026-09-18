@@ -23,15 +23,22 @@ change=$(config telemetry-change)
 story_points=$(config telemetry-story-points)
 work_hours=$(config telemetry-work-hours)
 cost_class=$(config telemetry-cost-class)
+# A session identifier when one is active, and `none` only when an operator declared this branch human-only.
+# There is deliberately no fallback: an unset variable means the repository does not know who did the work,
+# and writing `none` there would turn that ignorance into a claim that a human worked alone. Writing no
+# trailer leaves the change `undeclared`, which is a gap the projection already counts.
 session=$(git config --get telemetry.session 2>/dev/null || true)
-[ -n "$session" ] || session=none
+if [ -z "$session" ] && [ "$(config telemetry-human-only)" = "true" ]; then
+  session=none
+fi
 
 if [ -z "$change" ]; then
   change="c-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
   git config "branch.$branch.telemetry-change" "$change"
 fi
 
-set -- --trailer "Session: $session" --trailer "Change: $change"
+set -- --trailer "Change: $change"
+[ -n "$session" ] && set -- --trailer "Session: $session" "$@"
 [ -n "$spec" ] && set -- --trailer "Spec: $spec" "$@"
 [ -n "$story_points" ] && set -- "$@" --trailer "Story-Points: $story_points"
 [ -n "$work_hours" ] && set -- "$@" --trailer "Work-Hours: $work_hours"

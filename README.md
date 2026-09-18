@@ -68,8 +68,12 @@ a transcript on disk: `session end --transcript <file>` sums the token counts fr
 record. The payload fields are listed in [`docs/contract.md`](docs/contract.md). At session start,
 `./scripts/telemetry.sh session start --id <id>` records the identifier the commit hook writes as
 `Session:`. Order matters: start the session, commit the work, then end the session and commit the record.
-A commit made after `session end` carries `Session: none` today and reads as human-only work, a defect
-drafted as `fix-session-none-default`.
+A commit made with no active session — before one starts, or after `session end` unsets it — carries no
+`Session:` trailer at all, so its change reads `undeclared`: a gap the projection counts rather than a claim
+about who did the work. `Session: none` means something narrower and is never written by default: it says a
+person did this work without an agent, and an operator declares it per branch with
+`./scripts/telemetry.sh session human-only` (or `--human-only` on `scripts/pr.sh`), cleared with
+`session human-only --clear`.
 
 ## What The Ledger Shows
 
@@ -113,9 +117,10 @@ them:
 
 - **37 of 53 changes read as undeclared.** They are the template's history, inherited from spec-loop before
   the capture hooks existed. The gap is stated, not hidden, and it will not shrink.
-- **The three newest changes read as human-only.** They were committed after their session ended, so the
-  hook wrote `Session: none`. That is the defect above, and until it is fixed the human-only count on this
-  page overstates.
+- **Three changes read as human-only.** They were committed after their session ended, when the hook still
+  defaulted the trailer to `Session: none`. `fix-session-none-default` removed that default, so no new
+  change joins them; the records already written are left as they were, because a record says what was
+  reported at the time.
 - **Spend is $0.00 over 1.7 million tokens.** The sessions run on a subscription, and the tool refuses to
   guess a price. Twelve records carry no figures at all: they predate transcript summing.
 - **Releases per week is n/a.** One tag, `v0.1.0`, so there is no window to divide by. Lead time to release

@@ -20,6 +20,7 @@ Options:
   --body-file PATH   Read PR body literally from a file
   --spec NAME        OpenSpec change this work serves; written as a Spec: trailer on commits and the PR body
   --story-points N   Reported effort; written as a Story-Points: trailer when the unit is enabled
+  --human-only       Declare this branch human-only, so its commits carry Session: none
   --all             Stage all tracked and untracked changes
   --reuse-branch    Reuse an existing local branch instead of requiring a new one
   --skip-checks     Skip ./scripts/check.sh after staging. Use only for documented tool outages.
@@ -49,6 +50,7 @@ body_inline=false
 body_file=
 spec_name=
 story_points=
+human_only=false
 paths=
 
 while [ "$#" -gt 0 ]; do
@@ -93,6 +95,9 @@ while [ "$#" -gt 0 ]; do
       shift
       [ "$#" -gt 0 ] || die "--spec requires a value"
       spec_name=$1
+      ;;
+    --human-only)
+      human_only=true
       ;;
     --story-points)
       shift
@@ -218,6 +223,9 @@ fi
 # Branch-local telemetry values the prepare-commit-msg hook writes as trailers.
 [ -n "$spec_name" ] && git config "branch.$pr_branch.telemetry-spec" "$spec_name"
 [ -n "$story_points" ] && git config "branch.$pr_branch.telemetry-story-points" "$story_points"
+# A declaration, never a default: without it a commit with no active session carries no Session: trailer and
+# the change reads undeclared, which is the honest classification when nobody knows who did the work.
+[ "$human_only" = true ] && git config "branch.$pr_branch.telemetry-human-only" "true"
 
 if [ "$stage_all" = true ]; then
   git add -A
