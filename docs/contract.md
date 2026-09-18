@@ -102,6 +102,26 @@ all, and the change reads `undeclared`. The distinction matters because `none` i
 worked without an agent, and a missing trailer is the absence of a claim; defaulting one to the other turned
 an unset variable into an assertion about who did the work.
 
+## Plan declarations (schema version 1)
+
+Committed to `.telemetry/subscriptions/plans.json`, listing what each plan is arranged to cost.
+
+| Field       | Type   | Meaning                                                                                               |
+| ----------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| `planId`    | string | Matches the `subscriptionId` of the sessions it covers                                                |
+| `provider`  | string | The provider billing the plan                                                                         |
+| `currency`  | string | ISO 4217 code, upper case                                                                             |
+| `intervals` | list   | `{ from, unit, seats }`, ordered, non-overlapping, each holding from its period until the next begins |
+
+A price or seat change appends an interval; it never rewrites one, so what a plan cost in any period stays
+readable. A period covered by no interval is reported as uncovered rather than resolving to the nearest. The
+same forbidden keys a session record rejects apply here: no name, email address, or rate.
+
+`./scripts/telemetry.sh subscription close <YYYY-MM>` writes one cost record per declared plan for that
+period, with `amount` as seats times unit. It leaves an existing record alone unless `--overwrite` is passed,
+refuses a period whose end has not passed unless `--force` is passed, and **does not commit**: it prints the
+paths it wrote, and an operator reviews the diff and commits.
+
 ### Registry keys added for flow efficiency and work mix
 
 | Key                                | Meaning                                                               |

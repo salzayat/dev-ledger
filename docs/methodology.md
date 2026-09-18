@@ -69,6 +69,24 @@ request, the most-reworked files, and the spend bars — are folds over the same
 page is rendered. Nothing on the page can compute a figure the projection does not hold, so the citation
 rule holds for the page as well as for the data.
 
+## A declaration is an intention; a record is what happened
+
+A plan declaration says what a plan is arranged to cost. A period record says what was actually paid. They
+are different kinds of fact, and holding both in one file would make a rate change indistinguishable from a
+typo.
+
+`subscription close` proposes the period's records from the declarations and stops. It does not commit,
+deliberately: only a person knows what came off the card, and months differ — a credit, a proration, a seat
+added on the nineteenth. A projection that generated figures from declarations alone would assert months of
+spend nobody checked, which is the shape of the `Session: none` defect this repository has already met once,
+where an unset variable became a claim about who did the work. The commit is where a person confirms the
+figure, and the committed record remains the only thing any read trusts.
+
+The Ledger reports the gaps between declarations, records, and the sessions that cite them — a declared plan
+with no record for a closed period, a record no declaration covers, a session naming a plan with no record,
+and a period no interval covers — each beside the command that closes it. It reports and never repairs: the
+published page reads only from the projection and carries no form, so there is nothing to submit.
+
 ## Work mix
 
 Each week's changes by the conventional commit type on their subject, with `other` for a subject that does

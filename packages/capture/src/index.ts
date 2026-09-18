@@ -39,14 +39,21 @@ export {
   sessionSummary,
 } from './cli.ts';
 export {
+  PLANS_PATH,
   SUBSCRIPTIONS_PATH,
   SUBSCRIPTION_SCHEMA_VERSION,
+  amountFor,
   buildSubscriptionFile,
+  intervalFor,
   periodOf,
   subscriptionFilePath,
+  validatePlansFile,
   validateSubscriptionFile,
 } from './subscription.ts';
 export type {
+  PlanDeclaration,
+  PlanInterval,
+  PlansFile,
   SubscriptionCostFile,
   SubscriptionInput,
 } from './subscription.ts';

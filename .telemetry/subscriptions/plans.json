@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "plans": [
+    {
+      "planId": "claude-max",
+      "provider": "anthropic",
+      "currency": "USD",
+      "intervals": [{ "from": "2026-09", "unit": 100, "seats": 1 }]
+    }
+  ]
+}

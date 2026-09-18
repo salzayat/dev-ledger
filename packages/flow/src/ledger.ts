@@ -193,6 +193,17 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   lines.push(
     `  check compliance: ${share(signals.checkCompliance.recordedShare)} of ${signals.checkCompliance.changes} changes recorded a check, ${share(signals.checkCompliance.passRate)} of those passed [${signals.checkCompliance.trust.join(', ')}]`,
   );
+  const gaps = repository.configurationGaps ?? [];
+  lines.push(
+    gaps.length === 0
+      ? '  subscription configuration: no gaps [reported]'
+      : `  subscription configuration: ${gaps.length} gaps [reported]`,
+  );
+  for (const gap of gaps) {
+    lines.push(
+      `    ${gap.subject}${gap.period ? ` ${gap.period}` : ''}: ${gap.kind}; closes with: ${gap.remedy}`,
+    );
+  }
   lines.push(
     `  rework ignore: ${signals.rework.ignored} pairs removed by ${signals.rework.ignore.length} globs`,
   );

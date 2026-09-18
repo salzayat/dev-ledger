@@ -14,8 +14,13 @@ import {
 } from './session.ts';
 import {
   SUBSCRIPTIONS_PATH,
+  PLANS_PATH,
+  amountFor,
   buildSubscriptionFile,
   subscriptionFilePath,
+  type PlansFile,
+  type SubscriptionCostFile,
+  validatePlansFile,
   validateSubscriptionFile,
 } from './subscription.ts';
 import { validateMessage } from './trailers.ts';
@@ -32,6 +37,7 @@ import {
 //   session human-only [--clear]     declare this branch human-only, so its commits carry Session: none
 //   session end --payload <file|->   write the session file from the harness's figures and commit it
 //   subscription record ...          write a subscription cost record for one billing period and commit it
+//   subscription close <YYYY-MM>     write one record per declared plan for that period, without committing
 //   validate [paths...]              validate session and subscription records against their schemas
 //   validate-message <file>          validate a commit message's subject and trailers
 
@@ -262,6 +268,97 @@ function readTranscriptAttribution(
   return attributeTranscriptTime(events, idleCapSeconds);
 }
 
+/**
+ * Writes one period record per declared plan, from the declarations, and stops there.
+ *
+ * It deliberately does not commit. A declaration says what a plan is arranged to cost; only a person knows
+ * what actually came off the card, and months differ — a credit, a proration, a seat added on the
+ * nineteenth. Generating figures from an intention alone would assert twelve months of spend nobody
+ * checked, which is the shape of the `Session: none` defect this repository has already met once.
+ */
+function closePeriod(root: string, args: string[]): number {
+  const period = args[1];
+  if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+    fail(
+      'usage: telemetry subscription close <YYYY-MM> [--overwrite] [--force]',
+    );
+  }
+  const plansPath = resolve(root, PLANS_PATH);
+  if (!existsSync(plansPath)) {
+    fail(`no plan declarations at ${PLANS_PATH}; nothing to close`);
+  }
+  const parsed = JSON.parse(readFileSync(plansPath, 'utf8')) as unknown;
+  const errors = validatePlansFile(parsed);
+  if (errors.length > 0) {
+    fail(`plan declarations are invalid:\n  ${errors.join('\n  ')}`);
+  }
+  const plans = (parsed as PlansFile).plans;
+
+  // A period whose end has not passed is not settled, and recording it as though it were would state a
+  // figure the month can still change.
+  const [year, month] = period.split('-').map(Number);
+  const periodEnd = Date.UTC(year, month, 1);
+  if (periodEnd > Date.now() && !args.includes('--force')) {
+    fail(`${period} has not ended; pass --force to close it anyway`);
+  }
+
+  const written: string[] = [];
+  const kept: string[] = [];
+  const uncovered: string[] = [];
+  for (const plan of plans) {
+    const amount = amountFor(plan, period);
+    if (amount === null) {
+      uncovered.push(plan.planId);
+      continue;
+    }
+    const relative = subscriptionFilePath(plan.planId, period);
+    const absolute = resolve(root, relative);
+    if (existsSync(absolute) && !args.includes('--overwrite')) {
+      const current = JSON.parse(
+        readFileSync(absolute, 'utf8'),
+      ) as SubscriptionCostFile;
+      kept.push(
+        current.amount === amount
+          ? `${relative} (unchanged)`
+          : `${relative} (would become ${amount} ${plan.currency}, is ${current.amount})`,
+      );
+      continue;
+    }
+    const file = buildSubscriptionFile({
+      planId: plan.planId,
+      period,
+      amount,
+      currency: plan.currency,
+      overageAmount: 0,
+    });
+    const invalid = validateSubscriptionFile(file);
+    if (invalid.length > 0) {
+      fail(`${relative} is invalid:\n  ${invalid.join('\n  ')}`);
+    }
+    mkdirSync(dirname(absolute), { recursive: true });
+    writeFileSync(absolute, canonicalJson(file));
+    written.push(relative);
+  }
+
+  for (const path of written) {
+    process.stdout.write(`${path}\n`);
+  }
+  for (const note of kept) {
+    process.stdout.write(`kept ${note}\n`);
+  }
+  for (const planId of uncovered) {
+    process.stdout.write(
+      `${planId}: no interval covers ${period}; nothing written\n`,
+    );
+  }
+  process.stdout.write(
+    written.length > 0
+      ? 'Review the diff and commit; nothing was committed.\n'
+      : 'Nothing written.\n',
+  );
+  return 0;
+}
+
 export function captureMain(argv: string[]): number {
   const [command, ...args] = argv;
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']).trim();
@@ -438,9 +535,12 @@ export function captureMain(argv: string[]): number {
       break;
     }
     case 'subscription': {
+      if (args[0] === 'close') {
+        return closePeriod(root, args);
+      }
       if (args[0] !== 'record') {
         fail(
-          'usage: telemetry subscription record --plan <id> --period <YYYY-MM> --amount <number> --currency <code> [--overage <number>] [--no-commit]',
+          'usage: telemetry subscription record --plan <id> --period <YYYY-MM> --amount <number> --currency <code> [--overage <number>] [--no-commit]\n       telemetry subscription close <YYYY-MM> [--overwrite] [--force]',
         );
       }
       const planId = option(args, '--plan');

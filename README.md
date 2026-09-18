@@ -151,6 +151,7 @@ repository turns it on, every control that needs them reads as not observable.
 | `./scripts/telemetry.sh validate`            | Validate session files against the schema.                                                                        |
 | `./scripts/telemetry.sh session`             | Record a session start, or write and commit a session file at session end.                                        |
 | `./scripts/telemetry.sh session summary`     | Print the session records this branch adds, as the Markdown the PR helper embeds.                                 |
+| `./scripts/telemetry.sh subscription close`  | Write one cost record per declared plan for a period, from the declarations; commits nothing.                     |
 | `./scripts/telemetry.sh session figures`     | Sum a session transcript's token figures and the operator's active seconds, to pass to `session end`.             |
 | `./scripts/telemetry.sh subscription record` | Write and commit what a plan cost for one billing period, the input to allocated spend.                           |
 | `npm exec nx run capture:test`               | Run the capture package's tests.                                                                                  |
