@@ -652,6 +652,64 @@ test('the operator dimension keeps agents in currency, humans in hours, and neit
   assert.doesNotMatch(row, /\$/);
 });
 
+test('the allocated amount per token leads with input and output, and counts what reported none', () => {
+  const fixture = makeFixtureRepo();
+  const period = '2026-09';
+  const pull = openPullRequest(fixture, 'r1', [
+    [
+      trailered('feat(r): rate', {
+        Session: 's-r1',
+        Change: 'c-r1',
+      }),
+      {
+        'src/r.ts': 'v1',
+        [`.telemetry/subscriptions/${period}/plan-r.json`]: subscriptionJson(
+          'plan-r',
+          period,
+          100,
+        ),
+        // Two sessions take a share; one of them reported no tokens at all.
+        [`.telemetry/sessions/${period}/s-r1.json`]: sessionJson('s-r1', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-r',
+          costUsd: 0,
+          agentRunSeconds: 1800,
+          inputTokens: 400_000,
+          outputTokens: 600_000,
+          cachedTokens: 100_000_000,
+        }),
+        [`.telemetry/sessions/${period}/s-r2.json`]: sessionJson('s-r2', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-r',
+          costUsd: 0,
+          agentRunSeconds: 1800,
+          figuresMissing: true,
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, pull, 'feat(r): rate', 'Session: s-r1\nSession: s-r2', {
+    hours: 24,
+  });
+
+  const { repo } = build(registryFor(fixture.dir));
+  const rate = repo.signals.allocation.currencies.USD.rate;
+
+  // The whole 100 is allocated across the two sessions, and the denominator is the million tokens the one
+  // session that reported any actually reported.
+  assert.equal(rate.amount, 100);
+  assert.equal(rate.inputOutputTokens, 1_000_000);
+  assert.equal(rate.perMillionInputOutput, 100);
+
+  // Cache reads are reported, and never folded into the headline denominator: doing so would read $1.00.
+  assert.equal(rate.cachedTokens, 100_000_000);
+  assert.equal(rate.perMillionCached, 1);
+
+  // The session that reported nothing is counted rather than silently shrinking the denominator.
+  assert.equal(rate.sessions, 2);
+  assert.equal(rate.withoutFigures, 1);
+});
+
 test('a projection built over many synthetic changes stays well under a minute', () => {
   const fixture = makeFixtureRepo();
   const count = Number(process.env.DEV_LEDGER_SYNTHETIC_CHANGES ?? '60');

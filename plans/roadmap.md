@@ -28,6 +28,7 @@ contract.
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
 | Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Blocked  |
+| Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Pending  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
@@ -133,6 +134,11 @@ through an unattended agent run — and it stops treating an absent figure as an
 operator figure is counted the way every other missing figure in this repository already is. It is
 `Blocked` only on archive order: `add-operator-dimension` is implemented and merged but not yet archived, and
 this change amends the requirement that one enabled.
+The allocated token rate row relates the two figures the subscription work left unrelated: what a period
+cost and how many tokens its sessions reported. Input and output lead the denominator and cache reads sit
+beside it, because over this repository's own records the two differ by more than two orders of magnitude,
+so a combined denominator would track how long a context stayed warm rather than how much work was asked
+for. It depends on no active change.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

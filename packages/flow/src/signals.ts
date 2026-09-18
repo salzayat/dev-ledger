@@ -150,8 +150,32 @@ export type AllocationPeriod = {
   cites: string[];
 };
 
+/**
+ * What the allocated amount worked out to per token. A subscription has no token component — the plan costs
+ * what it costs — so this is not a price and not a fraction of the amount: it is the amount divided by the
+ * tokens the sessions that took a share actually reported.
+ *
+ * Input plus output is the headline because those are the tokens the work asked for. Cache reads sit beside
+ * it rather than in the denominator: they rise with how long a context stayed warm, and folding them in
+ * makes the rate read roughly two hundred times better than the work cost.
+ */
+export type TokenRate = {
+  amount: number;
+  currency: string;
+  inputOutputTokens: number;
+  cachedTokens: number;
+  perMillionInputOutput: number | null;
+  perMillionCached: number | null;
+  sessions: number;
+  /** Sessions that took a share but reported no tokens, so the rate is over fewer records than it covers. */
+  withoutFigures: number;
+  provisional: boolean;
+  cites: string[];
+};
+
 export type AllocationAggregates = {
   total: AllocatedSpend;
+  rate: TokenRate;
   byChange: Record<string, AllocatedSpend>;
   bySpec: Record<string, AllocatedSpend>;
   byProvider: Record<string, AllocatedSpend>;
@@ -618,6 +642,18 @@ function computeAllocation(
   const aggregates = (currency: string): AllocationAggregates =>
     (allocation.currencies[currency] ??= {
       total: emptyAllocated(),
+      rate: {
+        amount: 0,
+        currency,
+        inputOutputTokens: 0,
+        cachedTokens: 0,
+        perMillionInputOutput: null,
+        perMillionCached: null,
+        sessions: 0,
+        withoutFigures: 0,
+        provisional: false,
+        cites: [],
+      },
       byChange: {},
       bySpec: {},
       byProvider: {},
@@ -634,6 +670,20 @@ function computeAllocation(
       }
       const into = aggregates(share.currency);
       addAllocated(into.total, share, record.path);
+      // The rate divides this session's share by the tokens this session reported. A share whose record
+      // carries no figures still counts toward the amount, so it is counted here rather than quietly
+      // shrinking the denominator without saying so.
+      into.rate.amount += share.amount + share.overage;
+      into.rate.sessions += 1;
+      into.rate.provisional ||= share.provisional;
+      into.rate.cites.push(record.path);
+      if (record.file.figuresMissing) {
+        into.rate.withoutFigures += 1;
+      } else {
+        into.rate.inputOutputTokens +=
+          record.file.inputTokens + record.file.outputTokens;
+        into.rate.cachedTokens += record.file.cachedTokens;
+      }
       addAllocated(
         (into.byChange[fact.change.id] ??= emptyAllocated()),
         share,
@@ -685,6 +735,17 @@ function computeAllocation(
       record.path,
     );
   }
+  // The rate is a division, done once the sums are final. No tokens means no rate: null says the figure
+  // could not be computed, where a zero would claim the tokens were free.
+  for (const into of Object.values(allocation.currencies)) {
+    const per = (tokens: number) =>
+      tokens > 0
+        ? Math.round((into.rate.amount / tokens) * 1e6 * 1e4) / 1e4
+        : null;
+    into.rate.perMillionInputOutput = per(into.rate.inputOutputTokens);
+    into.rate.perMillionCached = per(into.rate.cachedTokens);
+  }
+
   return allocation;
 }
 
