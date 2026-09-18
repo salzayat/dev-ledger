@@ -37,12 +37,9 @@ What is missing is narrower and concrete:
 
 ## Dependencies
 
-None.
-
-The allocated token rate this sits beside is drafted in an open pull request and is not yet on the default
-branch, so it cannot be named here as a dependency; the sequencing is recorded in the design instead. Both
-touch the same figures, so whichever archives second is rebased onto the first, and this change is selected
-after that one lands.
+`add-allocated-token-rate` (active), whose rate this sits beside and whose denominator rule it follows. It
+is on the default branch now, so it is named here rather than only in the design. Both touch the same
+figures, so whichever archives second is rebased onto the first.
 
 ## Non-Goals
 

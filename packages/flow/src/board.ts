@@ -118,6 +118,16 @@ export function renderRepository(repository: RepositoryProjection): string[] {
       );
     }
   }
+  for (const { rate } of Object.values(allocation.currencies)) {
+    if (rate.sessions === 0) {
+      continue;
+    }
+    lines.push(
+      rate.perMillionInputOutput === null
+        ? `  rate: no tokens reported by the ${rate.sessions} allocated sessions, so no rate [allocated]`
+        : `  rate: ${money(rate.perMillionInputOutput, rate.currency)} per million input and output tokens${rate.provisional ? ' (provisional)' : ''}, over ${rate.inputOutputTokens.toLocaleString('en-US')} tokens from ${rate.sessions} sessions${rate.withoutFigures ? `, ${rate.withoutFigures} of them reporting none` : ''}; ${rate.perMillionCached === null ? 'no cache reads' : `${money(rate.perMillionCached, rate.currency)} per million cache reads`} [allocated]`,
+    );
+  }
   lines.push(
     `  allocation excluded: ${allocation.excluded.noAgentSeconds} sessions with no agent seconds, ${allocation.excluded.noPeriodRecord} with no period record, ${allocation.excluded.invalidSession} invalid sessions, ${allocation.excluded.invalidRecord} invalid records (counted, never zeroed)`,
   );

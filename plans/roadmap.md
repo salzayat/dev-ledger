@@ -28,8 +28,9 @@ contract.
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
 | Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Blocked  |
+| Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Pending  |
 | Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Pending  |
-| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Pending  |
+| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Blocked  |
 | Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Blocked  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
@@ -136,6 +137,11 @@ through an unattended agent run — and it stops treating an absent figure as an
 operator figure is counted the way every other missing figure in this repository already is. It is
 `Blocked` only on archive order: `add-operator-dimension` is implemented and merged but not yet archived, and
 this change amends the requirement that one enabled.
+The allocated token rate row relates the two figures the subscription work left unrelated: what a period
+cost and how many tokens its sessions reported. Input and output lead the denominator and cache reads sit
+beside it, because over this repository's own records the two differ by more than two orders of magnitude,
+so a combined denominator would track how long a context stayed warm rather than how much work was asked
+for. It depends on no active change.
 The subscription declarations row answers what a team hits before a solo operator does: one hand-written
 record per plan per month is twelve files a year for one plan and thirty-six for three, with a rate change
 visible nowhere. It separates the standing arrangement from the month's fact — effective-dated intervals say
@@ -147,8 +153,8 @@ that closes each, because it reads only from the projection and its page carries
 The provider neutral spend row closes the three places multi-provider work stops short: the rate covers only
 allocated spend and not the metered spend a pay-per-token provider reports directly, the reported cost names
 a currency in its field name, and cached tokens are one number defined as one provider's reads plus writes.
-It is selected after the allocated token rate row, which it sits beside and whose denominator rule it
-follows; that change is still in an open pull request rather than on the default branch.
+It is `Blocked` behind the allocated token rate row, which it sits beside and whose denominator rule it
+follows, and which is now an active change on the default branch.
 
 The local configuration surface row gives an operator running this repository on their own machine what the
 published page cannot have. The Board's configuration panel names gaps and the commands that close them
