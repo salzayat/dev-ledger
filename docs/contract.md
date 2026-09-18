@@ -45,6 +45,27 @@ repeats a message as it grows, each record carrying its usage so far), `cachedTo
 cache writes, and cost is never derived from a price table. A transcript with no usage record leaves the
 session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
 
+## Subscription cost record (schema version 1)
+
+Written by `telemetry subscription record` to `.telemetry/subscriptions/<yyyy-mm>/<plan>.json` and
+committed. A subscription session records no marginal cost (`costUsd` stays `0`), so what the plan cost is
+a fact of the period, entered by the operator and never fetched from a provider.
+
+| Field           | Type                | Notes                                                  |
+| --------------- | ------------------- | ------------------------------------------------------ |
+| `schemaVersion` | `1`                 |                                                        |
+| `planId`        | string              | Matches the `subscriptionId` of the sessions it covers |
+| `period`        | `YYYY-MM`           | The billing period                                     |
+| `amount`        | non-negative number | What the plan cost for the period                      |
+| `currency`      | three-letter code   | Upper case                                             |
+| `overageAmount` | non-negative number | Paid beyond the plan in the period; `0` when none      |
+
+The record rejects the same forbidden keys a session file does. The projection apportions `amount` and
+`overageAmount` across the sessions that end in the period on that plan, in proportion to
+`agentRunSeconds`; a session with no agent seconds takes no share and is counted. Every apportioned figure
+carries the trust class `allocated` (the record itself is `reported` with producer `operator`), names its
+basis, and is provisional while the period has not closed as of the newest commit the mirror holds.
+
 ## Trailer vocabulary (version 1)
 
 Written by `.githooks/prepare-commit-msg` on every commit made through the hooks, validated by
@@ -90,10 +111,12 @@ is an SSH alias the derivation cannot read; it is recorded in the projection in 
 `.telemetry/projection.json`, canonical JSON (sorted keys, two-space indent, trailing newline), rebuilt by
 `telemetry rebuild` and byte-identical on any machine whose mirrors hold the same ref tips. The header
 names `schemaVersion`, `sessionSchemaVersion`, `registrySchemaVersion`, and `configSchemaVersion`. Each
-repository carries `refTips` (the refs the mirror held), `changes`, `sessions`, `unmerged`, `releases`,
-`unreleased`, `movedTags`, and `signals`, or `reachable: false` with a reason. `signals` carries the flow reads,
-`dora` (deployment frequency, lead time to release with its merge-to-tag part, change failure rate, time to fix,
-each with its approximation note), `trends.weekly`, `costClasses`, and `coverage`.
+repository carries `refTips` (the refs the mirror held), `changes`, `sessions`, `subscriptions`, `unmerged`,
+`releases`, `unreleased`, `movedTags`, and `signals`, or `reachable: false` with a reason. `signals` carries
+the flow reads, `dora` (deployment frequency, lead time to release with its merge-to-tag part, change failure
+rate, time to fix, each with its approximation note), `trends.weekly`, `costClasses`, `coverage`, and
+`allocation` (the subscription periods, each session's share, aggregates per currency, and the excluded
+counts, all under trust `allocated` with basis `agentRunSeconds`).
 
 Each change carries its identity (the last commit on the default branch), `kind`, `commits`,
 `association` (`pullRequest`, `method`: `subject`, `pull-head`, or `patch-identity`, and `classification`:

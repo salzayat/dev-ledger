@@ -3,6 +3,7 @@ import type { Association, UnmergedPullRequest } from './association.ts';
 import type { Change } from './history.ts';
 import type { Thresholds } from './registry.ts';
 import type { ChangeSessions, SessionRecord } from './sessions.ts';
+import type { SubscriptionRecord } from './subscriptions.ts';
 import type { Timing } from './timing.ts';
 
 // The flow signals. Every read states the trust classes it used and how many changes it excluded, cites
@@ -111,7 +112,112 @@ export type RepositorySignals = {
   trends: { weekly: WeeklyBucket[]; note: string };
   costClasses: CostClassSpend;
   coverage: Coverage;
+  allocation: Allocation;
+  operators: Operators;
   signals: Signal[];
+};
+
+/** An apportioned amount: a share of a subscription period, never a reported figure. */
+export type AllocatedSpend = {
+  amount: number;
+  overage: number;
+  sessions: number;
+  /** True when any share came from a period whose end had not passed as of the newest commit. */
+  provisional: boolean;
+  cites: string[];
+};
+
+export type AllocationPeriod = {
+  period: string;
+  planId: string;
+  currency: string;
+  amount: number;
+  overageAmount: number;
+  record: string;
+  provisional: boolean;
+  /** Sessions that took a share. */
+  allocated: number;
+  /** Sessions in the period with no agent run seconds: excluded and counted, never given zero. */
+  excludedNoAgentSeconds: number;
+  /** True when no session could take a share, so the whole amount is reported as unallocated. */
+  unallocated: boolean;
+  cites: string[];
+};
+
+export type AllocationAggregates = {
+  total: AllocatedSpend;
+  byChange: Record<string, AllocatedSpend>;
+  bySpec: Record<string, AllocatedSpend>;
+  byProvider: Record<string, AllocatedSpend>;
+  byModel: Record<string, AllocatedSpend>;
+  unmergedPullRequests: AllocatedSpend;
+  perUnmergedPullRequest: Record<string, AllocatedSpend>;
+};
+
+/**
+ * Effort keyed to an operator, covering both kinds. An agent operator is a provider and model pair and is
+ * measured in the currency of the subscription allocation and in tokens. A human operator is a pseudonymous
+ * identifier and is measured in hours, from `operatorActiveSeconds` under its idle cap. The two units never
+ * meet in one figure: there is no rate in any record that could convert hours into money, and none is
+ * invented here.
+ */
+export type AgentOperator = {
+  provider: string;
+  model: string;
+  /** Allocated amounts by currency code; empty when no subscription period covers this operator's work. */
+  currencies: Record<string, { amount: number; overage: number }>;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  sessions: number;
+  provisional: boolean;
+  cites: string[];
+};
+
+export type HumanOperator = {
+  hours: number;
+  sessions: number;
+  cites: string[];
+};
+
+export type Operators = {
+  trust: string[];
+  agents: Record<string, AgentOperator>;
+  humans: Record<string, HumanOperator>;
+  excluded: {
+    /** Changes declaring `Session: none`: human work with no record to hold its hours. */
+    humanOnly: number;
+    /** Sessions recorded before operator capture was enabled, which carry no identifier. */
+    noOperator: number;
+    invalidSession: number;
+  };
+};
+
+export type Allocation = {
+  trust: string[];
+  producer: 'operator';
+  basis: 'agentRunSeconds';
+  periods: AllocationPeriod[];
+  bySession: Record<
+    string,
+    {
+      period: string;
+      planId: string;
+      currency: string;
+      amount: number;
+      overage: number;
+      provisional: boolean;
+    }
+  >;
+  /** Aggregates keyed by currency, because two currencies never sum. */
+  currencies: Record<string, AllocationAggregates>;
+  excluded: {
+    noAgentSeconds: number;
+    noPeriodRecord: number;
+    invalidSession: number;
+    invalidRecord: number;
+  };
+  note: string;
 };
 
 export type DoraSignals = {
@@ -279,15 +385,304 @@ function weekOf(iso: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+function emptyAllocated(): AllocatedSpend {
+  return { amount: 0, overage: 0, sessions: 0, provisional: false, cites: [] };
+}
+
+function addAllocated(
+  into: AllocatedSpend,
+  share: Allocation['bySession'][string],
+  cite: string,
+): void {
+  into.amount = Math.round((into.amount + share.amount) * 1e6) / 1e6;
+  into.overage = Math.round((into.overage + share.overage) * 1e6) / 1e6;
+  into.sessions += 1;
+  into.provisional = into.provisional || share.provisional;
+  into.cites.push(cite);
+}
+
+/** Apportions one amount over weights, rounded to a millionth, with the remainder on the last share. */
+function apportion(amount: number, weights: number[]): number[] {
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const shares = weights.map(
+    (weight) => Math.round(((amount * weight) / total) * 1e6) / 1e6,
+  );
+  const assigned = shares.reduce((sum, share) => sum + share, 0);
+  if (shares.length > 0) {
+    shares[shares.length - 1] =
+      Math.round((shares[shares.length - 1] + amount - assigned) * 1e6) / 1e6;
+  }
+  return shares;
+}
+
+/** The first instant after a `YYYY-MM` period. */
+function periodEnd(period: string): number {
+  const [year, month] = period.split('-').map(Number);
+  return Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1);
+}
+
+/**
+ * The operator dimension. Agent operators come from the provider and model already on every record, and
+ * take their currency from the subscription allocation rather than from a reported cost, because a
+ * subscription session reports none. Human operators come from the pseudonymous `operatorId` and are
+ * measured in hours alone.
+ *
+ * Two populations are excluded rather than counted as zero hours, in the same shape every other exclusion
+ * in this file uses: a change declaring `Session: none` is human work whose hours no record holds, and a
+ * session recorded before operator capture was enabled carries no identifier to key on.
+ */
+function computeOperators(
+  facts: ChangeFacts[],
+  sessions: Map<string, SessionRecord>,
+  allocation: Allocation,
+): Operators {
+  const operators: Operators = {
+    trust: ['reported', 'allocated'],
+    agents: {},
+    humans: {},
+    excluded: { humanOnly: 0, noOperator: 0, invalidSession: 0 },
+  };
+  for (const fact of facts) {
+    if (fact.sessions.status === 'human-only') {
+      operators.excluded.humanOnly += 1;
+    }
+    for (const id of fact.sessions.sessions) {
+      const record = sessions.get(id);
+      if (!record?.file) {
+        operators.excluded.invalidSession += 1;
+        continue;
+      }
+      const file = record.file;
+
+      const key = `${file.provider}/${file.model}`;
+      const agent = (operators.agents[key] ??= {
+        provider: file.provider,
+        model: file.model,
+        currencies: {},
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedTokens: 0,
+        sessions: 0,
+        provisional: false,
+        cites: [],
+      });
+      agent.sessions += 1;
+      agent.cites.push(record.path);
+      // Tokens are a reported figure and stay absent when the harness supplied none; the allocated share
+      // does not depend on them, so a record with missing figures still carries its currency here.
+      if (!file.figuresMissing) {
+        agent.inputTokens += file.inputTokens;
+        agent.outputTokens += file.outputTokens;
+        agent.cachedTokens += file.cachedTokens;
+      }
+      const share = allocation.bySession[id];
+      if (share) {
+        const currency = (agent.currencies[share.currency] ??= {
+          amount: 0,
+          overage: 0,
+        });
+        currency.amount += share.amount;
+        currency.overage += share.overage;
+        agent.provisional ||= share.provisional;
+      }
+
+      // Hours, never money. `operatorActiveSeconds` is absent on every record written before cost
+      // allocation was enabled, and those are counted rather than read as an operator working no hours.
+      if (
+        typeof file.operatorId !== 'string' ||
+        typeof file.operatorActiveSeconds !== 'number'
+      ) {
+        operators.excluded.noOperator += 1;
+        continue;
+      }
+      const human = (operators.humans[file.operatorId] ??= {
+        hours: 0,
+        sessions: 0,
+        cites: [],
+      });
+      human.hours += file.operatorActiveSeconds / 3600;
+      human.sessions += 1;
+      human.cites.push(record.path);
+    }
+  }
+  return operators;
+}
+
+/**
+ * Subscription spend, allocated by agent run seconds. A session's marginal cost on a subscription is
+ * zero and stays zero in its record; what the plan cost is a period fact, apportioned here across the
+ * period's sessions. A session with no agent seconds takes no share and is counted, never given zero.
+ */
+function computeAllocation(
+  facts: ChangeFacts[],
+  sessions: Map<string, SessionRecord>,
+  subscriptions: SubscriptionRecord[],
+  now: string,
+): Allocation {
+  const allocation: Allocation = {
+    trust: ['allocated'],
+    producer: 'operator',
+    basis: 'agentRunSeconds',
+    periods: [],
+    bySession: {},
+    currencies: {},
+    excluded: {
+      noAgentSeconds: 0,
+      noPeriodRecord: 0,
+      invalidSession: 0,
+      invalidRecord: 0,
+    },
+    note: 'a subscription session records no marginal cost; the period amount is apportioned across its sessions by agent run seconds, and a figure from a period that has not closed is provisional',
+  };
+  const nowMs = Date.parse(now);
+  const byPeriodAndPlan = new Map<string, SubscriptionRecord>();
+  for (const record of subscriptions) {
+    if (!record.file) {
+      allocation.excluded.invalidRecord += 1;
+      continue;
+    }
+    byPeriodAndPlan.set(`${record.file.period}/${record.file.planId}`, record);
+  }
+  const members = new Map<string, SessionRecord[]>();
+  for (const record of [...sessions.values()].sort((a, b) =>
+    a.sessionId.localeCompare(b.sessionId),
+  )) {
+    const file = record.file;
+    if (!file) {
+      allocation.excluded.invalidSession += 1;
+      continue;
+    }
+    if (file.billingKind !== 'subscription') {
+      continue;
+    }
+    const key = `${file.endedAt.slice(0, 7)}/${file.subscriptionId}`;
+    if (!byPeriodAndPlan.has(key)) {
+      allocation.excluded.noPeriodRecord += 1;
+      continue;
+    }
+    (members.get(key) ?? members.set(key, []).get(key)!).push(record);
+  }
+  for (const [key, record] of [...byPeriodAndPlan.entries()].sort()) {
+    const file = record.file!;
+    const inPeriod = members.get(key) ?? [];
+    const eligible = inPeriod.filter(
+      (member) => member.file!.agentRunSeconds > 0,
+    );
+    const excludedNoAgentSeconds = inPeriod.length - eligible.length;
+    allocation.excluded.noAgentSeconds += excludedNoAgentSeconds;
+    const provisional = periodEnd(file.period) > nowMs;
+    const weights = eligible.map((member) => member.file!.agentRunSeconds);
+    const amounts = apportion(file.amount, weights);
+    const overages = apportion(file.overageAmount, weights);
+    eligible.forEach((member, index) => {
+      allocation.bySession[member.sessionId] = {
+        period: file.period,
+        planId: file.planId,
+        currency: file.currency,
+        amount: amounts[index],
+        overage: overages[index],
+        provisional,
+      };
+    });
+    allocation.periods.push({
+      period: file.period,
+      planId: file.planId,
+      currency: file.currency,
+      amount: file.amount,
+      overageAmount: file.overageAmount,
+      record: record.path,
+      provisional,
+      allocated: eligible.length,
+      excludedNoAgentSeconds,
+      unallocated: eligible.length === 0,
+      cites: [record.path, ...inPeriod.map((member) => member.path)],
+    });
+  }
+  const aggregates = (currency: string): AllocationAggregates =>
+    (allocation.currencies[currency] ??= {
+      total: emptyAllocated(),
+      byChange: {},
+      bySpec: {},
+      byProvider: {},
+      byModel: {},
+      unmergedPullRequests: emptyAllocated(),
+      perUnmergedPullRequest: {},
+    });
+  for (const fact of facts) {
+    for (const id of fact.sessions.sessions) {
+      const share = allocation.bySession[id];
+      const record = sessions.get(id);
+      if (!share || !record?.file) {
+        continue;
+      }
+      const into = aggregates(share.currency);
+      addAllocated(into.total, share, record.path);
+      addAllocated(
+        (into.byChange[fact.change.id] ??= emptyAllocated()),
+        share,
+        record.path,
+      );
+      const spec =
+        typeof fact.change.trailers.Spec === 'string'
+          ? fact.change.trailers.Spec
+          : (record.file.spec ?? '(none)');
+      addAllocated(
+        (into.bySpec[spec] ??= emptyAllocated()),
+        share,
+        record.path,
+      );
+      addAllocated(
+        (into.byProvider[record.file.provider] ??= emptyAllocated()),
+        share,
+        record.path,
+      );
+      addAllocated(
+        (into.byModel[record.file.model] ??= emptyAllocated()),
+        share,
+        record.path,
+      );
+    }
+  }
+  for (const record of sessions.values()) {
+    const number = record.attribution.unmergedPullRequest;
+    const share = allocation.bySession[record.sessionId];
+    if (number === null || !share || !record.file) {
+      continue;
+    }
+    const into = aggregates(share.currency);
+    addAllocated(into.total, share, record.path);
+    addAllocated(into.unmergedPullRequests, share, record.path);
+    addAllocated(
+      (into.perUnmergedPullRequest[String(number)] ??= emptyAllocated()),
+      share,
+      record.path,
+    );
+    addAllocated(
+      (into.byProvider[record.file.provider] ??= emptyAllocated()),
+      share,
+      record.path,
+    );
+    addAllocated(
+      (into.byModel[record.file.model] ??= emptyAllocated()),
+      share,
+      record.path,
+    );
+  }
+  return allocation;
+}
+
 export function computeSignals(
   facts: ChangeFacts[],
   sessions: Map<string, SessionRecord>,
   unmerged: UnmergedPullRequest[],
   releases: ReleaseSummary[],
+  subscriptions: SubscriptionRecord[],
   thresholds: Thresholds,
   configAt: (change: Change) => TelemetryConfig,
   now: string,
 ): RepositorySignals {
+  const allocation = computeAllocation(facts, sessions, subscriptions, now);
+  const operators = computeOperators(facts, sessions, allocation);
   const cycleTime = distribution(facts, (timing) => timing.cycleTimeSeconds);
   const waitTime = distribution(facts, (timing) => timing.waitTimeSeconds);
   const nowMs = Date.parse(now);
@@ -825,7 +1220,9 @@ export function computeSignals(
     dora,
     trends,
     costClasses,
+    operators,
     coverage,
+    allocation,
     signals,
   };
 }

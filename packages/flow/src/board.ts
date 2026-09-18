@@ -93,6 +93,59 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   lines.push(
     `  coverage: ${signals.coverage.agent} with an agent session, ${signals.coverage.humanOnly} human-only, ${signals.coverage.undeclared} undeclared, ${signals.coverage.unreported} unreported of ${signals.coverage.total}`,
   );
+  const allocation = signals.allocation;
+  const money = (amount: number, currency: string) =>
+    currency === 'USD'
+      ? `$${amount.toFixed(2)}`
+      : `${amount.toFixed(2)} ${currency}`;
+  lines.push(
+    `  subscription spend (allocated by ${allocation.basis}): ${
+      allocation.periods
+        .map(
+          (period) =>
+            `${period.period} ${period.planId} ${money(period.amount, period.currency)}${period.overageAmount ? ` + ${money(period.overageAmount, period.currency)} overage` : ''} over ${period.allocated} sessions${period.excludedNoAgentSeconds ? `, ${period.excludedNoAgentSeconds} with no agent seconds` : ''}${period.unallocated ? ' (unallocated)' : period.provisional ? ' (provisional)' : ''}`,
+        )
+        .join('; ') || 'no period record'
+    } [${allocation.trust.join(', ')}]`,
+  );
+  for (const [currency, aggregates] of Object.entries(allocation.currencies)) {
+    lines.push(
+      `  allocated total ${currency}: ${money(aggregates.total.amount + aggregates.total.overage, currency)} over ${aggregates.total.sessions} sessions${aggregates.total.provisional ? ' (provisional)' : ''}; cites: ${aggregates.total.cites.join(' ') || '(none)'}`,
+    );
+    for (const [spec, spend] of Object.entries(aggregates.bySpec)) {
+      lines.push(
+        `  allocated by spec ${spec}: ${money(spend.amount + spend.overage, currency)} over ${spend.sessions} sessions`,
+      );
+    }
+  }
+  lines.push(
+    `  allocation excluded: ${allocation.excluded.noAgentSeconds} sessions with no agent seconds, ${allocation.excluded.noPeriodRecord} with no period record, ${allocation.excluded.invalidSession} invalid sessions, ${allocation.excluded.invalidRecord} invalid records (counted, never zeroed)`,
+  );
+  // The operator dimension: agents in the subscription's currency, humans in hours. Kept as separate lines
+  // because the two units are never summed — no record holds a rate that could combine them.
+  const operators = signals.operators;
+  for (const [key, agent] of Object.entries(operators.agents)) {
+    const amounts =
+      Object.entries(agent.currencies)
+        .map(([currency, amount]) =>
+          money(amount.amount + amount.overage, currency),
+        )
+        .join(' ') || 'no subscription period';
+    lines.push(
+      `  agent ${key}: ${amounts}${agent.provisional ? ' (provisional)' : ''}, ${(agent.inputTokens + agent.outputTokens).toLocaleString('en-US')} tokens over ${agent.sessions} sessions`,
+    );
+  }
+  for (const [id, human] of Object.entries(operators.humans)) {
+    lines.push(
+      `  operator ${id}: ${human.hours.toFixed(1)} h over ${human.sessions} sessions`,
+    );
+  }
+  if (Object.keys(operators.humans).length === 0) {
+    lines.push('  operator hours: none recorded');
+  }
+  lines.push(
+    `  operator excluded: ${operators.excluded.humanOnly} human-only changes, ${operators.excluded.noOperator} sessions without an operator identifier (counted, never zeroed) [${operators.trust.join(', ')}]`,
+  );
   lines.push(
     `  ${spendLine('spend total', signals.spend.total)} [${signals.spend.trust.join(', ')}]`,
   );

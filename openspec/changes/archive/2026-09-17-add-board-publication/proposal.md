@@ -27,8 +27,9 @@ stands means putting a private key into a workflow, which `Sync needs no platfor
   workflow can land while the repository is private and begin publishing when it is not.
 - Serialize deployments with a concurrency group, since a repository has one Pages site and a merge queue can
   otherwise race it.
-- Depend on `add-subscription-and-operator-spend`: until that change lands, every currency figure on the page
-  renders `$0.00` (`packages/capture/src/session.ts:132-137`), which is not a page worth publishing.
+- Publish what the records currently say: every currency figure on the page renders `$0.00`
+  (`packages/capture/src/session.ts:132-137`) until a subscription cost record exists, and the page says
+  so beside the figure rather than waiting for it.
 
 ## Dependencies
 

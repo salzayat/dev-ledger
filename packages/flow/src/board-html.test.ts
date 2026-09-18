@@ -6,6 +6,7 @@ import {
   mergeSquash,
   openPullRequest,
   sessionJson,
+  subscriptionJson,
   tag,
   trailered,
 } from './fixture.ts';
@@ -13,6 +14,7 @@ import { buildProjection } from './projection.ts';
 import { parseRegistry, webUrl } from './registry.ts';
 import { syncAll } from './sync.ts';
 import { mkdtempSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -210,7 +212,7 @@ test('the projection records the derived web URL, never the registry path', () =
   const projection = fixtureProjection();
   assert.equal(projection.repositories.fixture.webUrl, null);
   assert.equal(projection.repositories.gone.webUrl, null);
-  assert.equal(projection.schemaVersion, 4);
+  assert.equal(projection.schemaVersion, 5);
 });
 
 test('every panel carries trust classes, excluded counts, and citations', () => {
@@ -253,7 +255,7 @@ test('every panel carries trust classes, excluded counts, and citations', () => 
   assert.match(html, /Measured as of/);
 });
 
-test('text from the repository is escaped and no person dimension appears', () => {
+test('text from the repository is escaped and no identifier resolves to a person', () => {
   const html = renderBoardHtml(fixtureProjection());
   assert.doesNotMatch(html, /<first>/);
   const linked = renderBoardHtml(
@@ -270,7 +272,11 @@ test('text from the repository is escaped and no person dimension appears', () =
     escapeHtml('<a href="x">&\''),
     '&lt;a href=&quot;x&quot;&gt;&amp;&#39;',
   );
-  assert.doesNotMatch(html, /operator|author/i);
+  // The operator is a dimension now. The boundary that replaced the old prohibition is narrower and
+  // stricter about the thing that actually matters: nothing on the page resolves to a person.
+  assert.doesNotMatch(html, /author/i);
+  assert.doesNotMatch(html, /[a-z0-9._-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+  assert.doesNotMatch(html, /hourlyRate|salary|compensation/i);
 });
 
 test('spend on an unmerged pull request excludes a record with no figures rather than zeroing it', () => {
@@ -321,4 +327,68 @@ test('the queue and changes tables show spend, or say why there is none', () => 
   assert.doesNotMatch(undeclaredRow!, /\$0\.00/);
   const declaredRow = rows.find((row) => row.includes('feat(one)'));
   assert.match(declaredRow!, /\$0\.50/);
+});
+
+test('allocated subscription spend renders beside reported spend, with its class and provisional mark', () => {
+  const fixture = makeFixtureRepo();
+  const seed = openPullRequest(fixture, 'seed', [
+    ['feat(seed): seed', { 'seed.txt': 's' }],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const period = execFileSync('git', ['log', '-1', '--format=%cI'], {
+    cwd: fixture.dir,
+    encoding: 'utf8',
+  })
+    .trim()
+    .slice(0, 7);
+  const pull = openPullRequest(fixture, 'sub', [
+    [
+      trailered('feat(sub): on a plan', {
+        Spec: 'add-sub',
+        Session: 's-sub',
+        Change: 'c-s',
+      }),
+      {
+        'sub.txt': 's',
+        '.telemetry/sessions/x/s-sub.json': sessionJson('s-sub', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-max',
+          costUsd: 0,
+          startedAt: `${period}-02T09:00:00Z`,
+          endedAt: `${period}-02T10:00:00Z`,
+          agentRunSeconds: 1200,
+        }),
+        [`.telemetry/subscriptions/${period}/plan-max.json`]: subscriptionJson(
+          'plan-max',
+          period,
+          200,
+        ),
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    pull,
+    'feat(sub): on a plan',
+    'Spec: add-sub\nSession: s-sub',
+  );
+  const registry = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [{ name: 'fixture', url: fixture.dir }],
+    }),
+  ).registry;
+  const state = mkdtempSync(join(tmpdir(), 'dev-ledger-board-sub-'));
+  syncAll(state, registry);
+  const html = renderBoardHtml(buildProjection(state, registry));
+  assert.match(html, /<h3>Subscription spend<\/h3>/);
+  assert.match(html, /badge-allocated/);
+  assert.match(
+    html,
+    /\$200\.00 allocated <span class="dim">provisional<\/span>/,
+  );
+  assert.match(html, /<td><code>plan-max<\/code><\/td>/);
+  assert.match(html, /allocated across the sessions of each recorded period/);
+  assert.doesNotMatch(html, /<script/);
+  assert.doesNotMatch(html, /url\(/);
 });

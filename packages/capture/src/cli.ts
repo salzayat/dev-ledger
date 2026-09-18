@@ -9,6 +9,12 @@ import {
   validateSessionFile,
   type SessionInput,
 } from './session.ts';
+import {
+  SUBSCRIPTIONS_PATH,
+  buildSubscriptionFile,
+  subscriptionFilePath,
+  validateSubscriptionFile,
+} from './subscription.ts';
 import { validateMessage } from './trailers.ts';
 import {
   sumTranscriptUsage,
@@ -20,7 +26,8 @@ import {
 // package, so a repository can record sessions before the flow package exists.
 //   session start --id <id>          record the active session in local git configuration
 //   session end --payload <file|->   write the session file from the harness's figures and commit it
-//   validate [paths...]              validate session files against the schema
+//   subscription record ...          write a subscription cost record for one billing period and commit it
+//   validate [paths...]              validate session and subscription records against their schemas
 //   validate-message <file>          validate a commit message's subject and trailers
 
 export const CONFIG_PATH = 'telemetry.config.json';
@@ -102,11 +109,14 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(sort(value), null, 2) + '\n';
 }
 
-function sessionFiles(root: string, paths: string[]): string[] {
+function recordFiles(root: string, paths: string[]): string[] {
   if (paths.length > 0) {
     return paths.map((path) => resolve(root, path));
   }
-  if (!existsSync(join(root, '.telemetry', 'sessions'))) {
+  const present = [SESSIONS_PATH, SUBSCRIPTIONS_PATH].filter((path) =>
+    existsSync(join(root, path)),
+  );
+  if (present.length === 0) {
     return [];
   }
   return git(root, [
@@ -115,11 +125,24 @@ function sessionFiles(root: string, paths: string[]): string[] {
     '--others',
     '--exclude-standard',
     '--',
-    '.telemetry/sessions',
+    ...present,
   ])
     .split('\n')
     .filter((path) => path.endsWith('.json'))
     .map((path) => join(root, path));
+}
+
+/** Which schema a record file answers to, by where it lives. */
+function validateRecord(
+  root: string,
+  path: string,
+  value: unknown,
+  config: TelemetryConfig,
+): string[] {
+  const relative = path.startsWith(root) ? path.slice(root.length + 1) : path;
+  return relative.startsWith(`${SUBSCRIPTIONS_PATH}/`)
+    ? validateSubscriptionFile(value)
+    : validateSessionFile(value, config);
 }
 
 /**
@@ -326,13 +349,62 @@ export function captureMain(argv: string[]): number {
       );
       break;
     }
+    case 'subscription': {
+      if (args[0] !== 'record') {
+        fail(
+          'usage: telemetry subscription record --plan <id> --period <YYYY-MM> --amount <number> --currency <code> [--overage <number>] [--no-commit]',
+        );
+      }
+      const planId = option(args, '--plan');
+      const period = option(args, '--period');
+      const amount = Number(option(args, '--amount'));
+      const currency = option(args, '--currency');
+      const overage = option(args, '--overage');
+      if (!planId || !period || !currency || Number.isNaN(amount)) {
+        fail(
+          'subscription record requires --plan, --period, --amount, and --currency',
+        );
+      }
+      const file = buildSubscriptionFile({
+        planId,
+        period,
+        amount,
+        currency,
+        overageAmount: overage === undefined ? 0 : Number(overage),
+      });
+      const errors = validateSubscriptionFile(file);
+      if (errors.length > 0) {
+        fail(`subscription cost record is invalid:\n  ${errors.join('\n  ')}`);
+      }
+      const relative = subscriptionFilePath(file.planId, file.period);
+      const absolute = join(root, relative);
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(absolute, canonicalJson(file));
+      if (!args.includes('--no-commit')) {
+        git(root, ['add', '--', relative]);
+        git(root, [
+          'commit',
+          '--quiet',
+          '-m',
+          `chore(telemetry): record subscription ${file.planId} ${file.period}`,
+          '--',
+          relative,
+        ]);
+      }
+      process.stdout.write(`${relative}\n`);
+      return 0;
+    }
     case 'validate': {
       const config = loadConfig(root);
       let failed = 0;
-      for (const path of sessionFiles(root, args)) {
+      let checked = 0;
+      for (const path of recordFiles(root, args)) {
+        checked += 1;
         let errors: string[];
         try {
-          errors = validateSessionFile(
+          errors = validateRecord(
+            root,
+            path,
             JSON.parse(readFileSync(path, 'utf8')),
             config,
           );
@@ -347,7 +419,7 @@ export function captureMain(argv: string[]): number {
       if (failed > 0) {
         return 1;
       }
-      process.stdout.write('session files valid\n');
+      process.stdout.write(`${checked} records valid\n`);
       return 0;
     }
     case 'validate-message': {

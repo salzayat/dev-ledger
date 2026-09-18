@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { renderBoard } from './board.ts';
+import { renderBoardHtml } from './board-html.ts';
 import { advanceCursor } from './cursor.ts';
 import {
   commit,
@@ -16,6 +17,7 @@ import {
   mergeSquash,
   openPullRequest,
   sessionJson,
+  subscriptionJson,
   tag,
   trailered,
 } from './fixture.ts';
@@ -563,7 +565,91 @@ test('the board renders an empty state and never a person dimension', () => {
   const { projection } = build(registryFor(fixture.dir));
   const text = renderBoard(projection);
   assert.match(text, /no changes on the default branch yet|cycle time/);
-  assert.doesNotMatch(text, /operator|author/i);
+  // The operator dimension is now a read, so the board may name an operator. What it must never do is
+  // resolve one to a person: no name, no email address, no author.
+  assert.doesNotMatch(text, /author|@[a-z0-9.-]+\.[a-z]{2,}/i);
+});
+
+test('the operator dimension keeps agents in currency, humans in hours, and neither in the other', () => {
+  const fixture = makeFixtureRepo();
+  writeFiles(fixture, {
+    'telemetry.config.json': JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: ['op-1'],
+        costClasses: ['rd', 'production'],
+      },
+    }),
+  });
+  commit(fixture, 'chore(repo): enable cost allocation', {});
+
+  const worked = openPullRequest(fixture, 'w1', [
+    [
+      trailered('feat(w): agent and human', {
+        Session: 's-op',
+        Change: 'c-w1',
+      }),
+      {
+        'src/w.ts': 'v1',
+        '.telemetry/subscriptions/2026-09/plan-x.json': subscriptionJson(
+          'plan-x',
+          '2026-09',
+          100,
+        ),
+        '.telemetry/sessions/2026-09/s-op.json': sessionJson('s-op', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-x',
+          costUsd: 0,
+          agentRunSeconds: 3600,
+          operatorActiveSeconds: 5400,
+          operatorActiveAlgorithm: 'idle-cap-v1:900',
+          operatorId: 'op-1',
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, worked, 'feat(w): agent and human', 'Session: s-op', {
+    hours: 24,
+  });
+
+  // A change declaring human-only work has hours no record holds: excluded and counted, never zero.
+  const alone = openPullRequest(fixture, 'h1', [
+    [
+      trailered('docs(h): by hand', { Session: 'none', Change: 'c-h1' }),
+      { 'docs/h.md': 'hand' },
+    ],
+  ]);
+  mergeSquash(fixture, alone, 'docs(h): by hand', 'Session: none', {
+    hours: 24,
+  });
+
+  const { repo, projection } = build(registryFor(fixture.dir));
+  const operators = repo.signals.operators;
+
+  // The human is measured in hours, from operatorActiveSeconds alone.
+  assert.ok(operators.humans['op-1'], 'the declared operator is a dimension');
+  assert.equal(operators.humans['op-1'].hours, 1.5);
+  assert.equal(operators.humans['op-1'].sessions, 1);
+
+  // The agent is measured in the subscription's currency: the sole eligible session takes the whole period.
+  const agent = operators.agents['provider-a/model-x'];
+  assert.ok(agent, 'the agent operator is a dimension');
+  assert.equal(agent.currencies.USD.amount, 100);
+
+  // Human-only work is counted as an exclusion rather than read as an operator working no hours.
+  assert.equal(operators.excluded.humanOnly, 1);
+
+  // No figure crosses the two units, and no identifier resolves to a person.
+  const html = renderBoardHtml(projection);
+  assert.match(html, /op-1/);
+  assert.match(html, /1\.5 h/);
+  assert.doesNotMatch(html, /\$[0-9.]+\s*(<[^>]*>)?\s*(per hour|\/ ?h\b)/i);
+  assert.doesNotMatch(html, /hourlyRate|salary|compensation/i);
+  // The operator's own row carries hours and never a currency amount.
+  const row = html.slice(html.indexOf('>op-1<'), html.indexOf('>op-1<') + 400);
+  assert.doesNotMatch(row, /\$/);
 });
 
 test('a projection built over many synthetic changes stays well under a minute', () => {
@@ -802,5 +888,191 @@ test('an escape after the newest release yields a failure rate and a time to fix
   assert.match(
     dora.timeToFix.note,
     /restore in production would need a deployment record/,
+  );
+});
+
+test('subscription spend is allocated by agent run seconds, excluded and counted, and provisional while open', () => {
+  const fixture = makeFixtureRepo();
+  // The open period is the month of the newest commit the mirror will hold; the closed one is well before.
+  const first = openPullRequest(fixture, 'seed', [
+    ['feat(seed): seed', { 'seed.txt': 's' }],
+  ]);
+  mergeSquash(fixture, first, 'feat(seed): seed');
+  const openPeriod = git(fixture.dir, ['log', '-1', '--format=%cI'])
+    .trim()
+    .slice(0, 7);
+  const sub = (
+    id: string,
+    endedAt: string,
+    agentRunSeconds: number,
+    extra: Record<string, unknown> = {},
+  ) =>
+    sessionJson(id, {
+      billingKind: 'subscription',
+      subscriptionId: 'plan-max',
+      costUsd: 0,
+      endedAt,
+      startedAt: endedAt,
+      agentRunSeconds,
+      ...extra,
+    });
+  const work = openPullRequest(fixture, 'work', [
+    [
+      trailered('feat(work): allocated', {
+        Spec: 'add-work',
+        Session: 's-a',
+        Change: 'c-w',
+      }),
+      {
+        'work.txt': 'w',
+        '.telemetry/sessions/x/s-a.json': sub(
+          's-a',
+          `${openPeriod}-02T10:00:00Z`,
+          1800,
+        ),
+        '.telemetry/sessions/x/s-b.json': sub(
+          's-b',
+          `${openPeriod}-03T10:00:00Z`,
+          600,
+          {
+            figuresMissing: true,
+            inputTokens: 0,
+            outputTokens: 0,
+            cachedTokens: 0,
+          },
+        ),
+        '.telemetry/sessions/x/s-c.json': sub(
+          's-c',
+          `${openPeriod}-04T10:00:00Z`,
+          0,
+        ),
+        '.telemetry/sessions/x/s-old.json': sub(
+          's-old',
+          '2026-01-15T10:00:00Z',
+          100,
+        ),
+        '.telemetry/sessions/x/s-idle.json': sub(
+          's-idle',
+          '2025-12-15T10:00:00Z',
+          0,
+        ),
+        '.telemetry/sessions/x/s-none.json': sub(
+          's-none',
+          '2025-11-15T10:00:00Z',
+          500,
+        ),
+        [`.telemetry/subscriptions/${openPeriod}/plan-max.json`]:
+          subscriptionJson('plan-max', openPeriod, 240, { overageAmount: 24 }),
+        '.telemetry/subscriptions/2026-01/plan-max.json': subscriptionJson(
+          'plan-max',
+          '2026-01',
+          100,
+        ),
+        '.telemetry/subscriptions/2025-12/plan-max.json': subscriptionJson(
+          'plan-max',
+          '2025-12',
+          50,
+        ),
+        '.telemetry/subscriptions/2025-10/bad.json':
+          '{"schemaVersion":1,"salary":1}',
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    work,
+    'feat(work): allocated',
+    'Spec: add-work\nSession: s-a\nSession: s-b\nSession: s-c\nSession: s-old\nSession: s-idle\nSession: s-none',
+  );
+  openPullRequest(fixture, 'waiting', [
+    [
+      trailered('feat(waiting): unmerged', { Session: 's-u', Change: 'c-u' }),
+      {
+        'u.txt': 'u',
+        '.telemetry/sessions/x/s-u.json': sub(
+          's-u',
+          `${openPeriod}-05T10:00:00Z`,
+          600,
+        ),
+      },
+    ],
+  ]);
+  const built = build(registryFor(fixture.dir));
+  const allocation = built.repo.signals!.allocation;
+  assert.deepEqual(allocation.trust, ['allocated']);
+  assert.equal(allocation.basis, 'agentRunSeconds');
+  // 240 over 1800 + 600 + 600 agent seconds: 144, 48, 48; overage 24 the same way.
+  assert.deepEqual(
+    ['s-a', 's-b', 's-u'].map((id) => [
+      allocation.bySession[id].amount,
+      allocation.bySession[id].overage,
+    ]),
+    [
+      [144, 14.4],
+      [48, 4.8],
+      [48, 4.8],
+    ],
+  );
+  assert.equal(
+    allocation.bySession['s-c'],
+    undefined,
+    'no agent seconds, no share',
+  );
+  assert.equal(
+    allocation.bySession['s-none'],
+    undefined,
+    'no period record, no share',
+  );
+  const open = allocation.periods.find(
+    (period) => period.period === openPeriod,
+  )!;
+  assert.equal(open.provisional, true);
+  assert.equal(open.allocated, 3);
+  assert.equal(open.excludedNoAgentSeconds, 1);
+  assert.ok(
+    open.cites.includes(`.telemetry/subscriptions/${openPeriod}/plan-max.json`),
+  );
+  const closed = allocation.periods.find(
+    (period) => period.period === '2026-01',
+  )!;
+  assert.equal(closed.provisional, false);
+  assert.equal(allocation.bySession['s-old'].amount, 100);
+  const idle = allocation.periods.find(
+    (period) => period.period === '2025-12',
+  )!;
+  assert.equal(idle.unallocated, true);
+  assert.equal(idle.allocated, 0);
+  assert.deepEqual(allocation.excluded, {
+    noAgentSeconds: 2,
+    noPeriodRecord: 1,
+    invalidSession: 0,
+    invalidRecord: 1,
+  });
+  const usd = allocation.currencies.USD;
+  assert.equal(usd.total.amount, 340);
+  assert.equal(usd.total.overage, 24);
+  assert.equal(usd.total.provisional, true);
+  assert.equal(usd.bySpec['add-work'].amount, 292);
+  assert.equal(usd.perUnmergedPullRequest[String(3)].amount, 48);
+  assert.equal(usd.unmergedPullRequests.sessions, 1);
+  // A record with missing figures took its share and is still excluded from reported figures.
+  assert.equal(built.repo.signals!.spend.excluded.missingFigures, 1);
+  assert.ok(
+    usd.byChange[work.mergedAs!].cites.includes(
+      '.telemetry/sessions/x/s-b.json',
+    ),
+  );
+  assert.equal(built.repo.subscriptions.length, 4);
+  const board = renderBoard(built.projection);
+  assert.match(board, /subscription spend \(allocated by agentRunSeconds\)/);
+  assert.match(
+    board,
+    /allocated total USD: \$364\.00 over 4 sessions \(provisional\)/,
+  );
+  // Deterministic: the same records rebuild byte-identically.
+  const again = build(registryFor(fixture.dir));
+  assert.equal(
+    canonicalJson(built.projection),
+    canonicalJson(again.projection),
   );
 });

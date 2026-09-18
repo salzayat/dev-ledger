@@ -1,0 +1,26 @@
+{
+  "agentRunSeconds": 900,
+  "billingKind": "subscription",
+  "branch": "openspec/archive-board-publication",
+  "cachedTokens": 142441864,
+  "commits": [
+    "76ce5a8ddcc3fbf0d157f07ba1a759913edab6e6"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T02:50:00Z",
+  "figuresSource": "summed from 289 messages in the session transcript",
+  "inputTokens": 7994,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 551547,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-publication-archive",
+  "spec": "add-board-publication",
+  "startedAt": "2026-09-18T02:30:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 1200
+}
