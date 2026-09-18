@@ -52,9 +52,11 @@ record no declaration covers, every session naming a plan that does not exist, a
 each beside the command that closes it, turns a silent `noPeriodRecord` exclusion into a worklist. That is a
 read over the projection, and it changes nothing about what the page is.
 
-A surface that genuinely edits configuration would be a local program — a command, or a local-only server
-that is not the published page — and it belongs in its own change, where the authority it needs can be
-argued on its own terms rather than smuggled into a dashboard.
+A surface that genuinely edits configuration is a local program — a command, or a local-only server that is
+not the published page — and it is `add-local-configuration-surface`, drafted alongside this one so the
+authority it needs is argued on its own terms rather than smuggled into a dashboard. The split there is
+containment rather than visibility: the published artifact carries no editing markup at all, so it cannot be
+made to reveal an editor it never held.
 
 ## Open question: binding a session to a plan when a team shares agents
 

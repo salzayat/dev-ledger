@@ -29,6 +29,7 @@ contract.
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
 | Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Pending  |
 | Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Pending  |
+| Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Blocked  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
@@ -138,6 +139,15 @@ allocated spend and not the metered spend a pay-per-token provider reports direc
 a currency in its field name, and cached tokens are one number defined as one provider's reads plus writes.
 It is selected after the allocated token rate row, which it sits beside and whose denominator rule it
 follows; that change is still in an open pull request rather than on the default branch.
+
+The local configuration surface row gives an operator running this repository on their own machine what the
+published page cannot have. The Board's configuration panel names gaps and the commands that close them
+because a static file on a hosting surface has nothing for a form to submit to; an operator with a working
+copy and a shell has no such limit, and retyping a command in another window is friction with no safety
+behind it. The split is containment rather than visibility: the published artifact carries no editing markup
+at all, so a deployment cannot be made to reveal an editor it never held, and the local server binds
+loopback, writes only plan declarations and cost records, and never commits. It is `Blocked` behind the
+subscription declarations row, which defines what it edits.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

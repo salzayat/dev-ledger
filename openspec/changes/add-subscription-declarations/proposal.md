@@ -44,8 +44,8 @@ required first.
   intention alone.
 - No editing from the published dashboard. The Board "SHALL read only from the projection"
   (`openspec/specs/flow-observability/spec.md:410`) and its page carries "no script element and no external
-  resource" (`:413`), so it reports configuration and names the commands rather than changing anything. A
-  local editing surface would be a different program and needs its own change.
+  resource" (`:413`), so it reports configuration and names the commands rather than changing anything.
+  Editing from a locally served surface is `add-local-configuration-surface`, which depends on this change.
 - No price table and no provider API call. A unit amount is entered by the operator, as the record's amount
   already is.
 - No change to the allocation basis, which stays agent run seconds, or to how a period's amount is
