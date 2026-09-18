@@ -1,0 +1,7 @@
+{
+  "at": "2026-09-18T18:00:00Z",
+  "figure": "dora",
+  "noteId": "one-release",
+  "schemaVersion": 1,
+  "text": "One tag, v0.1.0, so releases per week has no window to divide by; lead time to release is the release lag, not the review queue."
+}

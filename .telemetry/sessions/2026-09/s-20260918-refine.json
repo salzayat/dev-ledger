@@ -1,0 +1,33 @@
+{
+  "agentAutonomousSeconds": 13217,
+  "agentRunSeconds": 5400,
+  "billingKind": "subscription",
+  "branch": "refine/ledger-after-review",
+  "cacheReadTokens": 194813579,
+  "cacheWriteTokens": 2006075,
+  "cachedTokens": 196819654,
+  "commits": [
+    "9f0b072e863d7641bfde1f6b66c14b3838b59807"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T17:46:16.846Z",
+  "figuresSource": "summed from 404 messages in the session transcript",
+  "idleSeconds": 56426,
+  "inputTokens": 11335,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorActiveAlgorithm": "prompt-attribution-v1:900",
+  "operatorActiveSeconds": 13389,
+  "operatorId": null,
+  "outputTokens": 763738,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-refine",
+  "spec": "refine-ledger-after-review",
+  "startedAt": "2026-09-18T17:31:34.365Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 882
+}

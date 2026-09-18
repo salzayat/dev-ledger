@@ -1,0 +1,7 @@
+{
+  "at": "2026-09-18T18:00:00Z",
+  "figure": "coverage",
+  "noteId": "human-only-default",
+  "schemaVersion": 1,
+  "text": "Changes that read human-only before the trailer default was removed were committed after their session ended, when the hook still wrote Session: none. A record says what was reported at the time."
+}

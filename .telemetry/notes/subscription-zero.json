@@ -1,0 +1,8 @@
+{
+  "at": "2026-09-18T18:00:00Z",
+  "figure": "spend",
+  "noteId": "subscription-zero",
+  "period": "2026-09",
+  "schemaVersion": 1,
+  "text": "Every session runs on a subscription, so no record carries a marginal cost. Reported spend is $0.00; the allocated figure is the plan's September cost apportioned by agent run seconds, provisional until the month closes."
+}

@@ -39,6 +39,10 @@ export type RegistryEntry = {
   reworkIgnore: string[];
   /** An explicit browsable URL, for a remote whose host is an SSH alias the derivation cannot read. */
   webUrl: string | null;
+  /** Changes merged before this instant predate the instrumentation and are excluded with that reason. */
+  measuredFrom: string | null;
+  /** Pull requests an operator declares closed, which git cannot see; they leave the queue with that reason. */
+  closedPullRequests: number[];
 };
 
 export type Registry = {
@@ -127,6 +131,30 @@ export function parseRegistry(text: string): {
         errors.push(`${label}.thresholds.${key} must be a non-negative number`);
       }
     }
+    let measuredFrom: string | null = null;
+    if (record.measuredFrom !== undefined) {
+      if (
+        typeof record.measuredFrom === 'string' &&
+        !Number.isNaN(Date.parse(record.measuredFrom))
+      ) {
+        measuredFrom = new Date(record.measuredFrom).toISOString();
+      } else {
+        errors.push(`${label}.measuredFrom must be an ISO 8601 date`);
+      }
+    }
+    const closedPullRequests: number[] = [];
+    if (record.closedPullRequests !== undefined) {
+      if (
+        Array.isArray(record.closedPullRequests) &&
+        record.closedPullRequests.every(
+          (n) => Number.isInteger(n) && (n as number) > 0,
+        )
+      ) {
+        closedPullRequests.push(...(record.closedPullRequests as number[]));
+      } else {
+        errors.push(`${label}.closedPullRequests must be positive integers`);
+      }
+    }
     let explicitWebUrl: string | null = null;
     if (record.webUrl !== undefined) {
       if (
@@ -166,6 +194,8 @@ export function parseRegistry(text: string): {
       thresholds,
       reworkIgnore,
       webUrl: explicitWebUrl,
+      measuredFrom,
+      closedPullRequests,
     });
   });
   return {

@@ -327,6 +327,9 @@ if [ -n "$session_values" ]; then
 "
   done
 fi
+# An override is recorded where the workflow's declared check reads it, so undeclared on purpose is visible.
+[ "$allow_undeclared" = true ] && [ -z "$session_values" ] && trailer_block="${trailer_block}Session: undeclared
+"
 points_value=$(git config --get "branch.$pr_branch.telemetry-story-points" 2>/dev/null || true)
 [ -n "$points_value" ] && trailer_block="${trailer_block}Story-Points: ${points_value}
 "
