@@ -3,13 +3,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { DEFAULT_CONFIG, parseConfig, type TelemetryConfig } from './config.ts';
 import {
-  computeOperatorActiveSeconds,
+  attributeTranscriptTime,
   SESSIONS_PATH,
   buildSessionFile,
   sessionFilePath,
   validateSessionFile,
   type SessionInput,
-  IDLE_CAP_ALGORITHM,
+  ATTRIBUTION_ALGORITHM,
+  type TimeAttribution,
 } from './session.ts';
 import {
   SUBSCRIPTIONS_PATH,
@@ -19,7 +20,7 @@ import {
 } from './subscription.ts';
 import { validateMessage } from './trailers.ts';
 import {
-  operatorPromptTimes,
+  transcriptEvents,
   sumTranscriptUsage,
   transcriptFiguresSource,
   type Figures,
@@ -241,11 +242,11 @@ function readTranscriptFigures(
  * leaves the figure absent rather than zero: one prompt measures no engagement, and a zero would claim the
  * operator was present for none of a session they started.
  */
-function readTranscriptOperatorSeconds(
+function readTranscriptAttribution(
   root: string,
   path: string | undefined,
   idleCapSeconds: number,
-): number | null {
+): TimeAttribution | null {
   if (!path) {
     return null;
   }
@@ -253,11 +254,11 @@ function readTranscriptOperatorSeconds(
   if (!existsSync(absolute)) {
     return null;
   }
-  const times = operatorPromptTimes(readFileSync(absolute, 'utf8'));
-  if (times.length < 2) {
+  const events = transcriptEvents(readFileSync(absolute, 'utf8'));
+  if (events.filter((event) => event.kind === 'prompt').length < 2) {
     return null;
   }
-  return computeOperatorActiveSeconds(times, idleCapSeconds);
+  return attributeTranscriptTime(events, idleCapSeconds);
 }
 
 export function captureMain(argv: string[]): number {
@@ -287,8 +288,8 @@ export function captureMain(argv: string[]): number {
           );
         }
         const config = loadConfig(root);
-        const operatorSeconds = config.costAllocation.enabled
-          ? readTranscriptOperatorSeconds(
+        const attribution = config.costAllocation.enabled
+          ? readTranscriptAttribution(
               root,
               option(args, '--transcript'),
               config.costAllocation.idleCapSeconds,
@@ -299,11 +300,13 @@ export function captureMain(argv: string[]): number {
             cachedTokens: figures.cachedTokens,
             figuresSource: transcriptFiguresSource(figures),
             inputTokens: figures.inputTokens,
-            ...(operatorSeconds === null
+            ...(attribution === null
               ? {}
               : {
-                  operatorActiveAlgorithm: `${IDLE_CAP_ALGORITHM}:${config.costAllocation.idleCapSeconds}`,
-                  operatorActiveSeconds: operatorSeconds,
+                  agentAutonomousSeconds: attribution.agentAutonomousSeconds,
+                  idleSeconds: attribution.idleSeconds,
+                  operatorActiveAlgorithm: `${ATTRIBUTION_ALGORITHM}:${config.costAllocation.idleCapSeconds}`,
+                  operatorActiveSeconds: attribution.operatorActiveSeconds,
                 }),
             outputTokens: figures.outputTokens,
           }),
@@ -343,13 +346,16 @@ export function captureMain(argv: string[]): number {
             config.costAllocation.enabled &&
             input.operatorActiveSeconds === undefined
           ) {
-            const seconds = readTranscriptOperatorSeconds(
+            const attribution = readTranscriptAttribution(
               root,
               transcript,
               config.costAllocation.idleCapSeconds,
             );
-            if (seconds !== null) {
-              input.operatorActiveSeconds = seconds;
+            if (attribution !== null) {
+              input.operatorActiveSeconds = attribution.operatorActiveSeconds;
+              input.agentAutonomousSeconds ??=
+                attribution.agentAutonomousSeconds;
+              input.idleSeconds ??= attribution.idleSeconds;
             }
           }
         }

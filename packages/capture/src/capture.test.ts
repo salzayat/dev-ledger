@@ -3,6 +3,7 @@ import test from 'node:test';
 import { DEFAULT_CONFIG, parseConfig } from './config.ts';
 import {
   buildSessionFile,
+  attributeTranscriptTime,
   computeOperatorActiveSeconds,
   sessionFilePath,
   validateSessionFile,
@@ -51,6 +52,48 @@ const baseSession = {
   commits: ['abc'],
   localCheck: { outcome: 'passed', command: 'npm run check' },
 };
+
+test('time between prompts splits into operator, autonomous, and idle', () => {
+  // 10:00 prompt; the agent works until 10:40; the operator reads and replies at 10:45.
+  // Then a second prompt at 11:30 with no agent activity between: the thread sat open.
+  const events = [
+    { timestamp: '2026-09-18T10:00:00Z', kind: 'prompt' as const },
+    { timestamp: '2026-09-18T10:20:00Z', kind: 'agent' as const },
+    { timestamp: '2026-09-18T10:40:00Z', kind: 'agent' as const },
+    { timestamp: '2026-09-18T10:45:00Z', kind: 'prompt' as const },
+    { timestamp: '2026-09-18T11:30:00Z', kind: 'prompt' as const },
+  ];
+  const split = attributeTranscriptTime(events, 900);
+
+  // First gap: 40 minutes autonomous, then 5 minutes of a person reading and typing.
+  // Second gap: 45 minutes with nobody producing — 15 capped as the operator, 30 idle.
+  assert.equal(split.agentAutonomousSeconds, 40 * 60);
+  assert.equal(split.operatorActiveSeconds, 5 * 60 + 15 * 60);
+  assert.equal(split.idleSeconds, 30 * 60);
+
+  // The three account for the whole span between first and last prompt, which is what makes them checkable.
+  const span = 90 * 60;
+  assert.equal(
+    split.agentAutonomousSeconds +
+      split.operatorActiveSeconds +
+      split.idleSeconds,
+    span,
+  );
+
+  // A flat cap over the same gaps cannot tell the agent's 40 minutes from the person's 5.
+  assert.equal(
+    computeOperatorActiveSeconds(
+      events.filter((event) => event.kind === 'prompt').map((e) => e.timestamp),
+      900,
+    ),
+    30 * 60,
+    'the flat cap charges the unattended agent run to the operator',
+  );
+  assert.ok(
+    split.operatorActiveSeconds < 30 * 60,
+    'attribution reports less man time than the flat cap, because it knows who was producing',
+  );
+});
 
 test('operator hours count prompts and never tool results', () => {
   // Shaped like a real transcript: a prompt, a long unattended agent turn whose tool results come back as

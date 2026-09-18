@@ -27,7 +27,12 @@ present for every file read.
 
 ## What Changes
 
-- Derive operator active seconds from a session transcript's human prompts: a `type: "user"` record whose
+- Attribute the span between consecutive prompts three ways rather than capping it whole: agent autonomous
+  time up to the last agent record, operator time after it under the idle cap, and idle beyond that. Record
+  all three, so man hours exclude unattended agent runs and the figures sum to the span.
+- Report man hours beside tokens as an expense in their own unit, per change and per unmerged pull request,
+  so a pull request an operator was present for shows what that presence cost in time.
+- Derive the prompts a span is measured between from a session transcript: a `type: "user"` record whose
   content is a string, or whose content blocks are all `text`. A record carrying a `tool_result` block is
   harness traffic and SHALL NOT count as an operator event.
 - Emit `operatorActiveSeconds` and `operatorActiveAlgorithm` from

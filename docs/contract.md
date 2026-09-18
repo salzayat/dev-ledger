@@ -47,9 +47,13 @@ cache writes, and cost is never derived from a price table.
 The same transcript gives the operator's hours. A human prompt is a user-addressed record whose content is a
 string or whose blocks are all text; a record carrying a tool result is the harness returning its own output
 to the model and is not an operator event, so an unattended agent turn does not read as someone sitting
-there. The gaps between consecutive prompts are summed under the configured idle cap and recorded with the
-algorithm's identifier, which is why a session spanning 1.37 hours with a long agent run in the middle
-records 1.28. Fewer than two prompts leaves the figure absent rather than zero, and nothing but timestamps is
+there. The span between consecutive prompts is then split three ways rather than
+capped whole. Up to the last agent record in that span the agent was producing on its own; after it the
+person was reading, thinking, and typing; and beyond the idle cap the thread was simply left open. So a
+session spanning 1.37 hours with a long agent run in the middle records 0.42 hours of man time, 0.95
+autonomous, and no idle — where capping the whole span would have recorded 1.28 hours of man time and
+charged the agent's work to the person. Across this repository's own transcripts that difference is about
+1.75 times. Fewer than two prompts leaves the figure absent rather than zero, and nothing but timestamps is
 read. A transcript with no usage record leaves the
 session recorded as missing figures rather than as zeros. Every session record in the projection carries `producer: harness` and `trust: reported`.
 

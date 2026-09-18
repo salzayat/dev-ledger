@@ -117,8 +117,13 @@ that is absent, unreadable, or carries no usage record SHALL leave the session r
 rather than as zeros. Operator active seconds SHALL be derived from the operator's own prompts in that
 transcript: a record addressed from the user whose content is a string, or whose content blocks are all
 text. A record carrying a tool result is harness traffic and SHALL NOT count as an operator event, so an
-unattended agent turn SHALL NOT read as operator presence. The gaps between consecutive prompts SHALL be
-summed under the configured idle cap and recorded with the algorithm's identifier. A transcript with
+unattended agent turn SHALL NOT read as operator presence. The span between consecutive prompts SHALL be attributed
+rather than capped whole: the time up to the last agent record in that span is the agent working
+autonomously, the remainder is the operator, and the part of that remainder beyond the configured idle cap
+is the thread sitting idle. The three SHALL sum to the span between the first and last prompt, and SHALL be
+recorded alongside each other with the algorithm's identifier, so a reader can check them. Attributing the
+whole span to the operator instead would charge an unattended agent run to a person; over this repository's
+own transcripts that reads about 1.75 times the man hours actually worked. A transcript with
 fewer than two prompts SHALL leave the figure absent rather than recording zero. Nothing but timestamps
 SHALL be read for this figure. A transcript SHALL only fill figures the payload omits, and SHALL NOT override a
 figure the harness stated. When the transcript supplied any figure, the record's `figuresSource` SHALL name
@@ -170,3 +175,20 @@ the transcript as the source; when the payload stated every figure, its own sour
 - WHEN operator active seconds are derived
 - THEN only timestamps MUST be read
 - AND no transcript content MUST enter the session record
+
+#### Scenario: An unattended agent run is not man hours
+
+- GIVEN a span between two prompts in which the agent produced records for forty minutes and the operator
+  replied five minutes after the last of them
+- WHEN the span is attributed
+- THEN forty minutes MUST be recorded as agent autonomous time
+- AND five minutes MUST be recorded as operator time
+- AND no part of the agent's forty minutes MUST be counted as man hours
+
+#### Scenario: A thread left open is idle, not worked
+
+- GIVEN a span of forty-five minutes between two prompts in which no agent record appears, under a fifteen
+  minute idle cap
+- WHEN the span is attributed
+- THEN fifteen minutes MUST be recorded as operator time
+- AND thirty minutes MUST be recorded as idle

@@ -140,8 +140,10 @@ a change, and you cannot see that division while instrumenting one side of it.
 
 The two are measured in different units on purpose. An agent's consumption of a paid plan is denominated in
 the currency the plan is billed in. A human's effort is denominated in hours, from `operatorActiveSeconds`
-under its idle cap — the time they spent prompting in the message thread, derived from their own prompts
-in the session transcript and never from the harness's tool traffic — and is never multiplied by a rate. No record in this repository can hold one: `rate`,
+under its idle cap — the time they spent working the thread, derived from their own prompts in the session
+transcript, with the agent's autonomous runs and the thread's idle stretches attributed away from them —
+and is never multiplied by a rate. Man hours are reported beside tokens as a second expense, per change
+and per unmerged pull request, in hours and never in money. No record in this repository can hold one: `rate`,
 `hourlyRate`, `salary`, and `compensation` are rejected by the session schema, so there is nothing to
 convert hours into money with, and the two figures are never summed.
 

@@ -86,7 +86,23 @@ export function transcriptFiguresSource(figures: Figures): string {
  * text.
  */
 export function operatorPromptTimes(text: string): string[] {
-  const times: string[] = [];
+  return transcriptEvents(text)
+    .filter((event) => event.kind === 'prompt')
+    .map((event) => event.timestamp);
+}
+
+export type TranscriptEvent = {
+  timestamp: string;
+  kind: 'prompt' | 'agent';
+};
+
+/**
+ * Every timestamped transcript record, split into the two things that can produce one: the operator, who
+ * writes prompts, and the harness, which writes assistant messages and feeds tool results back to the
+ * model. A user-addressed record carrying a tool result is harness traffic, not a person.
+ */
+export function transcriptEvents(text: string): TranscriptEvent[] {
+  const events: TranscriptEvent[] = [];
   for (const line of text.split('\n')) {
     if (line.trim().length === 0) {
       continue;
@@ -101,27 +117,31 @@ export function operatorPromptTimes(text: string): string[] {
     } catch {
       continue;
     }
-    if (record.type !== 'user' || typeof record.timestamp !== 'string') {
+    if (
+      (record.type !== 'user' && record.type !== 'assistant') ||
+      typeof record.timestamp !== 'string' ||
+      Number.isNaN(Date.parse(record.timestamp))
+    ) {
       continue;
     }
     const content = record.message?.content;
     const prompt =
-      typeof content === 'string' ||
-      (Array.isArray(content) &&
-        content.length > 0 &&
-        content.every(
-          (block) =>
-            typeof block === 'object' &&
-            block !== null &&
-            (block as { type?: unknown }).type === 'text',
-        ));
-    if (!prompt) {
-      continue;
-    }
-    if (Number.isNaN(Date.parse(record.timestamp))) {
-      continue;
-    }
-    times.push(record.timestamp);
+      record.type === 'user' &&
+      (typeof content === 'string' ||
+        (Array.isArray(content) &&
+          content.length > 0 &&
+          content.every(
+            (block) =>
+              typeof block === 'object' &&
+              block !== null &&
+              (block as { type?: unknown }).type === 'text',
+          )));
+    events.push({
+      timestamp: record.timestamp,
+      kind: prompt ? 'prompt' : 'agent',
+    });
   }
-  return times;
+  return events.sort(
+    (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp),
+  );
 }
