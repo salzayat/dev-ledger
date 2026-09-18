@@ -29,6 +29,7 @@ import {
 // The capture command line: what the hooks and the harness call. It needs nothing but git and this
 // package, so a repository can record sessions before the flow package exists.
 //   session start --id <id>          record the active session in local git configuration
+//   session human-only [--clear]     declare this branch human-only, so its commits carry Session: none
 //   session end --payload <file|->   write the session file from the harness's figures and commit it
 //   subscription record ...          write a subscription cost record for one billing period and commit it
 //   validate [paths...]              validate session and subscription records against their schemas
@@ -277,6 +278,31 @@ export function captureMain(argv: string[]): number {
         );
         return 0;
       }
+      if (args[0] === 'human-only') {
+        // A declaration, not a default: `Session: none` says a person did this work without an agent, and
+        // only an operator knows that. It is branch-local like every other trailer value the hook reads.
+        const branch = git(root, ['branch', '--show-current']).trim();
+        if (!branch) {
+          fail('session human-only requires a branch');
+        }
+        const key = `branch.${branch}.telemetry-human-only`;
+        if (args.includes('--clear')) {
+          try {
+            git(root, ['config', '--unset', key]);
+          } catch {
+            // nothing declared for this branch
+          }
+          process.stdout.write(
+            `${branch} no longer declares human-only work; commits with no active session are undeclared\n`,
+          );
+          return 0;
+        }
+        git(root, ['config', key, 'true']);
+        process.stdout.write(
+          `${branch} declares human-only work; its commits carry Session: none\n`,
+        );
+        return 0;
+      }
       if (args[0] === 'figures') {
         const figures = readTranscriptFigures(
           root,
@@ -407,7 +433,7 @@ export function captureMain(argv: string[]): number {
         return 0;
       }
       fail(
-        'usage: telemetry session start --id <id> | telemetry session end --payload <file|-> [--transcript <file>] | telemetry session figures --transcript <file> | telemetry session summary [--base <ref>] [--head <ref>]',
+        'usage: telemetry session start --id <id> | telemetry session human-only [--clear] | telemetry session end --payload <file|-> [--transcript <file>] | telemetry session figures --transcript <file> | telemetry session summary [--base <ref>] [--head <ref>]',
       );
       break;
     }

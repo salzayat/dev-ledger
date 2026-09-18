@@ -326,6 +326,39 @@ test('trailers parse from the final paragraph only', () => {
   assert.deepEqual(parseTrailers('feat(x): thing\n'), {});
 });
 
+test('a message with no Session trailer is valid, and a malformed identifier is not', () => {
+  // Absence is the honest state when no session was active: the projection reads it as undeclared. Only a
+  // present-but-malformed value is an error.
+  const withoutSession = ['chore(repo): work', '', 'Change: c-1'].join('\n');
+  assert.deepEqual(validateMessage(withoutSession, DEFAULT_CONFIG), []);
+
+  const declared = [
+    'chore(repo): work',
+    '',
+    'Session: none',
+    'Change: c-1',
+  ].join('\n');
+  assert.deepEqual(validateMessage(declared, DEFAULT_CONFIG), []);
+
+  const identified = [
+    'chore(repo): work',
+    '',
+    'Session: s-20260918-x',
+    'Change: c-1',
+  ].join('\n');
+  assert.deepEqual(validateMessage(identified, DEFAULT_CONFIG), []);
+
+  const malformed = ['chore(repo): work', '', 'Session: not a session'].join(
+    '\n',
+  );
+  assert.ok(
+    validateMessage(malformed, DEFAULT_CONFIG).some((error) =>
+      error.startsWith('Session:'),
+    ),
+    'a malformed identifier is still rejected',
+  );
+});
+
 test('an over-long subject and a disabled unit are rejected', () => {
   const long = `feat(x): ${'a'.repeat(100)}\n\nSpec: add-thing\n`;
   assert.ok(

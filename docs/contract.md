@@ -86,7 +86,7 @@ Written by `.githooks/prepare-commit-msg` on every commit made through the hooks
 | Trailer         | Value                                                | Single-valued per change |
 | --------------- | ---------------------------------------------------- | ------------------------ |
 | `Spec:`         | An identifier matching `specPattern`                 | yes                      |
-| `Session:`      | A session identifier, or `none`                      | no                       |
+| `Session:`      | A session identifier, or `none` when declared        | no                       |
 | `Change:`       | An identifier generated once per branch              | yes                      |
 | `Story-Points:` | A non-negative integer, or a value on the scale      | yes                      |
 | `Work-Hours:`   | A non-negative number                                | yes                      |
@@ -94,6 +94,13 @@ Written by `.githooks/prepare-commit-msg` on every commit made through the hooks
 
 A single-valued trailer that disagrees across a change's commits is a `conflicting-trailer` gap and reads
 as absent.
+
+`Session:` is written only when the repository knows the answer. An active session writes its identifier. A
+branch an operator has declared human-only, with `telemetry session human-only`, writes `none`. With
+neither — before a session starts, and after `session end` unsets it — no `Session:` trailer is written at
+all, and the change reads `undeclared`. The distinction matters because `none` is a claim that a person
+worked without an agent, and a missing trailer is the absence of a claim; defaulting one to the other turned
+an unset variable into an assertion about who did the work.
 
 ## Registry (schema version 1)
 

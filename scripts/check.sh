@@ -8,6 +8,7 @@ npm exec openspec -- validate --all --strict
 ./scripts/check-dependencies.sh
 ./scripts/test-governance.sh
 ./scripts/test-pr-body.sh
+./scripts/test-trailers.sh
 ./scripts/check-repository-conventions.sh
 ./scripts/check-agent-attribution.sh
 ./scripts/check-docs.sh
