@@ -1,0 +1,25 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "docs/readme-published-board",
+  "cachedTokens": 137808564,
+  "commits": [
+    "2ff1e74848b00defe6d274274ac6d36efe45f79a"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T02:20:00Z",
+  "figuresSource": "summed from 271 messages in the session transcript",
+  "inputTokens": 7448,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "outputTokens": 528388,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-readme",
+  "startedAt": "2026-09-18T02:00:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 1200
+}
