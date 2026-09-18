@@ -14,7 +14,7 @@ quietly edit, evidence packs that hash the same on any machine, and a governance
 Board. Its baseline needs nothing but git and says plainly which controls git alone cannot see; an
 optional collector, running in this repository's own continuous integration with one read-only credential,
 adds reviews, checks, protection, and deployments for the repositories that turn it on. It never claims
-compliance and never aggregates by person.
+compliance and never resolves an identifier to a person.
 
 The repository was forked from [spec-loop](https://github.com/salzayat/spec-loop) and keeps its
 discipline: specs before code, Nx project boundaries, evidence over trust, and an agent harness that gets
@@ -79,7 +79,9 @@ self-contained HTML page with inline SVG charts, no script, and no loaded resour
 dark. Every cited commit shows the change's subject beside its abbreviated hash and links to the commit on GitHub when the
 registry URL is a GitHub remote; with any other remote the same citations render unlinked. Undeclared and
 unreported changes, and records whose harness supplied no figures, are counted and named, never read as
-zero — on unmerged pull requests as on merged changes. Nothing is keyed to a person.
+zero — on unmerged pull requests as on merged changes. Operators are a dimension: agents by provider and
+model in the subscription's currency, humans by a pseudonymous identifier in hours, never summed, never
+priced, and never resolved to a name or an email address.
 [`docs/methodology.md`](docs/methodology.md) explains each figure.
 
 ## The Published Board

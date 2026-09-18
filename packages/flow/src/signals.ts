@@ -113,6 +113,7 @@ export type RepositorySignals = {
   costClasses: CostClassSpend;
   coverage: Coverage;
   allocation: Allocation;
+  operators: Operators;
   signals: Signal[];
 };
 
@@ -151,6 +152,45 @@ export type AllocationAggregates = {
   byModel: Record<string, AllocatedSpend>;
   unmergedPullRequests: AllocatedSpend;
   perUnmergedPullRequest: Record<string, AllocatedSpend>;
+};
+
+/**
+ * Effort keyed to an operator, covering both kinds. An agent operator is a provider and model pair and is
+ * measured in the currency of the subscription allocation and in tokens. A human operator is a pseudonymous
+ * identifier and is measured in hours, from `operatorActiveSeconds` under its idle cap. The two units never
+ * meet in one figure: there is no rate in any record that could convert hours into money, and none is
+ * invented here.
+ */
+export type AgentOperator = {
+  provider: string;
+  model: string;
+  /** Allocated amounts by currency code; empty when no subscription period covers this operator's work. */
+  currencies: Record<string, { amount: number; overage: number }>;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  sessions: number;
+  provisional: boolean;
+  cites: string[];
+};
+
+export type HumanOperator = {
+  hours: number;
+  sessions: number;
+  cites: string[];
+};
+
+export type Operators = {
+  trust: string[];
+  agents: Record<string, AgentOperator>;
+  humans: Record<string, HumanOperator>;
+  excluded: {
+    /** Changes declaring `Session: none`: human work with no record to hold its hours. */
+    humanOnly: number;
+    /** Sessions recorded before operator capture was enabled, which carry no identifier. */
+    noOperator: number;
+    invalidSession: number;
+  };
 };
 
 export type Allocation = {
@@ -382,6 +422,93 @@ function periodEnd(period: string): number {
 }
 
 /**
+ * The operator dimension. Agent operators come from the provider and model already on every record, and
+ * take their currency from the subscription allocation rather than from a reported cost, because a
+ * subscription session reports none. Human operators come from the pseudonymous `operatorId` and are
+ * measured in hours alone.
+ *
+ * Two populations are excluded rather than counted as zero hours, in the same shape every other exclusion
+ * in this file uses: a change declaring `Session: none` is human work whose hours no record holds, and a
+ * session recorded before operator capture was enabled carries no identifier to key on.
+ */
+function computeOperators(
+  facts: ChangeFacts[],
+  sessions: Map<string, SessionRecord>,
+  allocation: Allocation,
+): Operators {
+  const operators: Operators = {
+    trust: ['reported', 'allocated'],
+    agents: {},
+    humans: {},
+    excluded: { humanOnly: 0, noOperator: 0, invalidSession: 0 },
+  };
+  for (const fact of facts) {
+    if (fact.sessions.status === 'human-only') {
+      operators.excluded.humanOnly += 1;
+    }
+    for (const id of fact.sessions.sessions) {
+      const record = sessions.get(id);
+      if (!record?.file) {
+        operators.excluded.invalidSession += 1;
+        continue;
+      }
+      const file = record.file;
+
+      const key = `${file.provider}/${file.model}`;
+      const agent = (operators.agents[key] ??= {
+        provider: file.provider,
+        model: file.model,
+        currencies: {},
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedTokens: 0,
+        sessions: 0,
+        provisional: false,
+        cites: [],
+      });
+      agent.sessions += 1;
+      agent.cites.push(record.path);
+      // Tokens are a reported figure and stay absent when the harness supplied none; the allocated share
+      // does not depend on them, so a record with missing figures still carries its currency here.
+      if (!file.figuresMissing) {
+        agent.inputTokens += file.inputTokens;
+        agent.outputTokens += file.outputTokens;
+        agent.cachedTokens += file.cachedTokens;
+      }
+      const share = allocation.bySession[id];
+      if (share) {
+        const currency = (agent.currencies[share.currency] ??= {
+          amount: 0,
+          overage: 0,
+        });
+        currency.amount += share.amount;
+        currency.overage += share.overage;
+        agent.provisional ||= share.provisional;
+      }
+
+      // Hours, never money. `operatorActiveSeconds` is absent on every record written before cost
+      // allocation was enabled, and those are counted rather than read as an operator working no hours.
+      if (
+        typeof file.operatorId !== 'string' ||
+        typeof file.operatorActiveSeconds !== 'number'
+      ) {
+        operators.excluded.noOperator += 1;
+        continue;
+      }
+      const human = (operators.humans[file.operatorId] ??= {
+        hours: 0,
+        sessions: 0,
+        cites: [],
+      });
+      human.hours += file.operatorActiveSeconds / 3600;
+      human.sessions += 1;
+      human.cites.push(record.path);
+    }
+  }
+  return operators;
+}
+
+/**
  * Subscription spend, allocated by agent run seconds. A session's marginal cost on a subscription is
  * zero and stays zero in its record; what the plan cost is a period fact, apportioned here across the
  * period's sessions. A session with no agent seconds takes no share and is counted, never given zero.
@@ -555,6 +682,7 @@ export function computeSignals(
   now: string,
 ): RepositorySignals {
   const allocation = computeAllocation(facts, sessions, subscriptions, now);
+  const operators = computeOperators(facts, sessions, allocation);
   const cycleTime = distribution(facts, (timing) => timing.cycleTimeSeconds);
   const waitTime = distribution(facts, (timing) => timing.waitTimeSeconds);
   const nowMs = Date.parse(now);
@@ -1092,6 +1220,7 @@ export function computeSignals(
     dora,
     trends,
     costClasses,
+    operators,
     coverage,
     allocation,
     signals,

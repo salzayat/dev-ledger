@@ -131,11 +131,22 @@ month's sessions land. Two currencies are never summed.
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It
 has no state and nobody acknowledges it. Rules, findings, exceptions, and evidence packs are phase two.
 
-## Nothing keyed to a person
+## Nothing resolved to a person
 
-The Board reads by change, spec, repository, provider, and model. It never offers a person as a dimension.
-The pseudonymous operator identifier exists only for cost allocation, is off by default, and no read here
-uses it. The audience for this tool is the engineers being measured.
+The Board reads by change, spec, repository, provider, model, and operator. An operator is either an agent,
+identified by its provider and model, or a human, identified by a pseudonymous identifier. Both are
+measured, because the question this tool exists to answer is how agent labour and human labour divide across
+a change, and you cannot see that division while instrumenting one side of it.
+
+The two are measured in different units on purpose. An agent's consumption of a paid plan is denominated in
+the currency the plan is billed in. A human's effort is denominated in hours, from `operatorActiveSeconds`
+under its idle cap, and is never multiplied by a rate. No record in this repository can hold one: `rate`,
+`hourlyRate`, `salary`, and `compensation` are rejected by the session schema, so there is nothing to
+convert hours into money with, and the two figures are never summed.
+
+What stays true is the boundary that always did the work. No read resolves an identifier to a name or an
+email address; the schema refuses to record either. The audience for this tool is the engineers being
+measured, and a figure they can check is worth more to them than a figure withheld.
 
 ## The merge message setting
 
