@@ -56,11 +56,19 @@ ref tips print the same hash.
   or a rate. `pre-push` refuses to push while a finished session file is uncommitted.
 - **Sessions on unmerged pull requests**, read from the pull head refs, so a failed experiment keeps its
   cost.
-- **One subscription cost record per billing period and plan**, written by
-  `./scripts/telemetry.sh subscription record --plan <id> --period <YYYY-MM> --amount <n> --currency <code>`
-  and committed. A subscription session records no marginal cost; the period record is what the plan cost,
-  and the projection apportions it across the period's sessions by agent run seconds under the trust class
-  `allocated`.
+- **Plan declarations and period cost records.** `.telemetry/subscriptions/plans.json` declares each plan
+  once, with effective-dated intervals carrying a unit amount and a seat count, so a rate change is an
+  appended interval and not a rewrite. At month end, `./scripts/telemetry.sh subscription close <YYYY-MM>`
+  proposes one cost record per declared plan and stops; you check it against the invoice and commit it. A
+  subscription session records no marginal cost. The committed period record is what the plan cost, and
+  the projection apportions it across the period's sessions by agent run seconds under the trust class
+  `allocated`. `subscription record` still writes one record by hand.
+- **Man hours, attributed.** A session's span between operator prompts is split three ways: the agent
+  producing on its own, the person reading and typing, and the thread left idle past the cap. The person's
+  share is recorded in hours and never converted to money; no record can hold a rate.
+- **Cost in a named currency, cache reads and writes apart.** A metered record may carry
+  `cost: { amount, currency }` (`costUsd` is read as USD), and a harness that reports cache reads and
+  writes separately has them recorded separately.
 
 The harness hook is a command: at the end of a session, pipe the harness's figures as JSON to
 `./scripts/telemetry.sh session end --payload -`. A harness that does not state its figures can still leave
@@ -68,7 +76,7 @@ a transcript on disk: `session end --transcript <file>` sums the token counts fr
 record. The payload fields are listed in [`docs/contract.md`](docs/contract.md). At session start,
 `./scripts/telemetry.sh session start --id <id>` records the identifier the commit hook writes as
 `Session:`. Order matters: start the session, commit the work, then end the session and commit the record.
-A commit made with no active session — before one starts, or after `session end` unsets it — carries no
+A commit made with no active session (before one starts, or after `session end` unsets it) carries no
 `Session:` trailer at all, so its change reads `undeclared`: a gap the projection counts rather than a claim
 about who did the work. `Session: none` means something narrower and is never written by default: it says a
 person did this work without an agent, and an operator declares it per branch with
@@ -77,22 +85,34 @@ person did this work without an agent, and an operator declares it per branch wi
 
 ## What The Ledger Shows
 
-Per repository and across the registry: cycle time and wait time (from the pull head ref, so a rebase or
-squash does not erase them), the unmerged queue with each pull request's age and spend, batch size, merge
-frequency, rework, escapes after the newest release, local check outcomes, spend per change, per unmerged
-pull request, per spec, provider, model, and per unit of effort,
-the four DORA keys approximated to the release tag with the approximation named on each card, spend over time
-and by cost class, and subscription spend allocated across each period's sessions by agent run seconds
-(marked `allocated`, provisional while the month is open, never summed across currencies), with every
-figure naming its trust classes, its excluded count, and the changes behind it. The dashboard is one
-self-contained HTML page with inline SVG charts, no script, and no loaded resource, readable from a file URL, in light and
-dark. Every cited commit shows the change's subject beside its abbreviated hash and links to the commit on GitHub when the
-registry URL is a GitHub remote; with any other remote the same citations render unlinked. Undeclared and
-unreported changes, and records whose harness supplied no figures, are counted and named, never read as
-zero — on unmerged pull requests as on merged changes. Operators are a dimension: agents by provider and
-model in the subscription's currency, humans by a pseudonymous identifier in hours, never summed, never
-priced, and never resolved to a name or an email address.
-[`docs/methodology.md`](docs/methodology.md) explains each figure.
+One page per repository, in four tabs, each answering one question:
+
+- **Flow: where does work wait?** Wait time and cycle time from the pull head ref, so a rebase or squash
+  does not erase them; velocity per week; merge frequency; the unmerged queue with each pull request's
+  age, spend, and man hours, and a total of what is older than the registered age; batch size; work mix
+  by commit type; flow efficiency (active seconds over cycle time); iterations (sessions and commits per
+  change); spec lead time from a spec's first commit to the merge that archived it; rework with a
+  per-repository ignore list; escapes after the newest release; check compliance.
+- **DORA: how would a manager read it?** The four keys approximated to the release tag, the
+  approximation named on each card, with lead time split into review and release lag.
+- **Spend: what did it cost?** Reported spend over time and by cost class; subscription spend allocated
+  across each period's sessions by agent run seconds, provisional while the month is open, never summed
+  across currencies; what the plan worked out to per million input and output tokens, with cache reads
+  beside it; the metered rate per provider where a harness reports cost directly; spend per spec,
+  provider, model, and operator; cost per merged change, per released change, per release, and per unit
+  of effort.
+- **Records: what is the evidence?** The newest changes with their wait, cycle, lines, spend, man hours,
+  sessions, and gaps, and every cited session and subscription record.
+
+Every figure names its trust classes (`observed` from git, `reported` from a harness or an operator,
+`allocated` from an apportioned amount), its excluded count, and the changes and records behind it, and
+every cited commit shows its change's subject and links to the commit when the registry URL is a GitHub
+remote. Undeclared and unreported changes and records without figures are counted and named, never read
+as zero. Operators are a dimension: agents by provider and model in the plan's currency, humans by a
+pseudonymous identifier in hours, never summed, never priced, and never resolved to a name or an email
+address. The page is one self-contained HTML file with inline SVG, no script, and no loaded resource,
+readable from a file URL, in light and dark. [`docs/methodology.md`](docs/methodology.md) explains each
+figure.
 
 ## The Published Ledger
 
@@ -112,21 +132,30 @@ issues to its own run.
 
 ### Reading this repository's own page
 
-The published page is a real board over a young repository, and some of its figures need the story behind
-them:
+The published page is a real ledger over a young repository, and several of its figures need the story
+behind them. Figures as of 2026-09-18, 71 changes on `main`:
 
-- **37 of 53 changes read as undeclared.** They are the template's history, inherited from spec-loop before
-  the capture hooks existed. The gap is stated, not hidden, and it will not shrink.
-- **Three changes read as human-only.** They were committed after their session ended, when the hook still
-  defaulted the trailer to `Session: none`. `fix-session-none-default` removed that default, so no new
-  change joins them; the records already written are left as they were, because a record says what was
-  reported at the time.
-- **Spend is $0.00 over 1.7 million tokens.** The sessions run on a subscription, and the tool refuses to
-  guess a price. Twelve records carry no figures at all: they predate transcript summing.
-- **Releases per week is n/a.** One tag, `v0.1.0`, so there is no window to divide by. Lead time to release
-  is 20.8 days, of which 20.7 is merge to tag: the release lag, not the review queue.
-- **Rework shows 406 pairs**, most of them `plans/roadmap.md`, `README.md`, and `package-lock.json`. A
-  per-entry ignore list is drafted in `add-flow-efficiency-and-work-mix`.
+- **44 changes read as undeclared.** 37 are the template's history from before the capture hooks existed.
+  The rest were committed with no active session since the hook stopped defaulting `Session:`, which is
+  the gap the projection is built to show; a change made through the hooks with a session records one.
+- **11 read as human-only**, including the three committed under the old default. A record says what was
+  reported at the time, so they stand.
+- **Reported spend is $0.00 over 3.4 million tokens; allocated spend is $100.00.** Every session is on a
+  subscription, so no record carries a marginal cost. September's plan cost is recorded and apportioned
+  across the 6 sessions that recorded agent run seconds; 13 recorded none and take no share. That works
+  out to $73.68 per million input and output tokens, provisional until the month closes, and reads high
+  because three of the six reported no tokens.
+- **Flow efficiency reads 200%.** The earliest session records carry hand-entered start and end times that
+  do not sit inside the change's cycle window. The figure is reported as it stands rather than clamped,
+  because rounding it down would hide that two recorded figures disagree.
+- **Work mix is 61% `other`.** Changes that arrived as merge commits carry the merge subject, which has no
+  conventional type. Squash merges read their type.
+- **Spec lead time is 13 minutes typical.** Specs here are archived in the same pull request that
+  implements them, so the archive merge follows the first commit by about one cycle.
+- **Releases per week is n/a.** One tag, `v0.1.0`. Lead time to release is 20.7 days, all of it merge to
+  tag: the release lag, not the review queue.
+- **Rework shows 754 pairs**, led by `plans/roadmap.md`, `README.md`, and `docs/methodology.md`. The
+  registry's `rework.ignore` list can exclude paths that every change edits.
 - **The queue lists a closed pull request.** Its pull head ref still exists, and git cannot say it was
   closed. The panel says so beside the number.
 
@@ -148,10 +177,10 @@ repository turns it on, every control that needs them reads as not observable.
 | `npm run ledger`                             | Sync, rebuild, write the dashboard, and open it. The one command that goes from nothing to the page.              |
 | `npm run ledger -- --no-open`                | The same without opening a browser; `--output PATH` writes somewhere other than `.telemetry/ledger.html`.         |
 | `./scripts/telemetry.sh cursor <consumer>`   | Replay changes since the consumer's cursor and advance it.                                                        |
-| `./scripts/telemetry.sh validate`            | Validate session files against the schema.                                                                        |
-| `./scripts/telemetry.sh session`             | Record a session start, or write and commit a session file at session end.                                        |
+| `./scripts/telemetry.sh validate`            | Validate session and subscription records against their schemas.                                                  |
+| `./scripts/telemetry.sh session`             | Record a session start, write and commit a session file at session end, or declare a branch human-only.           |
 | `./scripts/telemetry.sh session summary`     | Print the session records this branch adds, as the Markdown the PR helper embeds.                                 |
-| `./scripts/telemetry.sh subscription close`  | Write one cost record per declared plan for a period, from the declarations; commits nothing.                     |
+| `./scripts/telemetry.sh subscription close`  | Propose one cost record per declared plan for a period, from `plans.json`; you check it and commit.               |
 | `./scripts/telemetry.sh session figures`     | Sum a session transcript's token figures and the operator's active seconds, to pass to `session end`.             |
 | `./scripts/telemetry.sh subscription record` | Write and commit what a plan cost for one billing period, the input to allocated spend.                           |
 | `npm exec nx run capture:test`               | Run the capture package's tests.                                                                                  |
@@ -183,12 +212,12 @@ the committer's to fix, and blocking their commit would punish the wrong person 
 | `.githooks/`                | `prepare-commit-msg`, `commit-msg`, `pre-commit`, `pre-push`                                                               |
 | `scripts/telemetry.sh`      | Entry point for every telemetry command                                                                                    |
 | `scripts/ledger.sh`         | Sync, rebuild, render, and open The Ledger in one step; backs `npm run ledger`                                             |
-| `telemetry.config.json`     | Effort vocabulary, spec pattern, cost allocation (off by default)                                                          |
+| `telemetry.config.json`     | Effort vocabulary, spec pattern, cost allocation (on here: operator hours and cost classes)                                |
 | `registry.json`             | The repositories the projection covers                                                                                     |
 | `.telemetry/sessions/`      | Session files, tracked, one per session                                                                                    |
-| `.telemetry/subscriptions/` | Subscription cost records, tracked, one per billing period and plan                                                        |
+| `.telemetry/subscriptions/` | `plans.json` declarations and one cost record per billing period and plan, tracked                                         |
 | `.telemetry/` (untracked)   | Mirrors, the projection, cursors: rebuilt, never committed                                                                 |
-| `openspec/`                 | Accepted specs and the two phase changes                                                                                   |
+| `openspec/`                 | Accepted specs, the active changes, and the archive                                                                        |
 | `docs/`                     | [`contract.md`](docs/contract.md), [`methodology.md`](docs/methodology.md), governance, orientation                        |
 
 See [`docs/repository-orientation.md`](docs/repository-orientation.md) for the agent loop, the harness
