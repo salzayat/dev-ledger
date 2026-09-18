@@ -78,6 +78,12 @@ The record rejects the same forbidden keys a session file does. The projection a
 carries the trust class `allocated` (the record itself is `reported` with producer `operator`), names its
 basis, and is provisional while the period has not closed as of the newest commit the mirror holds.
 
+## Note (schema version 1)
+
+`.telemetry/notes/<id>.json`, written by `telemetry note add`: `schemaVersion`, `noteId`, `figure` (one word
+naming a read), optional `period` (`YYYY-MM`), `text` (at most 600 characters), `at` (ISO 8601). Rejects the
+session record's forbidden keys. Rendered on the records tab, dated and cited.
+
 ## Trailer vocabulary (version 1)
 
 Written by `.githooks/prepare-commit-msg` on every commit made through the hooks, validated by
@@ -135,10 +141,12 @@ paths it wrote, and an operator reviews the diff and commits.
 
 ### Registry keys added for flow efficiency and work mix
 
-| Key                                | Meaning                                                               |
-| ---------------------------------- | --------------------------------------------------------------------- |
-| `thresholds.abandonedAfterSeconds` | The age past which an unmerged pull head is reported as older than it |
-| `rework.ignore`                    | Globs whose files never make a rework pair; replaces the default list |
+| Key                                | Meaning                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------- |
+| `thresholds.abandonedAfterSeconds` | The age past which an unmerged pull head is reported as older than it  |
+| `rework.ignore`                    | Globs whose files never make a rework pair; replaces the default list  |
+| `measuredFrom`                     | ISO 8601 instant; changes merged before it are excluded by reason      |
+| `closedPullRequests`               | Pull request numbers an operator declares closed; they leave the queue |
 
 ## Registry (schema version 1)
 

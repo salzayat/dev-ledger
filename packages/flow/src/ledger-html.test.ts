@@ -441,3 +441,37 @@ test('allocated subscription spend renders beside reported spend, with its class
   assert.doesNotMatch(html, /<script/);
   assert.doesNotMatch(html, /url\(/);
 });
+
+test('operator notes render on the records tab, dated and cited', () => {
+  const fixture = makeFixtureRepo();
+  const pull = openPullRequest(fixture, 'noted', [
+    [
+      'feat(noted): with a note',
+      {
+        'n.txt': 'n',
+        '.telemetry/notes/template-history.json': JSON.stringify({
+          schemaVersion: 1,
+          noteId: 'template-history',
+          figure: 'coverage',
+          text: 'The undeclared changes are template history from before the hooks existed.',
+          at: '2026-09-18T00:00:00Z',
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, pull, 'feat(noted): with a note');
+  const registry = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [{ name: 'fixture', url: fixture.dir }],
+    }),
+  ).registry;
+  const state = mkdtempSync(join(tmpdir(), 'dev-ledger-notes-'));
+  syncAll(state, registry);
+  const projection = buildProjection(state, registry);
+  assert.equal(projection.repositories.fixture.notes.length, 1);
+  const html = renderLedgerHtml(projection);
+  assert.match(html, /<h3>Notes<\/h3>/);
+  assert.match(html, /template history from before the hooks existed/);
+  assert.match(html, /\.telemetry\/notes\/template-history\.json/);
+});

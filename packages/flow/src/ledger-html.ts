@@ -265,6 +265,30 @@ function rateBlock(allocation: Allocation): string {
   return blocks;
 }
 
+type NoteRow = {
+  path: string;
+  file: { figure: string; period?: string; text: string; at: string } | null;
+};
+
+/** Operator notes: why a figure reads the way it does, each dated and cited, never editing the figure. */
+function notesPanel(notes: NoteRow[], links: Links): string {
+  const valid = notes.filter((note) => note.file !== null);
+  if (valid.length === 0) {
+    return '';
+  }
+  const rows = valid
+    .map(
+      (note) =>
+        `<tr><td><code>${escapeHtml(note.file!.figure)}</code></td><td class="mono">${escapeHtml(note.file!.period ?? '')}</td><td>${escapeHtml(note.file!.text)}</td><td class="mono">${escapeHtml(note.file!.at.slice(0, 10))}</td><td>${cites('record', [note.path], links)}</td></tr>`,
+    )
+    .join('');
+  return panel(
+    'Notes',
+    `<div class="scroll"><table><thead><tr><th>figure</th><th>period</th><th>note</th><th>written</th><th>cite</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    `${trustBadges(['reported'])} an operator's explanation of a figure, dated and committed; a note explains a number and never changes one`,
+  );
+}
+
 // --- Chrome ----------------------------------------------------------------------------------------
 
 function trustBadges(trust: string[]): string {
@@ -561,7 +585,7 @@ function efficiencyPanels(signals: RepositorySignals, links: Links): string {
   const compliance = signals.checkCompliance;
   return `${panel(
     'Flow efficiency',
-    `${figure(percent(signals.flowEfficiency.p50), `typical share of cycle time someone was working; ${count(signals.flowEfficiency.count, 'change')} measured`)}<p class="help">Active seconds are the agent's run time plus the operator's active time. A value above one is reported as it stands: it means the sessions ran outside the cycle window, and rounding it down would hide that the figures disagree.</p>${cites('changes', signals.flowEfficiency.cites, links)}`,
+    `${figure(percent(signals.flowEfficiency.p50), `typical share of cycle time someone was working; ${count(signals.flowEfficiency.count, 'change')} measured`)}<p class="help">Active seconds are the agent's run time plus the operator's active time, counted only where the session window overlaps the cycle window; ${escapeHtml(seconds(signals.flowEfficiency.outsideSeconds))} of active time fell outside any change's window and is reported here rather than hidden.</p>${cites('changes', signals.flowEfficiency.cites, links)}`,
     `${trustBadges(signals.flowEfficiency.trust)} ${escapeHtml(excludedNote(signals.flowEfficiency.excluded))}`,
   )}
 ${panel(
@@ -1054,6 +1078,7 @@ ${
 </div>
 </section>
 <section class="tab" id="${tab('records')}" aria-label="Records">
+${notesPanel(repository.notes as NoteRow[], links)}
 ${changesTable(changes, signals.spend.byChange, links, signals.allocation)}
 <div class="grid">
 ${panel(
@@ -1067,7 +1092,7 @@ ${panel(
 )}
 ${panel(
   'Population',
-  `${figure(String(outOfBand.length), `out-of-band changes of ${changes.length}; ${repository.unreleased.length} unreleased${repository.movedTags.length ? `; moved tags: ${escapeHtml((repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', '))}` : ''}`)}${cites(
+  `${figure(String(outOfBand.length), `out-of-band changes of ${changes.length}; ${signals.boundary.preInstrumentation} before ${escapeHtml(signals.boundary.measuredFrom ? dateOnly(signals.boundary.measuredFrom) : 'measurement')} excluded${signals.boundary.declaredClosed.length ? `; declared closed: ${signals.boundary.declaredClosed.map((n) => `#${n}`).join(', ')}` : ''}; ${repository.unreleased.length} unreleased${repository.movedTags.length ? `; moved tags: ${escapeHtml((repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', '))}` : ''}`)}${cites(
     'out-of-band',
     outOfBand.map((change) => change.id),
     links,

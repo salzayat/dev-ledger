@@ -19,7 +19,9 @@
           "package-lock.json",
           ".telemetry/**"
         ]
-      }
+      },
+      "measuredFrom": "2026-09-17T00:00:00Z",
+      "closedPullRequests": [14]
     }
   ]
 }

@@ -19,6 +19,7 @@ import {
   subscriptionFilePath,
   validateSubscriptionFile,
 } from './subscription.ts';
+import { noteFilePath, validateNoteFile } from './notes.ts';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import {
@@ -1088,5 +1089,49 @@ test('session start records the clock and session end fills the times a payload 
   assert.ok(record.wallClockSeconds >= 0);
   assert.throws(() =>
     fixtureGit(dir, ['config', '--get', 'telemetry.session-started']),
+  );
+});
+
+test('a note validates, rejects a rate, and is written by the command', () => {
+  const note = {
+    schemaVersion: 1,
+    noteId: 'why-zero',
+    figure: 'spend',
+    period: '2026-09',
+    text: 'Every session is on a subscription.',
+    at: '2026-09-18T00:00:00Z',
+  };
+  assert.deepEqual(validateNoteFile(note), []);
+  assert.ok(
+    validateNoteFile({ ...note, hourlyRate: 1, period: 'sept' }).length >= 2,
+  );
+  assert.equal(noteFilePath('why-zero'), '.telemetry/notes/why-zero.json');
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  const written = execFileSync(
+    process.execPath,
+    [
+      '--experimental-strip-types',
+      cli,
+      'note',
+      'add',
+      '--id',
+      'why-zero',
+      '--figure',
+      'spend',
+      '--text',
+      'Every session is on a subscription.',
+      '--no-commit',
+    ],
+    { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+  ).trim();
+  assert.equal(written, '.telemetry/notes/why-zero.json');
+  assert.match(
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, 'validate'],
+      { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+    ),
+    /1 records valid/,
   );
 });

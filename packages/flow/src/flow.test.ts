@@ -1622,3 +1622,144 @@ test("a merge commit takes its work mix type from its branch commits, not from g
   assert.ok(!otherCites.includes(feature.mergedAs!));
   assert.match(repo.signals!.workMix.note, /branch commits/);
 });
+
+test('measuredFrom excludes what predates the instrumentation, and a declared closed pull request leaves the queue', () => {
+  const fixture = makeFixtureRepo();
+  const early = openPullRequest(fixture, 'early', [
+    ['feat(early): before', { 'e.txt': 'e' }],
+  ]);
+  mergeSquash(fixture, early, 'feat(early): before');
+  const cut = git(fixture.dir, ['log', '-1', '--format=%cI']).trim();
+  const late = openPullRequest(fixture, 'late', [
+    [
+      trailered('feat(late): after', { Session: 'none', Change: 'c-l' }),
+      { 'l.txt': 'l' },
+    ],
+  ]);
+  mergeSquash(fixture, late, 'feat(late): after', 'Session: none');
+  const waiting = openPullRequest(fixture, 'waiting', [
+    ['feat(w): waiting', { 'w.txt': 'w' }],
+  ]);
+  const closed = openPullRequest(fixture, 'closed', [
+    ['feat(c): closed', { 'c.txt': 'c' }],
+  ]);
+  const registry = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [
+        {
+          name: 'fixture',
+          url: fixture.dir,
+          measuredFrom: new Date(Date.parse(cut) + 1000).toISOString(),
+          closedPullRequests: [closed.number],
+        },
+      ],
+    }),
+  ).registry;
+  const { repo } = build(registry);
+  const signals = repo.signals!;
+  assert.equal(
+    signals.boundary.preInstrumentation,
+    2,
+    'the initial commit and the early change',
+  );
+  assert.equal(signals.coverage.total, 1);
+  assert.equal(signals.coverage.humanOnly, 1);
+  assert.deepEqual(signals.boundary.declaredClosed, [closed.number]);
+  assert.deepEqual(
+    signals.queue.pullRequests.map((entry) => entry.number),
+    [waiting.number],
+  );
+  assert.equal(
+    repo.changes.length,
+    3,
+    'the projection still records every change',
+  );
+});
+
+test('flow efficiency counts only active time inside the cycle window, and spec lead time starts at the proposal', () => {
+  const fixture = makeFixtureRepo();
+  const seed = openPullRequest(fixture, 'seed', [
+    ['feat(seed): seed', { 'seed.txt': 's' }],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const proposal = openPullRequest(fixture, 'draft', [
+    [
+      'docs(openspec): draft add-x',
+      { 'openspec/changes/add-x/proposal.md': '# Add X' },
+    ],
+  ]);
+  mergeSquash(fixture, proposal, 'docs(openspec): draft add-x');
+  const work = openPullRequest(fixture, 'work', [
+    [
+      trailered('feat(x): first', {
+        Spec: 'add-x',
+        Session: 's-w',
+        Change: 'c-w',
+      }),
+      { 'x.txt': '1' },
+    ],
+    [
+      trailered('feat(x): second', {
+        Spec: 'add-x',
+        Session: 's-w',
+        Change: 'c-w',
+      }),
+      { 'x.txt': '2' },
+    ],
+  ]);
+  const firstAuthored = git(fixture.dir, [
+    'log',
+    '-1',
+    '--format=%aI',
+    work.commits[0],
+  ]).trim();
+  const start = new Date(Date.parse(firstAuthored) - 3_600_000).toISOString();
+  const end = new Date(Date.parse(firstAuthored) + 3_600_000).toISOString();
+  // The record travels in the work branch, as the hook writes it.
+  git(fixture.dir, ['switch', '--quiet', 'work']);
+  work.commits.push(
+    commit(
+      fixture,
+      trailered('chore(telemetry): record session s-w', {
+        Spec: 'add-x',
+        Session: 's-w',
+        Change: 'c-w',
+      }),
+      {
+        '.telemetry/sessions/x/s-w.json': sessionJson('s-w', {
+          startedAt: start,
+          endedAt: end,
+          agentRunSeconds: 1200,
+          spec: 'add-x',
+        }),
+      },
+      { minutes: 1 },
+    ),
+  );
+  git(fixture.dir, ['update-ref', `refs/pull/${work.number}/head`, 'HEAD']);
+  git(fixture.dir, ['switch', '--quiet', 'main']);
+  mergeSquash(fixture, work, 'feat(x): work', 'Spec: add-x\nSession: s-w');
+  const archive = openPullRequest(fixture, 'archive', [
+    [
+      'docs(openspec): archive add-x',
+      { 'openspec/changes/archive/2026-09-18-add-x/proposal.md': '# Add X' },
+    ],
+  ]);
+  mergeSquash(fixture, archive, 'docs(openspec): archive add-x');
+  const { repo } = build(registryFor(fixture.dir));
+  const signals = repo.signals!;
+  const efficiency = signals.flowEfficiency;
+  assert.ok(efficiency.count >= 1, 'the work change is measured');
+  // 1,200 active seconds spread over a two-hour window with one hour inside the cycle: about 600 outside.
+  assert.ok(
+    efficiency.outsideSeconds >= 400 && efficiency.outsideSeconds <= 800,
+    `outside ${efficiency.outsideSeconds}`,
+  );
+  assert.ok((efficiency.max ?? 2) <= 1);
+  assert.match(efficiency.note, /outside the window/);
+  const lead = signals.specLeadTime;
+  assert.ok(lead.cites.includes('add-x'));
+  // From the proposal's first commit, not the trailer's: the fixture advances hours between commits.
+  assert.ok((lead.max ?? 0) >= 3 * 3600, `lead ${lead.max}`);
+});

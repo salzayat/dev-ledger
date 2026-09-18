@@ -58,7 +58,15 @@ export type {
   SubscriptionInput,
 } from './subscription.ts';
 export {
+  NOTES_PATH,
+  NOTE_SCHEMA_VERSION,
+  noteFilePath,
+  validateNoteFile,
+} from './notes.ts';
+export type { NoteFile } from './notes.ts';
+export {
   sumTranscriptUsage,
+  transcriptModel,
   transcriptFiguresSource,
   type Figures,
 } from './figures.ts';

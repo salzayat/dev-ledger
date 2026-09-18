@@ -1,5 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { DEFAULT_CONFIG, parseConfig, type TelemetryConfig } from './config.ts';
 import {
@@ -23,12 +29,14 @@ import {
   validatePlansFile,
   validateSubscriptionFile,
 } from './subscription.ts';
+import { NOTES_PATH, noteFilePath, validateNoteFile } from './notes.ts';
 import { validateMessage } from './trailers.ts';
 import {
   transcriptEvents,
   sumTranscriptUsage,
   transcriptFiguresSource,
   type Figures,
+  transcriptModel,
 } from './figures.ts';
 
 // The capture command line: what the hooks and the harness call. It needs nothing but git and this
@@ -124,8 +132,8 @@ function recordFiles(root: string, paths: string[]): string[] {
   if (paths.length > 0) {
     return paths.map((path) => resolve(root, path));
   }
-  const present = [SESSIONS_PATH, SUBSCRIPTIONS_PATH].filter((path) =>
-    existsSync(join(root, path)),
+  const present = [SESSIONS_PATH, SUBSCRIPTIONS_PATH, NOTES_PATH].filter(
+    (path) => existsSync(join(root, path)),
   );
   if (present.length === 0) {
     return [];
@@ -151,6 +159,9 @@ function validateRecord(
   config: TelemetryConfig,
 ): string[] {
   const relative = path.startsWith(root) ? path.slice(root.length + 1) : path;
+  if (relative.startsWith(`${NOTES_PATH}/`)) {
+    return validateNoteFile(value);
+  }
   return relative.startsWith(`${SUBSCRIPTIONS_PATH}/`)
     ? validateSubscriptionFile(value)
     : validateSessionFile(value, config);
@@ -407,6 +418,16 @@ export function captureMain(argv: string[]): number {
         );
         return 0;
       }
+      if (args[0] === 'figures' && args.includes('--model-only')) {
+        const path = option(args, '--transcript');
+        const absolute = path ? resolve(root, path) : '';
+        const model =
+          absolute && existsSync(absolute)
+            ? transcriptModel(readFileSync(absolute, 'utf8'))
+            : null;
+        process.stdout.write(`${model ?? ''}\n`);
+        return 0;
+      }
       if (args[0] === 'figures') {
         const figures = readTranscriptFigures(
           root,
@@ -531,18 +552,33 @@ export function captureMain(argv: string[]): number {
         mkdirSync(dirname(absolute), { recursive: true });
         writeFileSync(absolute, canonicalJson(file));
         if (!args.includes('--no-commit')) {
-          git(root, ['add', '--', relative]);
-          // The active session is still in the repository's configuration here, and the hook reads it from
-          // there. Passing it with `-c` would also export it to every git child of the hooks through
+          // Atomic and loud: if the commit fails, the record is removed, the session stays active, and the
+          // hook's own words are printed, so nothing is left half done and nothing fails silently. The
+          // active session is still in the repository's configuration here, and the hook reads it from
+          // there; passing it with `-c` would export it to the hooks' git children through
           // GIT_CONFIG_PARAMETERS, where a fixture test of the hook would see a session it never started.
-          git(root, [
-            'commit',
-            '--quiet',
-            '-m',
-            `chore(telemetry): record session ${file.sessionId}`,
-            '--',
-            relative,
-          ]);
+          try {
+            git(root, ['add', '--', relative]);
+            git(root, [
+              'commit',
+              '--quiet',
+              '-m',
+              `chore(telemetry): record session ${file.sessionId}`,
+              '--',
+              relative,
+            ]);
+          } catch (error) {
+            try {
+              git(root, ['reset', '--quiet', '--', relative]);
+            } catch {
+              // nothing staged
+            }
+            rmSync(absolute, { force: true });
+            const detail = (error as { stderr?: string | Buffer }).stderr;
+            fail(
+              `session end: the record commit failed and the record was not written; the session stays active.\n${String(detail ?? '').trim()}`,
+            );
+          }
         }
         for (const key of ['telemetry.session', 'telemetry.session-started']) {
           try {
@@ -606,6 +642,49 @@ export function captureMain(argv: string[]): number {
           '--quiet',
           '-m',
           `chore(telemetry): record subscription ${file.planId} ${file.period}`,
+          '--',
+          relative,
+        ]);
+      }
+      process.stdout.write(`${relative}\n`);
+      return 0;
+    }
+    case 'note': {
+      if (args[0] !== 'add') {
+        fail(
+          'usage: telemetry note add --id <id> --figure <read> --text <text> [--period <YYYY-MM>] [--no-commit]',
+        );
+      }
+      const noteId = option(args, '--id');
+      const figure = option(args, '--figure');
+      const noteText = option(args, '--text');
+      const period = option(args, '--period');
+      if (!noteId || !figure || !noteText) {
+        fail('note add requires --id, --figure, and --text');
+      }
+      const note = {
+        schemaVersion: 1,
+        noteId,
+        figure,
+        ...(period ? { period } : {}),
+        text: noteText,
+        at: new Date().toISOString(),
+      };
+      const noteErrors = validateNoteFile(note);
+      if (noteErrors.length > 0) {
+        fail(`note is invalid:\n  ${noteErrors.join('\n  ')}`);
+      }
+      const relative = noteFilePath(noteId);
+      const absolute = join(root, relative);
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(absolute, canonicalJson(note));
+      if (!args.includes('--no-commit')) {
+        git(root, ['add', '--', relative]);
+        git(root, [
+          'commit',
+          '--quiet',
+          '-m',
+          `chore(telemetry): note ${noteId}`,
           '--',
           relative,
         ]);

@@ -29,6 +29,7 @@ import {
   configurationGaps,
   type ConfigurationGap,
 } from './subscriptions.ts';
+import { collectNotes } from './notes.ts';
 import {
   computeSignals,
   type ChangeFacts,
@@ -52,6 +53,7 @@ export type RepositoryProjection = {
   changes: Record<string, unknown>[];
   sessions: Record<string, unknown>[];
   subscriptions: Record<string, unknown>[];
+  notes: Record<string, unknown>[];
   configurationGaps: ConfigurationGap[];
   unmerged: unknown[];
   releases: unknown[];
@@ -158,6 +160,7 @@ export function buildRepositoryProjection(
       changes: [],
       sessions: [],
       subscriptions: [],
+      notes: [],
       configurationGaps: [],
       unmerged: [],
       releases: [],
@@ -255,6 +258,7 @@ export function buildRepositoryProjection(
   });
   const subscriptions = collectSubscriptions(dir, branch);
   const plans = collectPlans(dir, branch);
+  const notes = collectNotes(dir, branch);
   // A period is closed once its end has passed; an open month has no missing record yet.
   const asOfMs = asOf ? Date.parse(asOf) : Date.now();
   const periods = new Set<string>();
@@ -292,6 +296,10 @@ export function buildRepositoryProjection(
     entry.reworkIgnore,
     configAt,
     asOf ?? '1970-01-01T00:00:00Z',
+    {
+      measuredFrom: entry.measuredFrom,
+      closedPullRequests: entry.closedPullRequests,
+    },
   );
   return {
     name: entry.name,
@@ -326,6 +334,7 @@ export function buildRepositoryProjection(
       .sort((a, b) => a.sessionId.localeCompare(b.sessionId))
       .map((record) => ({ ...record })),
     subscriptions: subscriptions.map((record) => ({ ...record })),
+    notes: notes.map((record) => ({ ...record })),
     configurationGaps: gaps,
     unmerged,
     releases: releaseView.releases,

@@ -199,3 +199,22 @@ an explicit `--allow-undeclared` override, which SHALL open the pull request wit
 - GIVEN a branch whose earlier commit carries a `Session:` trailer and no session active now
 - WHEN the PR helper is run
 - THEN it MUST proceed
+
+### Requirement: Continuous integration refuses undeclared work
+
+The ledger workflow SHALL fail a pull request whose commits relative to the base carry no `Session:`
+trailer and whose body neither names a session nor carries `Session: undeclared`, and SHALL print the same
+three ways forward the PR helper prints. `scripts/pr.sh --allow-undeclared` SHALL write
+`Session: undeclared` into the body so the override is visible to the workflow.
+
+#### Scenario: An undeclared pull request fails the build
+
+- GIVEN a pull request with no `Session:` trailer on its commits and none in its body
+- WHEN the ledger workflow runs
+- THEN the declared check MUST fail naming the three ways forward
+
+#### Scenario: An explicit override passes
+
+- GIVEN a pull request whose body carries `Session: undeclared`
+- WHEN the ledger workflow runs
+- THEN the declared check MUST pass and say the work is undeclared on purpose

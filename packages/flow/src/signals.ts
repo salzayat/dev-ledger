@@ -205,7 +205,7 @@ export type RepositorySignals = {
     weekly: Record<string, Record<string, WorkMixEntry>>;
     note: string;
   };
-  flowEfficiency: Distribution;
+  flowEfficiency: Distribution & { outsideSeconds: number; note: string };
   iterations: {
     sessionsPerChange: Distribution;
     commitsPerChange: Distribution;
@@ -218,6 +218,13 @@ export type RepositorySignals = {
   coverage: Coverage;
   allocation: Allocation;
   operators: Operators;
+  /** What the registry declared about where measurement starts and what git cannot see. */
+  boundary: {
+    measuredFrom: string | null;
+    preInstrumentation: number;
+    declaredClosed: number[];
+    note: string;
+  };
   signals: Signal[];
 };
 
@@ -670,32 +677,49 @@ function changeWorkMixType(fact: ChangeFacts): WorkMixType {
 function computeFlowEfficiency(
   facts: ChangeFacts[],
   sessions: Map<string, SessionRecord>,
-): Distribution {
-  return distributionOf(
+): Distribution & { outsideSeconds: number; note: string } {
+  let outsideSeconds = 0;
+  const distribution = distributionOf(
     facts.map((fact) => {
       const cycle = fact.timing.cycleTimeSeconds;
-      if (cycle === null || cycle <= 0) {
+      const first = fact.timing.firstAuthoredAt;
+      if (cycle === null || cycle <= 0 || first === null) {
         return { value: null, cite: fact.change.id, reason: 'no-timing' };
       }
       const ids = fact.sessions.sessions;
       if (ids.length === 0) {
         return { value: null, cite: fact.change.id, reason: 'no-sessions' };
       }
-      let active = 0;
+      const windowStart = Date.parse(first);
+      const windowEnd = Date.parse(fact.change.mergeTime);
+      let inside = 0;
       let sawFigure = false;
       for (const id of ids) {
         const file = sessions.get(id)?.file;
         if (!file) {
           continue;
         }
-        if (file.agentRunSeconds > 0) {
-          active += file.agentRunSeconds;
-          sawFigure = true;
+        const active =
+          (file.agentRunSeconds > 0 ? file.agentRunSeconds : 0) +
+          (typeof file.operatorActiveSeconds === 'number'
+            ? file.operatorActiveSeconds
+            : 0);
+        if (active <= 0) {
+          continue;
         }
-        if (typeof file.operatorActiveSeconds === 'number') {
-          active += file.operatorActiveSeconds;
-          sawFigure = true;
-        }
+        sawFigure = true;
+        // A record holds totals, not a timeline, so active time is spread evenly over the session's own
+        // window and only the part overlapping the cycle window counts; the rest is reported apart.
+        const start = Date.parse(file.startedAt);
+        const end = Date.parse(file.endedAt);
+        const span = Math.max(1, end - start);
+        const overlap = Math.max(
+          0,
+          Math.min(end, windowEnd) - Math.max(start, windowStart),
+        );
+        const share = Number.isNaN(span) ? 1 : Math.min(1, overlap / span);
+        inside += active * share;
+        outsideSeconds += active * (1 - share);
       }
       if (!sawFigure) {
         return {
@@ -704,9 +728,14 @@ function computeFlowEfficiency(
           reason: 'no-active-seconds',
         };
       }
-      return { value: active / cycle, cite: fact.change.id };
+      return { value: Math.min(1, inside / cycle), cite: fact.change.id };
     }),
   );
+  return {
+    ...distribution,
+    outsideSeconds: Math.round(outsideSeconds),
+    note: "active seconds inside the cycle window over cycle seconds; a session's active time is spread over its own window and the part outside the cycle is reported as worked outside the window",
+  };
 }
 
 /**
@@ -997,16 +1026,39 @@ function computeAllocation(
 }
 
 export function computeSignals(
-  facts: ChangeFacts[],
+  allFacts: ChangeFacts[],
   sessions: Map<string, SessionRecord>,
-  unmerged: UnmergedPullRequest[],
+  allUnmerged: UnmergedPullRequest[],
   releases: ReleaseSummary[],
   subscriptions: SubscriptionRecord[],
   thresholds: Thresholds,
   reworkIgnore: string[],
   configAt: (change: Change) => TelemetryConfig,
   now: string,
+  declared: { measuredFrom: string | null; closedPullRequests: number[] } = {
+    measuredFrom: null,
+    closedPullRequests: [],
+  },
 ): RepositorySignals {
+  // Changes merged before the instrumentation existed are excluded with that reason, not measured as
+  // gaps; a pull request an operator declared closed leaves the queue, because git cannot see closed.
+  const fromMs = declared.measuredFrom
+    ? Date.parse(declared.measuredFrom)
+    : null;
+  const facts =
+    fromMs === null
+      ? allFacts
+      : allFacts.filter((fact) => Date.parse(fact.change.mergeTime) >= fromMs);
+  const closed = new Set(declared.closedPullRequests);
+  const unmerged = allUnmerged.filter((entry) => !closed.has(entry.number));
+  const boundary: RepositorySignals['boundary'] = {
+    measuredFrom: declared.measuredFrom,
+    preInstrumentation: allFacts.length - facts.length,
+    declaredClosed: allUnmerged
+      .filter((entry) => closed.has(entry.number))
+      .map((entry) => entry.number),
+    note: 'changes merged before measuredFrom predate the instrumentation and are excluded with that reason; a pull request declared closed in the registry leaves the queue',
+  };
   const allocation = computeAllocation(facts, sessions, subscriptions, now);
   const operators = computeOperators(facts, sessions, allocation);
   const cycleTime = distribution(facts, (timing) => timing.cycleTimeSeconds);
@@ -1781,6 +1833,22 @@ export function computeSignals(
         }
       }
     }
+    // The proposal file's first appearance is the earliest observed moment the idea existed, and it
+    // predates any trailer; the earlier of the two starts the clock.
+    for (const file of fact.files) {
+      const proposed = /^openspec\/changes\/([a-z0-9-]+)\/proposal\.md$/.exec(
+        file,
+      );
+      if (proposed) {
+        const name = proposed[1];
+        const at = fact.timing.firstAuthoredAt ?? fact.change.mergeTime;
+        const known = specFirstCommit.get(name);
+        if (known === undefined || Date.parse(at) < Date.parse(known)) {
+          specFirstCommit.set(name, at);
+        }
+        specUntimed.delete(name);
+      }
+    }
     // The change that archives a spec is the one that writes its archived directory.
     for (const file of fact.files) {
       const archived =
@@ -1862,6 +1930,7 @@ export function computeSignals(
     operators,
     coverage,
     allocation,
+    boundary,
     signals,
   };
 }

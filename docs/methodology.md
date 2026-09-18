@@ -126,11 +126,11 @@ Per change, the agent's run seconds plus the operator's active seconds, divided 
 the elapsed time anyone was actually working. Changes with no timing, no sessions, or no active figures are
 excluded by reason rather than read as nought per cent busy.
 
-A value above one is reported as it stands. It means the sessions ran outside the cycle window (an agent
-that started before the first commit on the pull request, or kept running after the merge) and rounding it
-down to one would hide that two figures disagree rather than showing it. The earliest records in this
-repository carry hand-typed start and end times and read that way; since `session start` began recording
-the clock and `session end` filling the times from it, a record's window is the one the commands saw.
+A record holds totals, not a timeline, so a session's active time is spread evenly over its own window and
+only the part overlapping the change's cycle window counts. What falls outside is reported as worked
+outside the window, never hidden and never folded in, and the figure cannot exceed one. Since
+`session start` began recording the clock and `session end` filling the times from it, a record's window
+is the one the commands saw.
 
 ## Iterations
 
@@ -147,9 +147,9 @@ merged, and the tool does not guess the difference.
 
 From the earliest commit citing a `Spec:` to the merge that archived that spec: an idea's whole life, not
 just its final pull request. A spec still open has no end yet and is excluded as `open`; one whose changes
-carry no pull head timing is excluded as `untimed`. The read is only as long as the trail: a spec drafted,
-implemented, and archived in one pull request measures one cycle, and a spec whose draft went through its
-own pull request with the `Spec:` trailer measures from that draft's first commit.
+carry no pull head timing is excluded as `untimed`. The clock starts at the earlier of the first commit
+carrying the trailer and the first appearance of the change's `proposal.md`, which git observed and which
+predates any implementation; a spec drafted and archived in one pull request still measures one cycle.
 
 ## Cost per change and per release
 
@@ -250,6 +250,20 @@ a period in which no session has any is reported as unallocated; a session whose
 counted as lacking one. A month that has not closed, as of the newest commit the mirror holds, is
 provisional, because a change merged early in it holds a larger share than it will once the rest of the
 month's sessions land. Two currencies are never summed.
+
+## Where measurement starts, and what only an operator knows
+
+A registry entry may declare `measuredFrom`. Changes merged before it predate the instrumentation and are
+excluded from every signal with that reason, so coverage counts the period the tool was present for rather
+than reporting a template's history as gaps; the projection still records them. An entry may also declare
+`closedPullRequests`: git cannot see that a pull request was closed, so an operator says so and the pull
+head leaves the queue with that reason.
+
+## Notes are records
+
+An explanation of a figure belongs beside it, under the same rules as every other record. A note names a
+read and optionally a period, carries text and a date, is committed under `.telemetry/notes/`, and renders
+on the records tab citing its file. It explains a number and never changes one.
 
 ## Signals, not findings
 

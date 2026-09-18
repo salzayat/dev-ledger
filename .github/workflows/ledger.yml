@@ -40,6 +40,11 @@ jobs:
           ./scripts/telemetry.sh sync \
             --entry dev-ledger \
             --fetch-url "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Refuse undeclared work
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: ./scripts/check-declared.sh "origin/${{ github.base_ref }}" HEAD
       - name: Rebuild the projection
         run: ./scripts/telemetry.sh rebuild
       - name: Render The Ledger

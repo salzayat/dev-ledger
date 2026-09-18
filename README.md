@@ -6,16 +6,11 @@ reads every repository over the SSH access a developer already has, fetches what
 advertises (tags and pull head refs included), and rebuilds a projection that is byte-identical on any
 machine that fetched the same ref tips. No platform API, no token, no workflow, no service.
 
-Phase one, `add-flow-observability`, is observability: capture hooks and session files, a registry of
-repositories, the projection, the flow signals (cycle time, wait time, the unmerged queue, batch size,
-rework, escapes, spend per change), the four DORA keys approximated to the release tag, and The Ledger,
-published for this repository at [salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/). Phase two, `add-change-audit`, is compliance as a layer
-over the same records: rules, levels and packs, findings you can quote by identifier, decisions you cannot
-quietly edit, evidence packs that hash the same on any machine, and a governance view added to the same
-Ledger. Its baseline needs nothing but git and says plainly which controls git alone cannot see; an
-optional collector, running in this repository's own continuous integration with one read-only credential,
-adds reviews, checks, protection, and deployments for the repositories that turn it on. It never claims
-compliance and never resolves an identifier to a person.
+Phase one is observability: capture hooks and session records, a registry, a deterministic projection,
+the flow and DORA reads, spend in three trust classes, and The Ledger, published for this repository at
+[salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/). Phase two, `add-change-audit`,
+layers compliance over the same records and is drafted in `openspec/changes/`. Nothing is resolved to a
+person.
 
 The repository was forked from [spec-loop](https://github.com/salzayat/spec-loop) and keeps its
 discipline: specs before code, Nx project boundaries, evidence over trust, and an agent harness that gets
@@ -70,99 +65,38 @@ ref tips print the same hash.
   `cost: { amount, currency }` (`costUsd` is read as USD), and a harness that reports cache reads and
   writes separately has them recorded separately.
 
-The harness hook is a command: at the end of a session, pipe the harness's figures as JSON to
-`./scripts/telemetry.sh session end --payload -`. A harness that does not state its figures can still leave
-a transcript on disk: `session end --transcript <file>` sums the token counts from it and says so in the
-record. The payload fields are listed in [`docs/contract.md`](docs/contract.md). At session start,
-`./scripts/telemetry.sh session start --id <id>` records the identifier the commit hook writes as
-`Session:` and the clock, so a payload may leave `startedAt` and `endedAt` to the commands. Order matters:
-start the session, commit the work, then end the session and commit the record. `scripts/pr.sh` refuses to
-open a pull request with no active session and no declaration; `--human-only` declares the branch, and
-`--allow-undeclared` opens it as undeclared on purpose.
-A commit made with no active session (before one starts, or after `session end` unsets it) carries no
-`Session:` trailer at all, so its change reads `undeclared`: a gap the projection counts rather than a claim
-about who did the work. `Session: none` means something narrower and is never written by default: it says a
-person did this work without an agent, and an operator declares it per branch with
-`./scripts/telemetry.sh session human-only` (or `--human-only` on `scripts/pr.sh`), cleared with
-`session human-only --clear`.
+With Claude Code, `.claude/settings.json` wires `scripts/harness/claude-code.sh` to `SessionStart` and
+`SessionEnd`, so the session starts and ends itself: the model comes from the transcript, the plan from
+`plans.json`, the commits from the branch. Any other harness pipes its figures as JSON to
+`./scripts/telemetry.sh session end --payload -`, with `--transcript <file>` to sum tokens and hours from a
+transcript; `session start --id <id>` records the identifier and the clock first. Fields are in
+[`docs/contract.md`](docs/contract.md). A commit with no active session carries no `Session:` trailer and
+reads `undeclared`; `session human-only` declares a branch's work done without an agent. Both
+`scripts/pr.sh` and the ledger workflow refuse an undeclared pull request unless `--allow-undeclared` says
+it is undeclared on purpose.
 
 ## What The Ledger Shows
 
-One page per repository, in four tabs, each answering one question:
+One page per repository, four tabs: **flow** (wait and cycle time from the pull head ref, velocity, the
+queue and what is older than the registered age, batch size, work mix, flow efficiency, iterations, spec
+lead time, rework, escapes, check compliance), **DORA** (the four keys approximated to the release tag,
+lead time split into review and release lag), **spend** (reported and allocated spend over time, by cost
+class, spec, provider, model, and operator; what the plan worked out to per token; cost per change and
+per release), and **records** (recent changes with their gaps, session and subscription records, notes).
 
-- **Flow: where does work wait?** Wait time and cycle time from the pull head ref, so a rebase or squash
-  does not erase them; velocity per week; merge frequency; the unmerged queue with each pull request's
-  age, spend, and man hours, and a total of what is older than the registered age; batch size; work mix
-  by commit type; flow efficiency (active seconds over cycle time); iterations (sessions and commits per
-  change); spec lead time from a spec's first commit to the merge that archived it; rework with a
-  per-repository ignore list; escapes after the newest release; check compliance.
-- **DORA: how would a manager read it?** The four keys approximated to the release tag, the
-  approximation named on each card, with lead time split into review and release lag.
-- **Spend: what did it cost?** Reported spend over time and by cost class; subscription spend allocated
-  across each period's sessions by agent run seconds, provisional while the month is open, never summed
-  across currencies; what the plan worked out to per million input and output tokens, with cache reads
-  beside it; the metered rate per provider where a harness reports cost directly; spend per spec,
-  provider, model, and operator; cost per merged change, per released change, per release, and per unit
-  of effort.
-- **Records: what is the evidence?** The newest changes with their wait, cycle, lines, spend, man hours,
-  sessions, and gaps, and every cited session and subscription record.
-
-Every figure names its trust classes (`observed` from git, `reported` from a harness or an operator,
-`allocated` from an apportioned amount), its excluded count, and the changes and records behind it, and
-every cited commit shows its change's subject and links to the commit when the registry URL is a GitHub
-remote. Undeclared and unreported changes and records without figures are counted and named, never read
-as zero. Operators are a dimension: agents by provider and model in the plan's currency, humans by a
-pseudonymous identifier in hours, never summed, never priced, and never resolved to a name or an email
-address. The page is one self-contained HTML file with inline SVG, no script, and no loaded resource,
-readable from a file URL, in light and dark. [`docs/methodology.md`](docs/methodology.md) explains each
-figure.
+Every figure names its trust class (`observed` from git, `reported` from a harness or operator,
+`allocated` from an apportioned amount), its excluded count, and the changes and records behind it. Missing
+figures are counted, never read as zero. Agents are measured in the plan's currency, humans in hours by a
+pseudonymous identifier, never summed and never priced. The page is one file: inline SVG, no script, no
+loaded resource. [`docs/methodology.md`](docs/methodology.md) explains each figure.
 
 ## The Published Ledger
 
-This repository's own board is published to GitHub Pages at
-[salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/), rebuilt on every push to `main` by
-the `Ledger` workflow. It is built by the same `telemetry ledger --html` that writes the local page, so what
-is published is what `npm run ledger` shows you.
-
-Every pull request builds the same page without publishing it: the run uploads it as a `board` artifact and
-writes the terminal render into the run's job summary, so a reviewer sees what a change does to the ledger
-before it merges. Only a push to `main` deploys, and only while the repository is public; the deploy job
-checks that itself rather than relying on anyone to remember.
-
-Nothing generated is committed. `.telemetry/ledger.html` is untracked, the published page is built in the
-workflow rather than stored in the tree, and the workflow uses no credential beyond the token the platform
-issues to its own run.
-
-### Reading this repository's own page
-
-The published page is a real ledger over a young repository, and several of its figures need the story
-behind them. Figures as of 2026-09-18, 71 changes on `main`:
-
-- **44 changes read as undeclared.** 37 are the template's history from before the capture hooks existed.
-  The rest were committed with no active session after the hook stopped defaulting `Session:`, which is
-  the gap the projection is built to show. `scripts/pr.sh` now refuses that by default.
-- **11 read as human-only**, including the three committed under the old default. A record says what was
-  reported at the time, so they stand.
-- **Reported spend is $0.00 over 3.4 million tokens; allocated spend is $100.00.** Every session is on a
-  subscription, so no record carries a marginal cost. September's plan cost is recorded and apportioned
-  across the 6 sessions that recorded agent run seconds; 13 recorded none and take no share. That works
-  out to $73.68 per million input and output tokens, provisional until the month closes, and reads high
-  because three of the six reported no tokens.
-- **Flow efficiency reads 200%.** The earliest session records carry hand-entered start and end times that
-  do not sit inside the change's cycle window. The figure is reported as it stands rather than clamped,
-  because rounding it down would hide that two recorded figures disagree. Records written since take
-  their times from `session start` and `session end`.
-- **Work mix.** A merge commit's subject carries no type, so those changes take the most common type
-  among their branch commits; `other` is left for changes whose commits carry no type at all.
-- **Spec lead time is 13 minutes typical.** Specs here are archived in the same pull request that
-  implements them, so the archive merge follows the first commit by about one cycle.
-- **Releases per week is n/a.** One tag, `v0.1.0`. Lead time to release is 20.7 days, all of it merge to
-  tag: the release lag, not the review queue.
-- **Rework.** With the default ignore list it showed 754 pairs led by `plans/roadmap.md`, `README.md`, and
-  `docs/methodology.md`, which every change here edits by design. The registry entry now ignores the
-  roadmap, the README, `docs/`, and `openspec/`, so the pairs that remain are in code.
-- **The queue lists a closed pull request.** Its pull head ref still exists, and git cannot say it was
-  closed. The panel says so beside the number.
+The `Ledger` workflow builds the page on every pull request (as a `board` artifact and a job summary) and
+deploys it to GitHub Pages from `main` while the repository is public, fetching over HTTPS with the run's
+own token. It also refuses a pull request whose work is undeclared. Nothing generated is committed. The
+page carries its own notes: `./scripts/telemetry.sh note add` records why a figure reads the way it does,
+shown on the records tab dated and cited.
 
 ## What It Does Not See
 
@@ -188,6 +122,8 @@ repository turns it on, every control that needs them reads as not observable.
 | `./scripts/telemetry.sh subscription close`  | Propose one cost record per declared plan for a period, from `plans.json`; you check it and commit.               |
 | `./scripts/telemetry.sh session figures`     | Sum a session transcript's token figures and the operator's active seconds, to pass to `session end`.             |
 | `./scripts/telemetry.sh subscription record` | Write and commit what a plan cost for one billing period, the input to allocated spend.                           |
+| `./scripts/telemetry.sh note add`            | Record why a figure reads the way it does; rendered on the records tab, dated and cited.                          |
+| `./scripts/check-declared.sh <base> <head>`  | Fail when a range carries no `Session:` trailer and nothing declares it; the ledger workflow runs it.             |
 | `npm exec nx run capture:test`               | Run the capture package's tests.                                                                                  |
 | `npm exec nx run flow:test`                  | Run the flow package's tests over fixture repositories built in a temporary directory.                            |
 | `./scripts/check-hooks-current.sh`           | Warn when the hooks git will run are not the hooks in this working tree. Warns; never fails.                      |
@@ -195,18 +131,6 @@ repository turns it on, every control that needs them reads as not observable.
 
 `capture` and `flow` are source-only: `build` emits `.d.ts` files, and consumers resolve the source
 through the `@dev-ledger/source` export condition, so no build step is needed to run anything.
-
-### Why the hook check warns instead of failing
-
-`core.hooksPath` may be relative, which git resolves against whichever working tree is current, or absolute,
-which points every worktree at one directory. A worktree carrying the absolute form runs another checkout's
-hooks, so a hook fixed on a branch never executes there, and a hook fixed and merged does not execute until
-that checkout is updated. Nothing reports this on its own: a hook that is never read cannot say it was not
-read.
-
-`./scripts/check-hooks-current.sh` compares the hooks git will run with the `.githooks` of the current
-working tree and names any that differ. It warns rather than failing because the stale checkout is often not
-the committer's to fix, and blocking their commit would punish the wrong person for it.
 
 ## Repository Map
 
@@ -218,7 +142,9 @@ the committer's to fix, and blocking their commit would punish the wrong person 
 | `scripts/telemetry.sh`      | Entry point for every telemetry command                                                                                    |
 | `scripts/ledger.sh`         | Sync, rebuild, render, and open The Ledger in one step; backs `npm run ledger`                                             |
 | `telemetry.config.json`     | Effort vocabulary, spec pattern, cost allocation (on here: operator hours and cost classes)                                |
-| `registry.json`             | The repositories the projection covers                                                                                     |
+| `registry.json`             | The repositories the projection covers, with `measuredFrom`, `closedPullRequests`, and `rework.ignore` per entry           |
+| `.telemetry/notes/`         | Operator notes on figures, tracked                                                                                         |
+| `scripts/harness/`          | Harness hook adapters; `claude-code.sh` runs the session lifecycle from the harness's own hooks                            |
 | `.telemetry/sessions/`      | Session files, tracked, one per session                                                                                    |
 | `.telemetry/subscriptions/` | `plans.json` declarations and one cost record per billing period and plan, tracked                                         |
 | `.telemetry/` (untracked)   | Mirrors, the projection, cursors: rebuilt, never committed                                                                 |

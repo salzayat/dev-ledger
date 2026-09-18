@@ -1,0 +1,8 @@
+{
+  "at": "2026-09-18T18:00:00Z",
+  "figure": "flowEfficiency",
+  "noteId": "hand-typed-times",
+  "period": "2026-09",
+  "schemaVersion": 1,
+  "text": "The earliest session records carry hand-typed start and end times. Records written since take their times from session start and session end."
+}

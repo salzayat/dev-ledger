@@ -154,3 +154,28 @@ export function transcriptEvents(text: string): TranscriptEvent[] {
     (a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp),
   );
 }
+
+/** The model named by the transcript's newest assistant record, or null when none names one. */
+export function transcriptModel(text: string): string | null {
+  let model: string | null = null;
+  for (const line of text.split('\n')) {
+    if (!line.includes('"model"')) {
+      continue;
+    }
+    try {
+      const record = JSON.parse(line) as {
+        type?: unknown;
+        message?: { model?: unknown };
+      };
+      if (
+        record.type === 'assistant' &&
+        typeof record.message?.model === 'string'
+      ) {
+        model = record.message.model;
+      }
+    } catch {
+      // not a JSON line
+    }
+  }
+  return model;
+}

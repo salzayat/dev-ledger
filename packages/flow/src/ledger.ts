@@ -252,6 +252,9 @@ export function renderRepository(repository: RepositoryProjection): string[] {
     `  out-of-band changes: ${outOfBand.length}${outOfBand.length ? '; cites: ' + outOfBand.map((change) => short(change.id as string)).join(' ') : ''}`,
   );
   lines.push(`  unreleased changes: ${repository.unreleased.length}`);
+  lines.push(
+    `  boundary: ${signals.boundary.preInstrumentation} changes before ${signals.boundary.measuredFrom ?? '(no measuredFrom)'} excluded; declared closed: ${signals.boundary.declaredClosed.map((n) => `#${n}`).join(', ') || 'none'}`,
+  );
   if (repository.movedTags.length > 0) {
     lines.push(
       `  moved tags: ${(repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', ')}`,

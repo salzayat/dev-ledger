@@ -5,3 +5,5 @@
 /.nx/workspace-data
 # Session files are generated canonical JSON; their bytes are part of the record
 .telemetry/sessions
+.telemetry/notes
+.telemetry/subscriptions
