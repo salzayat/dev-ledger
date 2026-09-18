@@ -26,4 +26,4 @@
 - [x] 4.2 Test that a session taking a share while reporting no tokens is counted and does not silently
       shrink the denominator.
 - [x] 4.3 Test that a rate with no tokens behind it is null rather than zero.
-- [ ] 4.4 Run `npm run check` and the board end to end, recording the result in the pull request.
+- [x] 4.4 Run `npm run check` and the board end to end, recording the result in the pull request.

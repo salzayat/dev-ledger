@@ -53,7 +53,10 @@ only in a separate `notionalCostUsd` field, which no cost total reads. A session
 operator active seconds (computed by the configured idle-capped algorithm and recorded with that
 algorithm's identifier) and the operator's pseudonymous identifier, read from the local git configuration
 value `telemetry.operator` and validated against the identifiers declared in the configuration; a missing
-or undeclared identifier SHALL be recorded as missing rather than guessed. The file SHALL NOT carry the
+or undeclared identifier SHALL be recorded as missing rather than guessed. A record carrying neither
+operator figure SHALL be valid: the absence SHALL be counted by every read that needs the figure, in the
+same way a record carrying `figuresMissing` is counted, and SHALL NOT make the record invalid or be read
+as an operator who worked no time. A figure that is present and malformed SHALL still be rejected. The file SHALL NOT carry the
 operator's name, email address, or any compensation figure. At session end the harness hook SHALL commit the
 session file as its own commit on the current branch, and a `pre-push` hook SHALL refuse a push while a
 finished session file is uncommitted; both hooks can be skipped, and a skipped hook surfaces as a paper-trail
@@ -122,6 +125,20 @@ correction SHALL be a further session file referencing the one it corrects.
 - WHEN a correction is made
 - THEN a correcting session file MUST be added referencing the original
 - AND the original MUST remain readable
+
+#### Scenario: A record with no operator figures is valid and counted
+
+- GIVEN cost allocation enabled and a session record carrying neither operator active seconds nor an
+  operator identifier
+- WHEN the record is validated
+- THEN validation MUST pass
+- AND every read needing the figure MUST count that record as excluded rather than as zero time
+
+#### Scenario: A malformed operator figure is still rejected
+
+- GIVEN cost allocation enabled and a session record whose operator active seconds are negative
+- WHEN the record is validated
+- THEN validation MUST fail naming the field
 
 ### Requirement: Spec, session, change, and effort trailers on every commit
 
@@ -241,14 +258,26 @@ are exported, SHALL behave exactly as it does when invoked from a shell.
 
 ### Requirement: Token figures may be summed from a harness transcript
 
-The system SHALL be able to sum a session's token figures from a local transcript file the operator names:
+The system SHALL be able to sum a session's token figures, and to derive the operator's active seconds,
+from a local transcript file the operator names:
 a JSONL file whose records carry a `usage` object in the wire format of the model API. Records SHALL be
 deduplicated by message identifier, keeping the last record for each identifier, so a streaming transcript
 that repeats a message as it grows counts that message once at its final usage. Input tokens SHALL exclude
 cache traffic, cached tokens SHALL be cache reads plus cache writes, and cost SHALL NOT be derived from any
 price table. The figures SHALL be recorded as `reported` like any other harness figure, and a transcript
 that is absent, unreadable, or carries no usage record SHALL leave the session recorded as missing figures
-rather than as zeros. A transcript SHALL only fill figures the payload omits, and SHALL NOT override a
+rather than as zeros. Operator active seconds SHALL be derived from the operator's own prompts in that
+transcript: a record addressed from the user whose content is a string, or whose content blocks are all
+text. A record carrying a tool result is harness traffic and SHALL NOT count as an operator event, so an
+unattended agent turn SHALL NOT read as operator presence. The span between consecutive prompts SHALL be attributed
+rather than capped whole: the time up to the last agent record in that span is the agent working
+autonomously, the remainder is the operator, and the part of that remainder beyond the configured idle cap
+is the thread sitting idle. The three SHALL sum to the span between the first and last prompt, and SHALL be
+recorded alongside each other with the algorithm's identifier, so a reader can check them. Attributing the
+whole span to the operator instead would charge an unattended agent run to a person; over this repository's
+own transcripts that reads about 1.75 times the man hours actually worked. A transcript with
+fewer than two prompts SHALL leave the figure absent rather than recording zero. Nothing but timestamps
+SHALL be read for this figure. A transcript SHALL only fill figures the payload omits, and SHALL NOT override a
 figure the harness stated. When the transcript supplied any figure, the record's `figuresSource` SHALL name
 the transcript as the source; when the payload stated every figure, its own source SHALL stand.
 
@@ -278,6 +307,43 @@ the transcript as the source; when the payload stated every figure, its own sour
 - GIVEN a payload omitting its token figures whose `figuresSource` says the harness exposed none
 - WHEN the session is recorded with a transcript carrying usage
 - THEN the record's `figuresSource` MUST name the transcript and the number of messages summed
+
+#### Scenario: Tool results are not operator events
+
+- GIVEN a transcript of 279 user-addressed records of which 262 carry a tool result and 17 are prompts
+- WHEN operator active seconds are derived
+- THEN only the 17 prompts MUST contribute events
+- AND an unattended agent turn between two prompts MUST contribute no more than the idle cap
+
+#### Scenario: A transcript with one prompt records no operator time
+
+- GIVEN a transcript carrying exactly one operator prompt
+- WHEN operator active seconds are derived
+- THEN the figure MUST be absent rather than recorded as zero
+
+#### Scenario: Operator hours read nothing but timestamps
+
+- GIVEN a transcript containing prompt text, tool output, and file contents
+- WHEN operator active seconds are derived
+- THEN only timestamps MUST be read
+- AND no transcript content MUST enter the session record
+
+#### Scenario: An unattended agent run is not man hours
+
+- GIVEN a span between two prompts in which the agent produced records for forty minutes and the operator
+  replied five minutes after the last of them
+- WHEN the span is attributed
+- THEN forty minutes MUST be recorded as agent autonomous time
+- AND five minutes MUST be recorded as operator time
+- AND no part of the agent's forty minutes MUST be counted as man hours
+
+#### Scenario: A thread left open is idle, not worked
+
+- GIVEN a span of forty-five minutes between two prompts in which no agent record appears, under a fifteen
+  minute idle cap
+- WHEN the span is attributed
+- THEN fifteen minutes MUST be recorded as operator time
+- AND thirty minutes MUST be recorded as idle
 
 ### Requirement: Subscription cost records are period facts
 
