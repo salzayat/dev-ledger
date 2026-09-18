@@ -1,0 +1,33 @@
+{
+  "agentAutonomousSeconds": 12421,
+  "agentRunSeconds": 2400,
+  "billingKind": "subscription",
+  "branch": "fix/ledger-reads-after-review",
+  "cacheReadTokens": 175288047,
+  "cacheWriteTokens": 1929327,
+  "cachedTokens": 177217374,
+  "commits": [
+    "b0398bcadaa5e8d6854a1cde89240ae24a8c8867"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T17:11:47.841Z",
+  "figuresSource": "summed from 371 messages in the session transcript",
+  "idleSeconds": 56426,
+  "inputTokens": 10309,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorActiveAlgorithm": "prompt-attribution-v1:900",
+  "operatorActiveSeconds": 12592,
+  "operatorId": null,
+  "outputTokens": 695571,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-review-findings",
+  "spec": "fix-ledger-reads-after-review",
+  "startedAt": "2026-09-18T05:45:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 41208
+}
