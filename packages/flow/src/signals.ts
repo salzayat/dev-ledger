@@ -9,6 +9,61 @@ import type { Timing } from './timing.ts';
 // The flow signals. Every read states the trust classes it used and how many changes it excluded, cites
 // the changes behind it, and never keys anything to a person.
 
+/** Conventional commit types the work mix reports, plus `other` for a subject that does not parse. */
+export const WORK_MIX_TYPES = [
+  'feat',
+  'fix',
+  'refactor',
+  'docs',
+  'test',
+  'chore',
+  'ci',
+  'other',
+] as const;
+
+export type WorkMixType = (typeof WORK_MIX_TYPES)[number];
+
+/** Changes and spend for one commit type in one week. */
+export type WorkMixEntry = {
+  changes: number;
+  costUsd: number;
+  cites: string[];
+};
+
+export type CheckCompliance = {
+  /** Changes whose sessions recorded a local check outcome, over changes in the window. */
+  recorded: number;
+  changes: number;
+  recordedShare: number | null;
+  /** Passing outcomes over recorded outcomes. */
+  passed: number;
+  passRate: number | null;
+  trust: string[];
+};
+
+export type Abandonment = {
+  /** The age past which an unmerged pull head is reported as older than, never as closed. */
+  afterSeconds: number;
+  count: number;
+  costUsd: number;
+  tokens: number;
+  /** Records on those pull heads carrying no figures: counted, never read as zero. */
+  withoutFigures: number;
+  trust: string[];
+  cites: string[];
+};
+
+export type CostPer = {
+  /** Cost over the population, or null when no cost was reported. */
+  costUsd: number | null;
+  tokens: number;
+  count: number;
+  excluded: number;
+  /** True when every contributing session was a subscription session, so cost is fixed at zero. */
+  tokensOnly: boolean;
+  trust: string[];
+};
+
 export type Distribution = {
   count: number;
   /** The median: half the changes were faster, half slower. */
@@ -70,6 +125,9 @@ export type RepositorySignals = {
   rework: {
     windowDays: number;
     pairs: { later: string; earlier: string; files: string[] }[];
+    /** Globs whose files never make a pair, and how many pairs they removed. */
+    ignore: string[];
+    ignored: number;
   };
   escapes: {
     release: string | null;
@@ -83,6 +141,9 @@ export type RepositorySignals = {
     bySpec: Record<string, Spend>;
     byProvider: Record<string, Spend>;
     byModel: Record<string, Spend>;
+    perMergedChange: CostPer;
+    perReleasedChange: CostPer;
+    perRelease: CostPer;
     perEffortUnit: Record<
       string,
       {
@@ -117,6 +178,18 @@ export type RepositorySignals = {
   dora: DoraSignals;
   trends: { weekly: WeeklyBucket[]; note: string };
   velocity: Velocity;
+  workMix: {
+    weekly: Record<string, Record<string, WorkMixEntry>>;
+    note: string;
+  };
+  flowEfficiency: Distribution;
+  iterations: {
+    sessionsPerChange: Distribution;
+    commitsPerChange: Distribution;
+  };
+  abandonment: Abandonment;
+  specLeadTime: Distribution;
+  checkCompliance: CheckCompliance;
   costClasses: CostClassSpend;
   coverage: Coverage;
   allocation: Allocation;
@@ -344,6 +417,17 @@ function median(values: number[]): number | null {
   );
 }
 
+function emptyCostPer(): CostPer {
+  return {
+    costUsd: null,
+    tokens: 0,
+    count: 0,
+    excluded: 0,
+    tokensOnly: false,
+    trust: ['reported'],
+  };
+}
+
 function emptySpend(): Spend {
   return {
     inputTokens: 0,
@@ -483,6 +567,89 @@ function apportion(amount: number, weights: number[]): number[] {
 function periodEnd(period: string): number {
   const [year, month] = period.split('-').map(Number);
   return Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1);
+}
+
+/**
+ * A path glob, supporting `*` within a segment and `**` across segments. Small on purpose: the ignore list
+ * names lockfiles and generated directories, and a dependency for that would be a dependency to audit.
+ */
+function matchesGlob(path: string, glob: string): boolean {
+  const pattern = glob
+    .split('')
+    .map((character) => {
+      if ('\\^$+?.()|{}[]'.includes(character)) {
+        return `\\${character}`;
+      }
+      return character;
+    })
+    .join('')
+    .replace(/\*\*\//g, '(?:.*/)?')
+    .replace(/\*\*/g, '.*')
+    .replace(/(?<!\.)\*/g, '[^/]*');
+  return new RegExp(`^${pattern}$`).test(path);
+}
+
+/**
+ * The conventional commit type on a change's subject. A subject that does not parse is `other` rather than
+ * dropped, so the mix always accounts for every change in the window.
+ */
+function workMixType(subject: string): WorkMixType {
+  const match = /^([a-z]+)(\([^)]*\))?!?:/.exec(subject.trim());
+  const type = match?.[1];
+  return (WORK_MIX_TYPES as readonly string[]).includes(type ?? '')
+    ? (type as WorkMixType)
+    : 'other';
+}
+
+/**
+ * Flow efficiency: how much of a change's elapsed cycle time anyone was actually working on it. Active
+ * seconds are the agent's run time plus the operator's active time across the change's sessions, which is
+ * why a change with no sessions, no timing, or no active figures is excluded by reason rather than read as
+ * nought per cent busy.
+ *
+ * A value above one is reported as it stands. It means the sessions overlapped the cycle window or ran
+ * either side of it, and rounding it down to one would hide that the figures disagree.
+ */
+function computeFlowEfficiency(
+  facts: ChangeFacts[],
+  sessions: Map<string, SessionRecord>,
+): Distribution {
+  return distributionOf(
+    facts.map((fact) => {
+      const cycle = fact.timing.cycleTimeSeconds;
+      if (cycle === null || cycle <= 0) {
+        return { value: null, cite: fact.change.id, reason: 'no-timing' };
+      }
+      const ids = fact.sessions.sessions;
+      if (ids.length === 0) {
+        return { value: null, cite: fact.change.id, reason: 'no-sessions' };
+      }
+      let active = 0;
+      let sawFigure = false;
+      for (const id of ids) {
+        const file = sessions.get(id)?.file;
+        if (!file) {
+          continue;
+        }
+        if (file.agentRunSeconds > 0) {
+          active += file.agentRunSeconds;
+          sawFigure = true;
+        }
+        if (typeof file.operatorActiveSeconds === 'number') {
+          active += file.operatorActiveSeconds;
+          sawFigure = true;
+        }
+      }
+      if (!sawFigure) {
+        return {
+          value: null,
+          cite: fact.change.id,
+          reason: 'no-active-seconds',
+        };
+      }
+      return { value: active / cycle, cite: fact.change.id };
+    }),
+  );
 }
 
 /**
@@ -779,6 +946,7 @@ export function computeSignals(
   releases: ReleaseSummary[],
   subscriptions: SubscriptionRecord[],
   thresholds: Thresholds,
+  reworkIgnore: string[],
   configAt: (change: Change) => TelemetryConfig,
   now: string,
 ): RepositorySignals {
@@ -830,7 +998,12 @@ export function computeSignals(
   };
 
   const windowDays = thresholds.reworkWindowDays ?? 14;
-  const rework: RepositorySignals['rework'] = { windowDays, pairs: [] };
+  const rework: RepositorySignals['rework'] = {
+    windowDays,
+    pairs: [],
+    ignore: reworkIgnore,
+    ignored: 0,
+  };
   for (let later = 0; later < facts.length; later += 1) {
     const laterFact = facts[later];
     const laterTime = Date.parse(laterFact.change.mergeTime);
@@ -842,10 +1015,18 @@ export function computeSignals(
       ) {
         break;
       }
-      const shared = laterFact.files.filter(
+      const sharedAll = laterFact.files.filter(
         (file) =>
           earlierFact.files.includes(file) && !file.startsWith('.telemetry/'),
       );
+      const shared = sharedAll.filter(
+        (file) => !reworkIgnore.some((glob) => matchesGlob(file, glob)),
+      );
+      // A pair whose every shared file is ignored is not a pair. It is counted so the read can say how much
+      // of the rework signal was lockfile and generated-file churn rather than work done twice.
+      if (sharedAll.length > 0 && shared.length === 0) {
+        rework.ignored += 1;
+      }
       if (shared.length > 0) {
         rework.pairs.push({
           later: laterFact.change.id,
@@ -898,6 +1079,9 @@ export function computeSignals(
     bySpec: {},
     byProvider: {},
     byModel: {},
+    perMergedChange: emptyCostPer(),
+    perReleasedChange: emptyCostPer(),
+    perRelease: emptyCostPer(),
     perEffortUnit: {},
     excluded: {
       undeclared: 0,
@@ -1343,6 +1527,198 @@ export function computeSignals(
     }
   }
 
+  // Cost per merged change, per released change, and per release. On a subscription every reported cost is
+  // zero by rule, so a currency figure would be a lie; the read says tokens instead and labels itself.
+  const releasedChangeIds = new Set(
+    releases.flatMap((release) => release.changes),
+  );
+  const costPer = (ids: Set<string> | null, units: number): CostPer => {
+    const figure = emptyCostPer();
+    let anyCost = false;
+    for (const fact of facts) {
+      if (ids !== null && !ids.has(fact.change.id)) {
+        continue;
+      }
+      const changeSpend = spend.byChange[fact.change.id];
+      if (!changeSpend || changeSpend.sessions === 0) {
+        figure.excluded += 1;
+        continue;
+      }
+      figure.count += 1;
+      figure.tokens += changeSpend.inputTokens + changeSpend.outputTokens;
+      figure.costUsd = (figure.costUsd ?? 0) + changeSpend.costUsd;
+      if (changeSpend.costUsd > 0) {
+        anyCost = true;
+      }
+    }
+    const divisor = units > 0 ? units : figure.count;
+    if (divisor > 0 && figure.costUsd !== null) {
+      figure.costUsd = Math.round((figure.costUsd / divisor) * 1e6) / 1e6;
+      figure.tokens = Math.round(figure.tokens / divisor);
+    }
+    // Every contributing session reported no cost, which on a subscription is the rule rather than a gap.
+    figure.tokensOnly = !anyCost;
+    return figure;
+  };
+  spend.perMergedChange = costPer(null, 0);
+  spend.perReleasedChange = costPer(releasedChangeIds, 0);
+  spend.perRelease = costPer(releasedChangeIds, releases.length);
+
+  // --- Work mix, flow efficiency, iterations, abandonment, spec lead time, check compliance -------------
+
+  // Work mix: what each week actually shipped, by the conventional type on the change's subject. A week of
+  // fixes and a week of features are the same count and a different story.
+  const workMixWeekly: Record<string, Record<string, WorkMixEntry>> = {};
+  for (const week of weekly) {
+    workMixWeekly[week.week] = {};
+  }
+  for (const fact of facts) {
+    const week = weekOf(fact.change.mergeTime);
+    const bucket = (workMixWeekly[week] ??= {});
+    const type = workMixType(fact.change.subject);
+    const entry = (bucket[type] ??= { changes: 0, costUsd: 0, cites: [] });
+    entry.changes += 1;
+    entry.cites.push(fact.change.id);
+    const changeSpend = spend.byChange[fact.change.id];
+    if (changeSpend) {
+      entry.costUsd =
+        Math.round((entry.costUsd + changeSpend.costUsd) * 1e6) / 1e6;
+    }
+  }
+  const workMix = {
+    weekly: workMixWeekly,
+    note: 'conventional commit type on the change subject; other covers a subject that does not parse',
+  };
+
+  const flowEfficiency = computeFlowEfficiency(facts, sessions);
+
+  const iterations = {
+    sessionsPerChange: distributionOf(
+      facts.map((fact) => ({
+        value: fact.sessions.sessions.length,
+        cite: fact.change.id,
+      })),
+    ),
+    commitsPerChange: distributionOf(
+      facts.map((fact) => ({
+        value: fact.change.branchCommits.length || 1,
+        cite: fact.change.id,
+      })),
+    ),
+  };
+
+  // Abandonment: what the queue costs once a pull head has sat past the registered age. Reported as older
+  // than that age, never as closed, because git does not say whether a pull request was closed.
+  const abandonedAfterSeconds = thresholds.abandonedAfterSeconds ?? 30 * 86_400;
+  const abandonment: Abandonment = {
+    afterSeconds: abandonedAfterSeconds,
+    count: 0,
+    costUsd: 0,
+    tokens: 0,
+    withoutFigures: 0,
+    trust: ['observed', 'reported'],
+    cites: [],
+  };
+  for (const entry of unmerged) {
+    // A pull head with no oldest commit has no age to compare, so it is not reported as old.
+    if (!entry.oldestCommitAt) {
+      continue;
+    }
+    const age = (nowMs - Date.parse(entry.oldestCommitAt)) / 1000;
+    if (!Number.isFinite(age) || age < abandonedAfterSeconds) {
+      continue;
+    }
+    abandonment.count += 1;
+    abandonment.cites.push(String(entry.number));
+    const perPull = spend.perUnmergedPullRequest[String(entry.number)];
+    if (perPull) {
+      abandonment.costUsd =
+        Math.round((abandonment.costUsd + perPull.spend.costUsd) * 1e6) / 1e6;
+      abandonment.tokens +=
+        perPull.spend.inputTokens + perPull.spend.outputTokens;
+      abandonment.withoutFigures += perPull.missingFigures;
+    }
+  }
+
+  // Spec lead time: an idea's whole life, from the first commit that cited the spec to the merge that
+  // archived it. A spec still open has no end yet, and one whose changes have no pull head timing has no
+  // start we trust; both are excluded by reason rather than guessed.
+  const specFirstCommit = new Map<string, string>();
+  const specArchiveMerge = new Map<string, string>();
+  const specUntimed = new Set<string>();
+  for (const fact of facts) {
+    const spec =
+      typeof fact.change.trailers.Spec === 'string'
+        ? fact.change.trailers.Spec
+        : null;
+    if (spec) {
+      const start = fact.timing.firstAuthoredAt;
+      if (start === null) {
+        specUntimed.add(spec);
+      } else {
+        const known = specFirstCommit.get(spec);
+        if (known === undefined || Date.parse(start) < Date.parse(known)) {
+          specFirstCommit.set(spec, start);
+        }
+      }
+    }
+    // The change that archives a spec is the one that writes its archived directory.
+    for (const file of fact.files) {
+      const archived =
+        /openspec\/changes\/archive\/[0-9-]+-([a-z0-9-]+)\//.exec(file);
+      if (archived) {
+        const name = archived[1];
+        const known = specArchiveMerge.get(name);
+        if (
+          known === undefined ||
+          Date.parse(fact.change.mergeTime) < Date.parse(known)
+        ) {
+          specArchiveMerge.set(name, fact.change.mergeTime);
+        }
+      }
+    }
+  }
+  const specLeadTime = distributionOf(
+    [...new Set([...specFirstCommit.keys(), ...specUntimed])]
+      .sort()
+      .map((spec) => {
+        if (specUntimed.has(spec) && !specFirstCommit.has(spec)) {
+          return { value: null, cite: spec, reason: 'untimed' };
+        }
+        const archived = specArchiveMerge.get(spec);
+        if (archived === undefined) {
+          return { value: null, cite: spec, reason: 'open' };
+        }
+        const start = specFirstCommit.get(spec)!;
+        return {
+          value: (Date.parse(archived) - Date.parse(start)) / 1000,
+          cite: spec,
+        };
+      }),
+  );
+
+  // Check compliance: how often a change recorded a local check at all, and how often it passed. The share
+  // matters more than the rate: a high pass rate over a tenth of the changes says very little.
+  const recordedOutcomes = Object.values(localChecks).reduce(
+    (sum, value) => sum + value,
+    0,
+  );
+  const passedOutcomes = localChecks.passed ?? 0;
+  const checkCompliance: CheckCompliance = {
+    recorded: recordedOutcomes,
+    changes: facts.length,
+    recordedShare:
+      facts.length > 0
+        ? Math.round((recordedOutcomes / facts.length) * 1e4) / 1e4
+        : null,
+    passed: passedOutcomes,
+    passRate:
+      recordedOutcomes > 0
+        ? Math.round((passedOutcomes / recordedOutcomes) * 1e4) / 1e4
+        : null,
+    trust: ['reported'],
+  };
+
   return {
     cycleTime,
     waitTime,
@@ -1356,6 +1732,12 @@ export function computeSignals(
     dora,
     trends,
     velocity,
+    workMix,
+    flowEfficiency,
+    iterations,
+    abandonment,
+    specLeadTime,
+    checkCompliance,
     costClasses,
     operators,
     coverage,

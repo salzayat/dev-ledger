@@ -8,7 +8,26 @@ export type Thresholds = {
   queueAgeSeconds?: number;
   batchSizeLines?: number;
   reworkWindowDays?: number;
+  /** The age past which an unmerged pull head is reported as older than, never as closed. */
+  abandonedAfterSeconds?: number;
 };
+
+/**
+ * Files a rework pair may share without the pair meaning anything. A lockfile changes on every dependency
+ * bump and a generated file changes whenever its source does, so without this the rework count is dominated
+ * by churn nobody chose and reads as noise rather than as a signal.
+ */
+export const DEFAULT_REWORK_IGNORE = [
+  '**/package-lock.json',
+  '**/pnpm-lock.yaml',
+  '**/yarn.lock',
+  '**/Cargo.lock',
+  '**/poetry.lock',
+  '**/go.sum',
+  '**/*.snap',
+  '**/dist/**',
+  '**/.telemetry/**',
+];
 
 export type RegistryEntry = {
   name: string;
@@ -16,6 +35,8 @@ export type RegistryEntry = {
   defaultBranch: string;
   releaseTagPattern: string;
   thresholds: Thresholds;
+  /** Globs whose files never make a rework pair; the entry's own list replaces the default. */
+  reworkIgnore: string[];
   /** An explicit browsable URL, for a remote whose host is an SSH alias the derivation cannot read. */
   webUrl: string | null;
 };
@@ -94,6 +115,7 @@ export function parseRegistry(text: string): {
       'queueAgeSeconds',
       'batchSizeLines',
       'reworkWindowDays',
+      'abandonedAfterSeconds',
     ] as const) {
       const value = rawThresholds[key];
       if (value === undefined) {
@@ -118,12 +140,31 @@ export function parseRegistry(text: string): {
         );
       }
     }
+    // An entry's own list replaces the default rather than extending it, so a repository that genuinely
+    // wants lockfile churn counted can say so by naming a shorter list.
+    let reworkIgnore = [...DEFAULT_REWORK_IGNORE];
+    const rawRework = (
+      typeof record.rework === 'object' && record.rework !== null
+        ? record.rework
+        : {}
+    ) as Record<string, unknown>;
+    if (rawRework.ignore !== undefined) {
+      if (
+        Array.isArray(rawRework.ignore) &&
+        rawRework.ignore.every((value) => typeof value === 'string')
+      ) {
+        reworkIgnore = rawRework.ignore as string[];
+      } else {
+        errors.push(`${label}.rework.ignore must be a list of glob strings`);
+      }
+    }
     repositories.push({
       name,
       url,
       defaultBranch,
       releaseTagPattern,
       thresholds,
+      reworkIgnore,
       webUrl: explicitWebUrl,
     });
   });

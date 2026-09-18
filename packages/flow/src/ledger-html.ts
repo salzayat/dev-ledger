@@ -522,6 +522,65 @@ function spendTable(
  * there is deliberately no total row across them — no record in this repository holds a rate, so a combined
  * figure could only be invented. Each human operator is its pseudonymous identifier and nothing else.
  */
+/** Work mix: what each week shipped, by conventional commit type, as stacked shares. */
+function workMixPanel(signals: RepositorySignals, links: Links): string {
+  const weeks = Object.keys(signals.workMix.weekly).sort();
+  const totals: Record<string, number> = {};
+  for (const week of weeks) {
+    for (const [type, entry] of Object.entries(signals.workMix.weekly[week])) {
+      totals[type] = (totals[type] ?? 0) + entry.changes;
+    }
+  }
+  const ranked = Object.entries(totals).sort(([, a], [, b]) => b - a);
+  const overall = ranked.reduce((sum, [, count]) => sum + count, 0);
+  const rows = ranked
+    .map(
+      ([type, count]) =>
+        `<tr><td>${escapeHtml(type)}</td><td class="num">${count}</td><td class="num">${overall > 0 ? Math.round((count / overall) * 100) : 0}%</td><td>${cites(
+          'changes',
+          Object.values(signals.workMix.weekly).flatMap(
+            (week) => week[type]?.cites ?? [],
+          ),
+          links,
+        )}</td></tr>`,
+    )
+    .join('');
+  return panel(
+    'Work mix',
+    rows
+      ? `<div class="scroll"><table><thead><tr><th>type</th><th class="num">changes</th><th class="num">share</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<p class="empty">No changes in the window.</p>',
+    `${trustBadges(['observed'])} ${escapeHtml(signals.workMix.note)}`,
+  );
+}
+
+/** Flow efficiency, iterations, spec lead time, and check compliance as one group of small reads. */
+function efficiencyPanels(signals: RepositorySignals, links: Links): string {
+  const percent = (value: number | null) =>
+    value === null ? 'n/a' : `${Math.round(value * 100)}%`;
+  const compliance = signals.checkCompliance;
+  return `${panel(
+    'Flow efficiency',
+    `${figure(percent(signals.flowEfficiency.p50), `typical share of cycle time someone was working; ${count(signals.flowEfficiency.count, 'change')} measured`)}<p class="help">Active seconds are the agent's run time plus the operator's active time. A value above one is reported as it stands: it means the sessions ran outside the cycle window, and rounding it down would hide that the figures disagree.</p>${cites('changes', signals.flowEfficiency.cites, links)}`,
+    `${trustBadges(signals.flowEfficiency.trust)} ${escapeHtml(excludedNote(signals.flowEfficiency.excluded))}`,
+  )}
+${panel(
+  'Iterations',
+  `${figure(String(signals.iterations.sessionsPerChange.p50 ?? 'n/a'), `typical sessions per change; ${signals.iterations.commitsPerChange.p50 ?? 'n/a'} commits per change`)}`,
+  `${trustBadges(['observed', 'reported'])} over ${count(signals.iterations.sessionsPerChange.count, 'change')}`,
+)}
+${panel(
+  'Spec lead time',
+  `${figure(escapeHtml(seconds(signals.specLeadTime.p50)), `typical, from a spec's first commit to the merge that archived it; ${count(signals.specLeadTime.count, 'spec')} measured`)}${cites('specs', signals.specLeadTime.cites, links)}`,
+  `${trustBadges(signals.specLeadTime.trust)} ${escapeHtml(excludedNote(signals.specLeadTime.excluded))}`,
+)}
+${panel(
+  'Check compliance',
+  `${figure(percent(compliance.recordedShare), `of ${count(compliance.changes, 'change')} recorded a local check; ${percent(compliance.passRate)} of those passed`)}<p class="help">The share matters more than the rate: a high pass rate over a tenth of the changes says very little.</p>`,
+  trustBadges(compliance.trust),
+)}`;
+}
+
 function operatorPanel(operators: Operators, links: Links): string {
   const agents = Object.entries(operators.agents).sort(
     ([, a], [, b]) => b.sessions - a.sessions,
@@ -931,7 +990,7 @@ ${panel(
       ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th class="num">spend</th><th class="num">man hours</th><th class="num">sessions</th><th>oldest commit</th><th>records</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
       : '<p class="empty">Nothing waiting.</p>'
   }`,
-  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report`,
+  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report. ${escapeHtml(`${signals.abandonment.count} older than ${seconds(signals.abandonment.afterSeconds)}, carrying ${signals.abandonment.tokens.toLocaleString('en-US')} tokens${signals.abandonment.withoutFigures ? ` and ${signals.abandonment.withoutFigures} records without figures` : ''}`)}`,
 )}
 ${panel(
   'Population',
@@ -948,6 +1007,8 @@ ${panel('Local checks', figure(checks || 'none', checks ? 'session records with 
 <section class="tab tab--default" id="${tab('flow')}" aria-label="Flow">
 ${signalPanels}
 <div class="grid">
+${workMixPanel(signals, links)}
+${efficiencyPanels(signals, links)}
 ${panel(
   'Velocity',
   `${figure(

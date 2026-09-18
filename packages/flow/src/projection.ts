@@ -255,6 +255,7 @@ export function buildRepositoryProjection(
     })),
     subscriptions,
     entry.thresholds,
+    entry.reworkIgnore,
     configAt,
     asOf ?? '1970-01-01T00:00:00Z',
   );

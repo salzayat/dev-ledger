@@ -805,6 +805,115 @@ test('coverage separates an agent session, a declared human-only change, and an 
   );
 });
 
+test('work mix, flow efficiency, iterations, and check compliance read from what is already recorded', () => {
+  const fixture = makeFixtureRepo();
+  const mix = [
+    ['feat(a): a feature', 'c-mix-1', 's-mix-1'],
+    ['fix(b): a fix', 'c-mix-2', 's-mix-2'],
+    ['chore(c): a chore', 'c-mix-3', null],
+    ['not a conventional subject', 'c-mix-4', null],
+  ] as const;
+  mix.forEach(([subject, change, session], index) => {
+    const files: Record<string, string> = {
+      [`src/mix-${index}.ts`]: String(index),
+    };
+    const trailers: Record<string, string> = { Change: change };
+    if (session) {
+      trailers.Session = session;
+      files[`.telemetry/sessions/2026-09/${session}.json`] = sessionJson(
+        session,
+        {
+          agentRunSeconds: 1800,
+        },
+      );
+    } else {
+      trailers.Session = 'none';
+    }
+    const pull = openPullRequest(fixture, `mix-${index}`, [
+      [trailered(subject, trailers), files],
+    ]);
+    mergeSquash(
+      fixture,
+      pull,
+      subject,
+      session ? `Session: ${session}` : 'Session: none',
+      { hours: 24 },
+    );
+  });
+
+  const { repo } = build(registryFor(fixture.dir));
+  const signals = repo.signals;
+
+  // Work mix: every change lands in a type, and a subject that does not parse is `other` rather than lost.
+  const types = Object.values(signals.workMix.weekly).flatMap((week) =>
+    Object.keys(week),
+  );
+  for (const type of ['feat', 'fix', 'chore', 'other']) {
+    assert.ok(types.includes(type), `${type} appears in the work mix`);
+  }
+
+  // Flow efficiency: the two changes with sessions can be measured; the two without are excluded by reason.
+  assert.equal(signals.flowEfficiency.count, 2);
+  assert.equal(signals.flowEfficiency.excluded['no-sessions'], 2);
+
+  // Iterations: one distribution per question, over every change.
+  assert.ok(signals.iterations.sessionsPerChange.count >= 4);
+  assert.ok(signals.iterations.commitsPerChange.count >= 4);
+
+  // Check compliance: the share matters more than the rate, so both are reported.
+  assert.equal(signals.checkCompliance.recorded, 2);
+  assert.ok(signals.checkCompliance.recordedShare !== null);
+  assert.equal(signals.checkCompliance.passRate, 1);
+
+  // Cost per merged change counts the changes it could not measure rather than averaging over them.
+  assert.ok(signals.spend.perMergedChange.excluded >= 2);
+});
+
+test('the rework ignore list drops lockfile pairs and says how many', () => {
+  const fixture = makeFixtureRepo();
+  // Two changes sharing only a lockfile: churn nobody chose, not work done twice.
+  for (const index of [0, 1]) {
+    const pull = openPullRequest(fixture, `lock-${index}`, [
+      [
+        trailered(`chore(deps): bump ${index}`, {
+          Session: 'none',
+          Change: `c-lock-${index}`,
+        }),
+        { 'package-lock.json': `{"v":${index}}` },
+      ],
+    ]);
+    mergeSquash(fixture, pull, `chore(deps): bump ${index}`, 'Session: none', {
+      hours: 2,
+    });
+  }
+
+  const ignored = build(registryFor(fixture.dir)).repo.signals.rework;
+  assert.equal(
+    ignored.pairs.length,
+    0,
+    'a pair sharing only an ignored file is not a pair',
+  );
+  assert.ok(ignored.ignored >= 1, 'and the read says how many it removed');
+  assert.ok(ignored.ignore.includes('**/package-lock.json'));
+
+  // An entry naming its own list replaces the default, so the same pair counts again.
+  const counted = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [
+        { name: 'counted', url: fixture.dir, rework: { ignore: [] } },
+      ],
+    }),
+  ).registry;
+  const state = stateRoot();
+  syncAll(state, counted);
+  const projection = buildProjection(state, counted);
+  assert.ok(
+    projection.repositories.counted.signals!.rework.pairs.length >= 1,
+    'an empty ignore list counts the pair',
+  );
+});
+
 test('a projection built over many synthetic changes stays well under a minute', () => {
   const fixture = makeFixtureRepo();
   const count = Number(process.env.DEV_LEDGER_SYNTHETIC_CHANGES ?? '60');
