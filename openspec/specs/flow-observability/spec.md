@@ -5,7 +5,7 @@
 Turn the commit histories of one or more repositories, fetched over the git access a developer already
 has, into the signals an engineer needs to find where work waits: cycle and wait time, the unmerged queue,
 batch size, rework, escapes, and spend per change, rebuilt into a projection that is byte-identical on any
-machine holding the same ref tips and rendered on one read surface, The Ledger. Reviews, checks, and
+machine holding the same ref tips and rendered on one read surface, The Board. Reviews, checks, and
 platform timestamps are out of scope here and belong to phase two.
 
 ## Requirements
@@ -400,16 +400,16 @@ that it did so.
 - THEN it MUST reset to the nearest reachable ancestor and replay forward
 - AND it MUST record that the reset happened
 
-### Requirement: The Ledger
+### Requirement: The Board
 
-The system SHALL provide one read surface, The Ledger, rendering the projection per repository and across the
+The system SHALL provide one read surface, The Board, rendering the projection per repository and across the
 registry: the flow signals and any thresholds exceeded, spend per spec reference, per provider, and per
 model, cost per unit of recorded effort, the unmerged queue, undeclared, unreported, and out-of-band changes,
 and unreachable repositories. Every figure SHALL show the trust classes it was computed from and its excluded
-count, and SHALL be traceable to the changes and records it was computed from. The Ledger SHALL NOT present
+count, and SHALL be traceable to the changes and records it was computed from. The Board SHALL NOT present
 any figure keyed to an operator identifier, SHALL read only from the projection, and SHALL render an explicit
-empty state when the projection has no records. The Ledger SHALL be available as a terminal render and as a
-static HTML dashboard written by `telemetry ledger --html`: one self-contained page with inline styles and
+empty state when the projection has no records. The Board SHALL be available as a terminal render and as a
+static HTML dashboard written by `telemetry board --html`: one self-contained page with inline styles and
 inline SVG, containing no script element and loading no external resource, readable from a file URL, laid out
 per repository with each figure's trust classes and excluded count beside it and its citations expandable
 beneath it, working in light and dark color schemes and at phone width. On the HTML dashboard every cited
@@ -417,10 +417,10 @@ commit SHALL render as its abbreviated hash beside the change's subject, and SHA
 hosting platform when the repository's web URL is recorded; a cited pull request SHALL link to that pull
 request and a cited session record to that file on the default branch. A hyperlink to the hosting platform is
 navigation and SHALL NOT be treated as an external resource; when no web URL is recorded the same text SHALL
-render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show each pull request's spend beside its age, and the recent-changes table SHALL show each change's spend, each rendering what the records say rather than a zero when figures are missing, with every session record cited. The Ledger SHALL show the four DORA
+render with no hyperlink. On the HTML dashboard the unmerged queue SHALL show each pull request's spend beside its age, and the recent-changes table SHALL show each change's spend, each rendering what the records say rather than a zero when figures are missing, with every session record cited. The Board SHALL show the four DORA
 reads as a strip of cards, each with its approximation note and its citations, a spend-over-time chart with
 the same weekly buckets as merge activity, a spend-by-cost-class panel, and the coverage counts, on both the
-HTML dashboard and the terminal render. The Ledger SHALL show allocated subscription spend where reported
+HTML dashboard and the terminal render. The Board SHALL show allocated subscription spend where reported
 spend is shown: an allocated figure in the summary strip, a subscription spend panel listing each period
 with its plan, amount, overage, sessions allocated over, sessions excluded for no agent seconds, and
 whether it is closed, provisional, or unallocated, an allocated column on the spend tables, and the
@@ -428,10 +428,10 @@ allocated share beside the reported spend in the queue and changes tables. Every
 carry the trust class `allocated`, SHALL be marked provisional when its period has not closed, and SHALL
 cite the period record behind it; two currencies SHALL NOT be summed.
 
-#### Scenario: The Ledger with an empty projection
+#### Scenario: The Board with an empty projection
 
 - GIVEN a projection with no records
-- WHEN an operator opens The Ledger
+- WHEN an operator opens The Board
 - THEN it MUST render with an explicit empty state rather than failing
 
 #### Scenario: A figure enumerates its inputs
@@ -440,16 +440,16 @@ cite the period record behind it; two currencies SHALL NOT be summed.
 - WHEN an operator inspects the figure
 - THEN it MUST list the changes and session records that produced it
 
-#### Scenario: The Ledger shows no per-operator figure
+#### Scenario: The Board shows no per-operator figure
 
 - GIVEN a projection whose session records carry operator identifiers
-- WHEN an operator opens The Ledger
+- WHEN an operator opens The Board
 - THEN no panel MUST group, rank, or trend any figure by operator identifier
 
 #### Scenario: The dashboard is one self-contained page
 
 - GIVEN a projection with records
-- WHEN `telemetry ledger --html` runs
+- WHEN `telemetry board --html` runs
 - THEN it MUST write one HTML file that contains no script element, no stylesheet or resource reference, and
   no style rule loading a resource
 - AND opening that file from a file URL MUST show every panel with its trust classes, excluded count, and
@@ -505,14 +505,14 @@ cite the period record behind it; two currencies SHALL NOT be summed.
 #### Scenario: An allocated figure shows its class, its period, and its provisional state
 
 - GIVEN a subscription cost record for the period of the newest commit and a session in it with agent seconds
-- WHEN an operator opens The Ledger
+- WHEN an operator opens The Board
 - THEN the subscription spend panel MUST list that period as provisional citing the record
 - AND the session's change MUST show its allocated share beside its reported spend, carrying `allocated`
 
 #### Scenario: No period record renders as absence, not as zero
 
 - GIVEN a repository with subscription sessions and no subscription cost record
-- WHEN an operator opens The Ledger
+- WHEN an operator opens The Board
 - THEN the allocated figure MUST read as no period record
 - AND every subscription session MUST be counted as excluded for lacking one
 

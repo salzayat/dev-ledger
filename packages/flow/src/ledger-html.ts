@@ -111,6 +111,24 @@ function spendCell(spend: Spend | undefined, absent: string): string {
     : `<span class="dim">${escapeHtml(absent)}</span>`;
 }
 
+/**
+ * Man hours beside the tokens: the operator's own time, and how much of the work needed nobody. A record
+ * with no operator figure is named rather than rendered as an hour of zero.
+ */
+function hoursCell(spend: Spend | undefined): string {
+  if (!spend || spend.sessions === 0) {
+    return '<span class="dim">—</span>';
+  }
+  if (spend.operatorSeconds === 0 && spend.withoutOperatorTime > 0) {
+    return `<span class="dim">${spend.withoutOperatorTime} without operator time</span>`;
+  }
+  const autonomous =
+    spend.agentAutonomousSeconds > 0
+      ? ` <span class="dim">${(spend.agentAutonomousSeconds / 3600).toFixed(1)} h autonomous</span>`
+      : '';
+  return `${(spend.operatorSeconds / 3600).toFixed(1)} h${autonomous}`;
+}
+
 /** An amount in its currency: `$12.34` for USD, `12.34 EUR` for anything else. */
 function money(amount: number, currency: string): string {
   return currency === 'USD'
@@ -430,6 +448,9 @@ function spendTable(
             outputTokens: 0,
             cachedTokens: 0,
             costUsd: 0,
+            operatorSeconds: 0,
+            agentAutonomousSeconds: 0,
+            withoutOperatorTime: 0,
             sessions: 0,
             cites: [],
           },
@@ -573,12 +594,12 @@ function changesTable(
       const gaps = change.gaps
         .map((gap) => `<span class="gap">${escapeHtml(gap.type)}</span>`)
         .join(' ');
-      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject">${href(links, `commit/${change.id}`, change.id.slice(0, 10))} <span class="cite-title">${escapeHtml(change.subject)}</span></td><td>${pullRef(change.association.pullRequest, links)} <span class="dim">${escapeHtml(change.association.method ?? '')}</span></td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num nowrap"><span class="added">+${change.insertions}</span> <span class="removed">−${change.deletions}</span></td><td class="num nowrap">${spend}</td><td>${sessions}</td><td>${gaps || '<span class="dim">none</span>'}</td></tr>`;
+      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject">${href(links, `commit/${change.id}`, change.id.slice(0, 10))} <span class="cite-title">${escapeHtml(change.subject)}</span></td><td>${pullRef(change.association.pullRequest, links)} <span class="dim">${escapeHtml(change.association.method ?? '')}</span></td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num nowrap"><span class="added">+${change.insertions}</span> <span class="removed">−${change.deletions}</span></td><td class="num nowrap">${spend}</td><td class="num nowrap">${hoursCell(byChange[change.id])}</td><td>${sessions}</td><td>${gaps || '<span class="dim">none</span>'}</td></tr>`;
     })
     .join('');
   return panel(
     'Recent changes',
-    `<div class="scroll tall"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">lines</th><th class="num">spend</th><th>sessions</th><th>gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    `<div class="scroll tall"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">lines</th><th class="num">spend</th><th class="num">man hours</th><th>sessions</th><th>gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
     `${trustBadges(['observed', 'reported'])} the newest ${recent.length} of ${changes.length} changes on the default branch; wait and cycle come from the pull head ref, sessions and spend from the harness`,
     'span-all',
   );
@@ -807,7 +828,7 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
       const records = perPull
         ? cites('records', perPull.cites, links)
         : '<span class="dim">none</span>';
-      return `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="num nowrap">${spendCell(perPull?.spend, absent)}${allocatedCell(signals.allocation, (aggregates) => aggregates.perUnmergedPullRequest[String(entry.number)])}</td><td class="num">${perPull?.spend.sessions ?? 0}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td><td>${records}</td></tr>`;
+      return `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="num nowrap">${spendCell(perPull?.spend, absent)}${allocatedCell(signals.allocation, (aggregates) => aggregates.perUnmergedPullRequest[String(entry.number)])}</td><td class="num nowrap">${hoursCell(perPull?.spend)}</td><td class="num">${perPull?.spend.sessions ?? 0}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td><td>${records}</td></tr>`;
     })
     .join('');
   const excludedLine = `${excluded.undeclared} undeclared, ${excluded.unreported} unreported, ${excluded.humanOnly} human-only, ${excluded.invalidSession} invalid, ${excluded.missingFigures} with figures missing`;

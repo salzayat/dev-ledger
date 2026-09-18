@@ -47,9 +47,9 @@ package registry and therefore runs only in CI, not in the local, offline qualit
 - WHEN the dependency advisory check runs
 - THEN it fails and names the unreviewed advisory id
 
-### Requirement: The Ledger is built on every pull request and published only from the default branch
+### Requirement: The Board is built on every pull request and published only from the default branch
 
-The continuous integration workflow SHALL build The Ledger's static HTML page on every pull request and on
+The continuous integration workflow SHALL build The Board's static HTML page on every pull request and on
 every push to the default branch, checking out the full history so the projection matches one an operator
 rebuilds locally. On a pull request it SHALL make the page available as a run artifact and write the terminal
 render into the run's job summary, and SHALL NOT deploy. On the default branch it SHALL deploy the page to

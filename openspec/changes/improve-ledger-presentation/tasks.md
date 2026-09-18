@@ -2,8 +2,9 @@
 
 ## 1. The rename
 
-- [x] 1.1 Rename the accepted requirement through the delta, and every mention of The Board in the specs,
-      the docs, the roadmap, and the active changes.
+- [x] 1.1 Rename the requirement through the deltas for `flow-observability` and `ci-governance`, leaving
+      the accepted specs untouched so the archive applies the rename; rename every other mention in the
+      docs, the roadmap, and the active changes.
 - [x] 1.2 Rename the modules: `board.ts` to `ledger.ts`, `board-html.ts` to `ledger-html.ts`, and their
       tests, with `renderBoard` and `renderBoardHtml` following.
 - [x] 1.3 Rename the entry points: the `telemetry ledger` subcommand, `scripts/ledger.sh`,
