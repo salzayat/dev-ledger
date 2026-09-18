@@ -23,6 +23,7 @@ contract.
 | Capture git environment (defect)                  | `fix-capture-git-environment`                                 | Complete |
 | Session figures (telemetry capture)               | `add-session-figures-from-transcript`                         | Complete |
 | Review fixes (session figures, Board links)       | `fix-transcript-figures-and-board-links`                      | Complete |
+| Session trailer default (defect)                  | `fix-session-none-default`                                    | Pending  |
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
 | Subscription and operator spend (phase one)       | `add-subscription-and-operator-spend`                         | Blocked  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Blocked  |
@@ -92,6 +93,14 @@ repository that follows the OpenSpec loop (spec lead time), and the cost figures
 token counts are real. It follows the DORA signals row for the weekly buckets and the review fixes row for
 the figures, and it is drafted rather than started. Every read that needs a review, a check run, a
 deployment, or an incident stays in the change audit row.
+
+The session trailer default row is a defect fix, not a capability, and it comes before the rows below it
+because it corrects a record every later row reads. Two accepted specs give `Session: none` two meanings:
+capture writes it whenever no session is active, and the projection reads it as a declaration that a human
+worked without an agent. Because ending a session unsets the active session, every commit made after a
+session is recorded — a review fix, a follow-up, a revert — is silently declared human-only, which
+falsifies the coverage counts the flow efficiency row accepts. The fix writes no trailer when nothing is
+known, leaving the change `undeclared`, and makes the human-only declaration something an operator states.
 
 The subscription and operator spend row comes before board publication because every currency figure The
 Board renders is `$0.00` today: validation requires a subscription session to record no marginal cost, and
