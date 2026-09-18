@@ -44,4 +44,4 @@
 - [x] 5.5 Test each gap kind appears on the Board with its command, and that a session naming an unknown
       plan is named rather than only counted.
 - [x] 5.6 Test that the rendered page still carries no script element, no external resource, and no form.
-- [ ] 5.7 Run `npm run check` and the board end to end, recording the result in the pull request.
+- [x] 5.7 Run `npm run check` and the board end to end, recording the result in the pull request.

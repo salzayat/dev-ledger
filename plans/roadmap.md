@@ -29,9 +29,9 @@ contract.
 | Operator dimension (phase one addendum)           | `add-operator-dimension`                                      | Complete |
 | Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Complete |
 | Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Complete |
-| Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Pending  |
+| Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Complete |
 | Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Pending  |
-| Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Blocked  |
+| Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Pending  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
 | Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
@@ -165,8 +165,7 @@ because a static file on a hosting surface has nothing for a form to submit to; 
 copy and a shell has no such limit, and retyping a command in another window is friction with no safety
 behind it. The split is containment rather than visibility: the published artifact carries no editing markup
 at all, so a deployment cannot be made to reveal an editor it never held, and the local server binds
-loopback, writes only plan declarations and cost records, and never commits. It is `Blocked` behind the
-subscription declarations row, which defines what it edits.
+loopback, writes only plan declarations and cost records, and never commits. It follows the subscription declarations row, which defines what it edits and is now archived.
 
 The ledger presentation row renames the read surface and reorganises it. The Board was a status display in a
 repository that keeps an account, and The Ledger says what the page is in the repository's own vocabulary.
