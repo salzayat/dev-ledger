@@ -27,6 +27,12 @@ export type Spend = {
   outputTokens: number;
   cachedTokens: number;
   costUsd: number;
+  /** Man hours in seconds, from the operator's time between prompts. An expense in its own unit. */
+  operatorSeconds: number;
+  /** Time the agent produced on its own, needing nobody. */
+  agentAutonomousSeconds: number;
+  /** Sessions contributing no operator figure, counted rather than read as nobody present. */
+  withoutOperatorTime: number;
   sessions: number;
   cites: string[];
 };
@@ -297,6 +303,9 @@ function emptySpend(): Spend {
     outputTokens: 0,
     cachedTokens: 0,
     costUsd: 0,
+    operatorSeconds: 0,
+    agentAutonomousSeconds: 0,
+    withoutOperatorTime: 0,
     sessions: 0,
     cites: [],
   };
@@ -316,6 +325,14 @@ function add(into: Spend, record: SessionRecord): boolean {
   into.outputTokens += file.outputTokens;
   into.cachedTokens += file.cachedTokens;
   into.costUsd = Math.round((into.costUsd + file.costUsd) * 1e6) / 1e6;
+  // Man hours ride beside the tokens as a second expense in its own unit. A record with no operator figure
+  // is counted, not read as a session nobody worked.
+  if (typeof file.operatorActiveSeconds === 'number') {
+    into.operatorSeconds += file.operatorActiveSeconds;
+    into.agentAutonomousSeconds += file.agentAutonomousSeconds ?? 0;
+  } else {
+    into.withoutOperatorTime += 1;
+  }
   into.sessions += 1;
   into.cites.push(record.path);
   return true;

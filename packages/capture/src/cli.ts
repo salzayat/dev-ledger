@@ -3,11 +3,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { DEFAULT_CONFIG, parseConfig, type TelemetryConfig } from './config.ts';
 import {
+  attributeTranscriptTime,
   SESSIONS_PATH,
   buildSessionFile,
   sessionFilePath,
   validateSessionFile,
   type SessionInput,
+  ATTRIBUTION_ALGORITHM,
+  type TimeAttribution,
 } from './session.ts';
 import {
   SUBSCRIPTIONS_PATH,
@@ -17,6 +20,7 @@ import {
 } from './subscription.ts';
 import { validateMessage } from './trailers.ts';
 import {
+  transcriptEvents,
   sumTranscriptUsage,
   transcriptFiguresSource,
   type Figures,
@@ -233,6 +237,30 @@ function readTranscriptFigures(
   return sumTranscriptUsage(readFileSync(absolute, 'utf8'));
 }
 
+/**
+ * Operator active seconds from the same transcript the token figures come from. Fewer than two prompts
+ * leaves the figure absent rather than zero: one prompt measures no engagement, and a zero would claim the
+ * operator was present for none of a session they started.
+ */
+function readTranscriptAttribution(
+  root: string,
+  path: string | undefined,
+  idleCapSeconds: number,
+): TimeAttribution | null {
+  if (!path) {
+    return null;
+  }
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute)) {
+    return null;
+  }
+  const events = transcriptEvents(readFileSync(absolute, 'utf8'));
+  if (events.filter((event) => event.kind === 'prompt').length < 2) {
+    return null;
+  }
+  return attributeTranscriptTime(events, idleCapSeconds);
+}
+
 export function captureMain(argv: string[]): number {
   const [command, ...args] = argv;
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']).trim();
@@ -259,11 +287,27 @@ export function captureMain(argv: string[]): number {
             'no usage record in the transcript; record the session without figures',
           );
         }
+        const config = loadConfig(root);
+        const attribution = config.costAllocation.enabled
+          ? readTranscriptAttribution(
+              root,
+              option(args, '--transcript'),
+              config.costAllocation.idleCapSeconds,
+            )
+          : null;
         process.stdout.write(
           canonicalJson({
             cachedTokens: figures.cachedTokens,
             figuresSource: transcriptFiguresSource(figures),
             inputTokens: figures.inputTokens,
+            ...(attribution === null
+              ? {}
+              : {
+                  agentAutonomousSeconds: attribution.agentAutonomousSeconds,
+                  idleSeconds: attribution.idleSeconds,
+                  operatorActiveAlgorithm: `${ATTRIBUTION_ALGORITHM}:${config.costAllocation.idleCapSeconds}`,
+                  operatorActiveSeconds: attribution.operatorActiveSeconds,
+                }),
             outputTokens: figures.outputTokens,
           }),
         );
@@ -294,6 +338,24 @@ export function captureMain(argv: string[]): number {
             input.cachedTokens ??= figures.cachedTokens;
             if (filled) {
               input.figuresSource = transcriptFiguresSource(figures);
+            }
+          }
+          // Operator seconds come from the same file and fill the same way: a payload that stated its own
+          // figure keeps it, because the harness knew something the transcript cannot show.
+          if (
+            config.costAllocation.enabled &&
+            input.operatorActiveSeconds === undefined
+          ) {
+            const attribution = readTranscriptAttribution(
+              root,
+              transcript,
+              config.costAllocation.idleCapSeconds,
+            );
+            if (attribution !== null) {
+              input.operatorActiveSeconds = attribution.operatorActiveSeconds;
+              input.agentAutonomousSeconds ??=
+                attribution.agentAutonomousSeconds;
+              input.idleSeconds ??= attribution.idleSeconds;
             }
           }
         }
