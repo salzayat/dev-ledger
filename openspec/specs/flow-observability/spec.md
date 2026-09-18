@@ -18,7 +18,11 @@ browsable web URL, which SHALL be an https URL or a registry error. `telemetry s
 registered repository into a local mirror, including tags and `refs/pull/*/head`, using the operator's own
 git access and nothing else, and SHALL record the ref tips it fetched. A repository that cannot be fetched
 SHALL be recorded as unreachable with the reason, and every read covering it SHALL name it as unreachable
-rather than omitting it silently.
+rather than omitting it silently. A sync MAY be given a fetch URL overriding that of one named registry
+entry, for an environment that reaches the same repository over a different transport; the override SHALL
+apply to that entry alone, SHALL NOT modify `registry.json`, and SHALL NOT change the ref tips recorded,
+so a projection rebuilt from an overridden sync is identical to one rebuilt from a sync without it against
+the same source.
 
 #### Scenario: Sync fetches pull head refs
 
@@ -44,6 +48,14 @@ rather than omitting it silently.
 - GIVEN a registry entry whose `webUrl` is a `file:` URL
 - WHEN the registry is parsed
 - THEN the entry MUST be reported as an error naming the field
+
+#### Scenario: An overridden fetch URL changes the transport and nothing else
+
+- GIVEN a registry entry whose URL is an SSH remote, and a sync given an HTTPS fetch URL for that entry
+- WHEN `telemetry sync` runs and the projection is rebuilt
+- THEN the recorded ref tips MUST equal those recorded by a sync without the override against the same source
+- AND `registry.json` MUST be unchanged
+- AND no other registry entry MUST be fetched from an overridden URL
 
 ### Requirement: A change is identified for every merge method
 

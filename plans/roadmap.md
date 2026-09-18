@@ -26,7 +26,7 @@ contract.
 | Session trailer default (defect)                  | `fix-session-none-default`                                    | Pending  |
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
 | Subscription and operator spend (phase one)       | `add-subscription-and-operator-spend`                         | Blocked  |
-| Board publication (phase one)                     | `add-board-publication`                                       | Blocked  |
+| Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -113,13 +113,13 @@ the flow efficiency and work mix row because both modify `Flow signals per repos
 whichever archives second is rebased onto the first.
 
 The board publication row builds The Board on every pull request as a run artifact and a job summary, and
-deploys it to Pages from the default branch only, gated on the repository being public — the gate lives in
+deploys it to Pages from the default branch only, gated on the repository being public; the gate lives in
 the workflow rather than in a sequencing note, so it cannot be forgotten if visibility ever changes back. It
-was first sequenced after the subscription and operator spend row so a published page would not lead with a
-spend panel reading zero; the repository owner has since decided to publish ahead of that row, and the
-currency figures become real when it lands. Its implementation is complete and it stays `Blocked` only
-because it modifies `A registry of repositories synced over SSH`, which the flow efficiency and work mix row
-modifies too, and the two cannot be archived out of order.
+was first sequenced after the subscription spend row so a published page would not lead with a spend panel
+reading zero; the repository owner decided to publish ahead of that row, and the currency figures become
+real when it lands. It was archived after its implementation had merged, out of the order the workflow
+asks for; the flow efficiency and work mix draft, which modifies the same registry requirement, was rebased
+onto the accepted text in the same change.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
