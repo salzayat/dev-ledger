@@ -30,7 +30,7 @@ contract.
 | Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Complete |
 | Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Complete |
 | Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Complete |
-| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Pending  |
+| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Complete |
 | Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Pending  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
