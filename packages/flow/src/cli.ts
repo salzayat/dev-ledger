@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { renderLedger } from './ledger.ts';
-import { renderLedgerHtml } from './ledger-html.ts';
+import { linksFor, renderLedgerHtml } from './ledger-html.ts';
+import { renderConfigurationPage } from './configuration-html.ts';
+import { serveConfiguration } from './configuration-server.ts';
 import { advanceCursor, readCursor, writeCursor } from './cursor.ts';
 import { git } from './git.ts';
 import {
@@ -23,6 +25,7 @@ const USAGE = `Usage: telemetry <command> [options]
                                            fetching one named entry from a different URL
   rebuild                                  Rebuild the projection from the mirrors and print its hash
   cursor <consumer> [--repo <name>]        Replay changes since the consumer's cursor and advance it
+  configure [--port N]                     Serve the configuration surface on the loopback interface only
   ledger [--html [path]]                    Render The Ledger in the terminal, or as a static HTML page (default .telemetry/ledger.html)
 `;
 
@@ -139,6 +142,44 @@ export function main(argv: string[]): number {
       writeCursor(state, consumer, cursor);
       return 0;
     }
+    case 'configure': {
+      // Local only, by construction: the surface refuses any host but loopback, and the published page
+      // carries neither this panel nor its editor.
+      const projection = readProjection(stateRoot(root));
+      const repositories = projection
+        ? Object.values(projection.repositories).filter(
+            (repository) => repository.reachable,
+          )
+        : [];
+      const port = Number(option(args, '--port') ?? 4711);
+      const host = option(args, '--host');
+      const plansPath = join('.telemetry', 'subscriptions', 'plans.json');
+      // The server keeps the process alive; `main` stays synchronous, so the promise is handled rather
+      // than awaited and a refused bind sets a failing exit code.
+      void serveConfiguration({
+        root,
+        port,
+        host,
+        page: () =>
+          renderConfigurationPage(
+            repositories,
+            linksFor(repositories[0] ?? ({ name: '' } as never)),
+            existsSync(resolve(root, plansPath))
+              ? readFileSync(resolve(root, plansPath), 'utf8')
+              : '{\n  "schemaVersion": 1,\n  "plans": []\n}\n',
+          ),
+      })
+        .then((started) => {
+          process.stdout.write(`${started.url}\n`);
+          process.stdout.write(`editing ${root}\n`);
+          process.stdout.write('local only; nothing is committed\n');
+        })
+        .catch((error: Error) => {
+          process.stderr.write(`${error.message}\n`);
+          process.exitCode = 1;
+        });
+      return 0;
+    }
     case 'ledger': {
       const projection = readProjection(stateRoot(root));
       const htmlIndex = args.indexOf('--html');
@@ -175,5 +216,12 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === new URL(import.meta.url).pathname
 ) {
-  process.exit(main(process.argv.slice(2)));
+  const status = main(process.argv.slice(2));
+  // `configure` leaves a server listening, and exiting here would kill it before it ever accepted a
+  // request. Every other subcommand finishes its work synchronously and exits as before.
+  if (process.argv[2] === 'configure') {
+    process.exitCode ??= status;
+  } else {
+    process.exit(status);
+  }
 }
