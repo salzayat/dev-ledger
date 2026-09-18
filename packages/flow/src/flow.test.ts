@@ -1702,3 +1702,50 @@ test('subscription spend is allocated by agent run seconds, excluded and counted
     canonicalJson(again.projection),
   );
 });
+
+test("a merge commit takes its work mix type from its branch commits, not from git's subject", () => {
+  const fixture = makeFixtureRepo();
+  const feature = openPullRequest(fixture, 'feature', [
+    [
+      trailered('feat(a): first', { Session: 'none', Change: 'c-f' }),
+      { 'a.txt': '1' },
+    ],
+    [
+      trailered('feat(a): second', { Session: 'none', Change: 'c-f' }),
+      { 'a.txt': '2' },
+    ],
+    [
+      trailered('fix(a): typo', { Session: 'none', Change: 'c-f' }),
+      { 'a.txt': '3' },
+    ],
+    [
+      trailered('chore(telemetry): record session s-x', {
+        Session: 'none',
+        Change: 'c-f',
+      }),
+      { 'b.txt': 'b' },
+    ],
+  ]);
+  mergeCommit(fixture, feature);
+  const untyped = openPullRequest(fixture, 'untyped', [
+    ['wrote some things', { 'c.txt': 'c' }],
+  ]);
+  mergeCommit(fixture, untyped);
+  const { repo } = build(registryFor(fixture.dir));
+  const mix = Object.values(repo.signals!.workMix.weekly);
+  const count = (type: string) =>
+    mix.reduce((sum, week) => sum + (week[type]?.changes ?? 0), 0);
+  assert.equal(
+    count('feat'),
+    1,
+    'two feat commits outvote one fix; the record commit does not vote',
+  );
+  assert.equal(count('fix'), 0);
+  const otherCites = mix.flatMap((week) => week.other?.cites ?? []);
+  assert.ok(
+    otherCites.includes(untyped.mergedAs!),
+    'the untyped branch reads other',
+  );
+  assert.ok(!otherCites.includes(feature.mergedAs!));
+  assert.match(repo.signals!.workMix.note, /branch commits/);
+});

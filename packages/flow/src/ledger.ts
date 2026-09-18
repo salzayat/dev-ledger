@@ -2,7 +2,7 @@ import type { Projection, RepositoryProjection } from './projection.ts';
 import type { Distribution, Spend } from './signals.ts';
 
 // The Ledger: one read surface over the projection. Every figure names its trust classes, its excluded
-// count, and the changes or records behind it. Nothing is keyed to a person.
+// count, and the changes or records behind it. Nothing is resolved to a person.
 
 function seconds(value: number | null): string {
   if (value === null) {

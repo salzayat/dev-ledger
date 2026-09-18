@@ -1367,7 +1367,7 @@ ${nav ? `<nav class="nav">${nav}</nav>` : ''}
 </div></header>
 <main class="wrap">
 ${body}
-<footer>Every figure names the trust classes it was computed from and the changes or records behind it. Nothing here is keyed to a person. Reviews, checks, and platform timestamps are not observed; see docs/methodology.md.</footer>
+<footer>Every figure names the trust classes it was computed from and the changes or records behind it. Nothing here is resolved to a person: operators are a pseudonymous identifier or a provider and model. Reviews, checks, and platform timestamps are not observed; see docs/methodology.md.</footer>
 </main>
 </body>
 </html>

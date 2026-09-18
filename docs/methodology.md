@@ -141,8 +141,9 @@ published page reads only from the projection and carries no form, so there is n
 
 Each week's changes by the conventional commit type on their subject, with `other` for a subject that does
 not parse. A week of fixes and a week of features are the same count and a different story, and the mix is
-what tells them apart. On this repository `other` is the largest bucket, because most of its history is
-merge commits, which carry no conventional type — that is the honest reading, not a gap.
+what tells them apart. A merge commit's subject is git's own and carries no type, so a change merged that
+way takes the most common type among the branch commits it brought in, with a telemetry record commit not
+voting; only a change whose commits carry no type at all reads `other`.
 
 ## Flow efficiency
 
@@ -150,9 +151,11 @@ Per change, the agent's run seconds plus the operator's active seconds, divided 
 the elapsed time anyone was actually working. Changes with no timing, no sessions, or no active figures are
 excluded by reason rather than read as nought per cent busy.
 
-A value above one is reported as it stands. It means the sessions ran outside the cycle window — an agent
-that started before the first commit on the pull request, or kept running after the merge — and rounding it
-down to one would hide that two figures disagree rather than showing it.
+A value above one is reported as it stands. It means the sessions ran outside the cycle window (an agent
+that started before the first commit on the pull request, or kept running after the merge) and rounding it
+down to one would hide that two figures disagree rather than showing it. The earliest records in this
+repository carry hand-typed start and end times and read that way; since `session start` began recording
+the clock and `session end` filling the times from it, a record's window is the one the commands saw.
 
 ## Iterations
 
@@ -167,9 +170,11 @@ merged, and the tool does not guess the difference.
 
 ## Spec lead time
 
-From the earliest commit citing a `Spec:` to the merge that archived that spec — an idea's whole life, not
+From the earliest commit citing a `Spec:` to the merge that archived that spec: an idea's whole life, not
 just its final pull request. A spec still open has no end yet and is excluded as `open`; one whose changes
-carry no pull head timing is excluded as `untimed`.
+carry no pull head timing is excluded as `untimed`. The read is only as long as the trail: a spec drafted,
+implemented, and archived in one pull request measures one cycle, and a spec whose draft went through its
+own pull request with the `Spec:` trailer measures from that draft's first commit.
 
 ## Cost per change and per release
 

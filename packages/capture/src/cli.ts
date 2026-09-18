@@ -370,6 +370,13 @@ export function captureMain(argv: string[]): number {
           fail('session start requires --id');
         }
         git(root, ['config', 'telemetry.session', id]);
+        // The clock at start is the one fact only this command can record: a session file written later
+        // from a payload gets its start from here rather than from a hand-typed timestamp.
+        git(root, [
+          'config',
+          'telemetry.session-started',
+          new Date().toISOString(),
+        ]);
         process.stdout.write(
           `session ${id} recorded in local git configuration\n`,
         );
@@ -446,6 +453,23 @@ export function captureMain(argv: string[]): number {
             : readFileSync(resolve(root, payloadPath), 'utf8');
         const config = loadConfig(root);
         const input = JSON.parse(text) as SessionInput;
+        // A payload may leave the clock to the commands: start is what `session start` recorded, end is
+        // now. A payload that states its own times keeps them, because the harness knew something these
+        // commands did not.
+        if (!input.startedAt) {
+          try {
+            input.startedAt = git(root, [
+              'config',
+              '--get',
+              'telemetry.session-started',
+            ]).trim();
+          } catch {
+            // no start recorded; validation names the missing field
+          }
+        }
+        if (!input.endedAt) {
+          input.endedAt = new Date().toISOString();
+        }
         // A transcript fills only what the payload left out: a harness that knows its own figures keeps
         // them, and a transcript with no usage record leaves the record missing figures as before. When
         // the transcript supplied any figure, the source says so, whatever the payload's source said:
@@ -508,9 +532,10 @@ export function captureMain(argv: string[]): number {
         writeFileSync(absolute, canonicalJson(file));
         if (!args.includes('--no-commit')) {
           git(root, ['add', '--', relative]);
+          // The active session is still in the repository's configuration here, and the hook reads it from
+          // there. Passing it with `-c` would also export it to every git child of the hooks through
+          // GIT_CONFIG_PARAMETERS, where a fixture test of the hook would see a session it never started.
           git(root, [
-            '-c',
-            `telemetry.session=${file.sessionId}`,
             'commit',
             '--quiet',
             '-m',
@@ -519,10 +544,12 @@ export function captureMain(argv: string[]): number {
             relative,
           ]);
         }
-        try {
-          git(root, ['config', '--unset', 'telemetry.session']);
-        } catch {
-          // no active session was recorded
+        for (const key of ['telemetry.session', 'telemetry.session-started']) {
+          try {
+            git(root, ['config', '--unset', key]);
+          } catch {
+            // nothing recorded under this key
+          }
         }
         process.stdout.write(`${relative}\n`);
         return 0;

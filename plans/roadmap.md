@@ -35,6 +35,7 @@ contract.
 | Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
 | Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
 | Hook drift check (workflow governance)            | `add-hook-drift-check`                                        | Complete |
+| Ledger reads after review (defects)               | `fix-ledger-reads-after-review`                               | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -181,6 +182,11 @@ its own follow-up commits kept carrying the trailer it had removed, because the 
 was twenty-six commits behind. Nothing reported it, and nothing could: a hook that is never read cannot say
 it was not read. The check compares the hooks git will run with the ones in the current tree and names any
 that differ. It warns rather than failing, because the stale checkout is often not the committer's to fix.
+
+The ledger reads after review row corrects what a review of the published page found: a merge commit's
+work mix type now comes from its branch commits, the session commands own the session clock, the pull
+request script refuses to open an undeclared pull request without an explicit override, the footer states
+the accepted boundary, and this repository's rework ignore list covers the files its process edits.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

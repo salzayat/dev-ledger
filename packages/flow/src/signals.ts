@@ -421,6 +421,8 @@ export type ChangeFacts = {
   files: string[];
   insertions: number;
   deletions: number;
+  /** Subjects of the branch commits a merge commit brought in, oldest first; empty for a squash or a push. */
+  branchSubjects: string[];
 };
 
 function percentile(sorted: number[], fraction: number): number | null {
@@ -623,6 +625,37 @@ function workMixType(subject: string): WorkMixType {
   return (WORK_MIX_TYPES as readonly string[]).includes(type ?? '')
     ? (type as WorkMixType)
     : 'other';
+}
+
+/**
+ * A merge commit's subject is git's ("Merge pull request #12 from ...") and carries no type, so a change
+ * merged that way takes the most common type among its branch commits, ties going to the earliest. A
+ * telemetry record commit is not the work and does not vote. Anything else reads its own subject.
+ */
+function changeWorkMixType(fact: ChangeFacts): WorkMixType {
+  const own = workMixType(fact.change.subject);
+  if (own !== 'other' || fact.branchSubjects.length === 0) {
+    return own;
+  }
+  const votes = new Map<WorkMixType, number>();
+  for (const subject of fact.branchSubjects) {
+    if (/^chore\(telemetry\): record /.test(subject)) {
+      continue;
+    }
+    const type = workMixType(subject);
+    if (type !== 'other') {
+      votes.set(type, (votes.get(type) ?? 0) + 1);
+    }
+  }
+  let best: WorkMixType = 'other';
+  let bestCount = 0;
+  for (const [type, count] of votes) {
+    if (count > bestCount) {
+      best = type;
+      bestCount = count;
+    }
+  }
+  return best;
 }
 
 /**
@@ -1661,7 +1694,7 @@ export function computeSignals(
   for (const fact of facts) {
     const week = weekOf(fact.change.mergeTime);
     const bucket = (workMixWeekly[week] ??= {});
-    const type = workMixType(fact.change.subject);
+    const type = changeWorkMixType(fact);
     const entry = (bucket[type] ??= { changes: 0, costUsd: 0, cites: [] });
     entry.changes += 1;
     entry.cites.push(fact.change.id);
@@ -1673,7 +1706,7 @@ export function computeSignals(
   }
   const workMix = {
     weekly: workMixWeekly,
-    note: 'conventional commit type on the change subject; other covers a subject that does not parse',
+    note: "conventional commit type on the change subject, or the most common type among a merge commit's branch commits; other covers a subject that does not parse",
   };
 
   const flowEfficiency = computeFlowEfficiency(facts, sessions);
