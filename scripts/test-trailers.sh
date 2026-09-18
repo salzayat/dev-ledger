@@ -8,7 +8,7 @@ set -eu
 # Without this, `git init` below can re-initialise the repository that invoked this script rather than the
 # fixture — the same hazard the flow and capture packages guard against in their own git helpers.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_COMMON_DIR \
-  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_NAMESPACE || true
+  GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES GIT_NAMESPACE GIT_CONFIG_PARAMETERS || true
 
 repo_root=$(pwd)
 fixture=$(mktemp -d)

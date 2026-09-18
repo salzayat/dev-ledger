@@ -15,6 +15,11 @@
 - [x] 2.2 `packages/capture/src/session.ts`: `startedAt` and `endedAt` optional on the input; the file still
       requires both.
 
+- [x] 2.3 `session end` commits the record without `-c telemetry.session=...`: the identifier is still in the
+      repository's configuration when the hook runs, and `-c` exported it through `GIT_CONFIG_PARAMETERS`
+      into the hook fixture test, which then failed every record commit. `scripts/test-trailers.sh` also
+      unsets that variable.
+
 ## 3. The guard
 
 - [x] 3.1 `scripts/pr.sh`: refuse to open a pull request with no active session, no human-only declaration,

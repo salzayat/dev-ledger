@@ -532,9 +532,10 @@ export function captureMain(argv: string[]): number {
         writeFileSync(absolute, canonicalJson(file));
         if (!args.includes('--no-commit')) {
           git(root, ['add', '--', relative]);
+          // The active session is still in the repository's configuration here, and the hook reads it from
+          // there. Passing it with `-c` would also export it to every git child of the hooks through
+          // GIT_CONFIG_PARAMETERS, where a fixture test of the hook would see a session it never started.
           git(root, [
-            '-c',
-            `telemetry.session=${file.sessionId}`,
             'commit',
             '--quiet',
             '-m',
