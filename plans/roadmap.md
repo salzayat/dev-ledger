@@ -35,6 +35,7 @@ contract.
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
 | Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
+| Hook drift check (workflow governance)            | `add-hook-drift-check`                                        | Pending  |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -174,6 +175,14 @@ different question, so the panels are grouped into four tabs — flow, DORA, spe
 fragment per tab and selected with CSS, because the page may carry no script element and no form control.
 The row also adds velocity, story points and changes merged per week, in the unit the configuration already
 enables, per repository and never per person.
+
+The hook drift check row closes a gap that cost a merged fix its credibility. `core.hooksPath` may be
+relative, which git resolves per working tree, or absolute, which points every worktree at one directory; a
+worktree carrying the absolute form runs another checkout's hooks. When `fix-session-none-default` merged,
+its own follow-up commits kept carrying the trailer it had removed, because the checkout supplying the hooks
+was twenty-six commits behind. Nothing reported it, and nothing could: a hook that is never read cannot say
+it was not read. The check compares the hooks git will run with the ones in the current tree and names any
+that differ. It warns rather than failing, because the stale checkout is often not the committer's to fix.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

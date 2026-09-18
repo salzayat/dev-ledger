@@ -155,10 +155,23 @@ repository turns it on, every control that needs them reads as not observable.
 | `./scripts/telemetry.sh subscription record` | Write and commit what a plan cost for one billing period, the input to allocated spend.                           |
 | `npm exec nx run capture:test`               | Run the capture package's tests.                                                                                  |
 | `npm exec nx run flow:test`                  | Run the flow package's tests over fixture repositories built in a temporary directory.                            |
+| `./scripts/check-hooks-current.sh`           | Warn when the hooks git will run are not the hooks in this working tree. Warns; never fails.                      |
 | `./scripts/spec-status.sh`                   | Report each capability with an active OpenSpec change and its task completion.                                    |
 
 `capture` and `flow` are source-only: `build` emits `.d.ts` files, and consumers resolve the source
 through the `@dev-ledger/source` export condition, so no build step is needed to run anything.
+
+### Why the hook check warns instead of failing
+
+`core.hooksPath` may be relative, which git resolves against whichever working tree is current, or absolute,
+which points every worktree at one directory. A worktree carrying the absolute form runs another checkout's
+hooks, so a hook fixed on a branch never executes there, and a hook fixed and merged does not execute until
+that checkout is updated. Nothing reports this on its own: a hook that is never read cannot say it was not
+read.
+
+`./scripts/check-hooks-current.sh` compares the hooks git will run with the `.githooks` of the current
+working tree and names any that differ. It warns rather than failing because the stale checkout is often not
+the committer's to fix, and blocking their commit would punish the wrong person for it.
 
 ## Repository Map
 
