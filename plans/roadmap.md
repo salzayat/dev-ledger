@@ -16,7 +16,7 @@ contract.
 | Fork rename automation                            | `add-project-rename-tooling`                                  | Complete |
 | Flow observability (phase one)                    | `add-flow-observability`                                      | Complete |
 | Ledger dashboard (phase one addendum)             | `add-board-dashboard`                                         | Complete |
-| Ledger presentation (phase one addendum)          | `improve-board-presentation`                                  | Complete |
+| Ledger links and charts (phase one addendum)      | `improve-board-presentation`                                  | Complete |
 | Per pull request spend (phase one addendum)       | `add-per-pull-request-spend`                                  | Complete |
 | DORA signals (phase one addendum)                 | `add-dora-signals`                                            | Complete |
 | Pull request telemetry (workflow governance)      | `add-telemetry-in-pull-request-body`                          | Complete |
@@ -32,7 +32,6 @@ contract.
 | Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Complete |
 | Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Complete |
 | Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Pending  |
-| Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
 | Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
 | Hook drift check (workflow governance)            | `add-hook-drift-check`                                        | Complete |

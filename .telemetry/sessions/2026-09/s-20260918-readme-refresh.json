@@ -1,0 +1,32 @@
+{
+  "agentAutonomousSeconds": 12066,
+  "agentRunSeconds": 1500,
+  "billingKind": "subscription",
+  "branch": "docs/readme-ledger-refresh",
+  "cacheReadTokens": 166939074,
+  "cacheWriteTokens": 1878957,
+  "cachedTokens": 168818031,
+  "commits": [
+    "ff17703b98fb9a573d8dd6f92d4a67a6a9cb278a"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T05:40:00Z",
+  "figuresSource": "summed from 355 messages in the session transcript",
+  "idleSeconds": 56426,
+  "inputTokens": 9812,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorActiveAlgorithm": "prompt-attribution-v1:900",
+  "operatorActiveSeconds": 12497,
+  "operatorId": null,
+  "outputTokens": 663356,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-readme-refresh",
+  "startedAt": "2026-09-18T05:00:00Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 2400
+}
