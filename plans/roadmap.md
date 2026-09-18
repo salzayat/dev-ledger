@@ -27,6 +27,7 @@ contract.
 | Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Pending  |
 | Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
 | Operator dimension (decision pending)             | `add-operator-dimension`                                      | Blocked  |
+| Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Pending  |
 | Board publication (phase one)                     | `add-board-publication`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
@@ -122,6 +123,12 @@ reading zero; the repository owner decided to publish ahead of that row, and the
 real when it lands. It was archived after its implementation had merged, out of the order the workflow
 asks for; the flow efficiency and work mix draft, which modifies the same registry requirement, was rebased
 onto the accepted text in the same change.
+
+The allocated token rate row relates the two figures the subscription work left unrelated: what a period
+cost and how many tokens its sessions reported. Input and output lead the denominator and cache reads sit
+beside it, because over this repository's own records the two differ by more than two orders of magnitude,
+so a combined denominator would track how long a context stayed warm rather than how much work was asked
+for. It depends on no active change.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
