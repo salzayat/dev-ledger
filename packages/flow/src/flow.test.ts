@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { renderLedger } from './ledger.ts';
 import { renderLedgerHtml } from './ledger-html.ts';
+import { configurationGaps } from './subscriptions.ts';
 import { advanceCursor } from './cursor.ts';
 import {
   commit,
@@ -912,6 +913,130 @@ test('the rework ignore list drops lockfile pairs and says how many', () => {
     projection.repositories.counted.signals!.rework.pairs.length >= 1,
     'an empty ignore list counts the pair',
   );
+});
+
+test('every configuration gap kind is reported with its own remedy', () => {
+  // Unit-level, because three of the four kinds need a closed period and a fixture's commits are all now.
+  const plans = {
+    path: '.telemetry/subscriptions/plans.json',
+    valid: true,
+    errors: [],
+    plans: [
+      {
+        planId: 'plan-declared',
+        provider: 'anthropic',
+        currency: 'USD',
+        intervals: [{ from: '2026-05', unit: 100, seats: 1 }],
+      },
+    ],
+  };
+  const records = [
+    {
+      path: '.telemetry/subscriptions/2026-06/plan-stray.json',
+      producer: 'operator' as const,
+      trust: 'reported' as const,
+      valid: true,
+      errors: [],
+      file: {
+        schemaVersion: 1,
+        planId: 'plan-stray',
+        period: '2026-06',
+        amount: 10,
+        currency: 'USD',
+        overageAmount: 0,
+      },
+    },
+  ];
+  const gaps = configurationGaps(
+    plans,
+    records,
+    [
+      {
+        planId: 'plan-ghost',
+        period: '2026-06',
+        path: '.telemetry/sessions/2026-06/s-1.json',
+      },
+    ],
+    ['2026-04', '2026-06'],
+  );
+  const byKind = Object.fromEntries(gaps.map((gap) => [gap.kind, gap]));
+
+  // A declared plan with no record for a closed period its intervals cover.
+  assert.equal(byKind['missing-record'].subject, 'plan-declared');
+  assert.match(byKind['missing-record'].remedy, /subscription close 2026-06/);
+
+  // A closed period before the plan's earliest interval is uncovered, not missing.
+  assert.equal(byKind['uncovered-period'].period, '2026-04');
+  assert.match(byKind['uncovered-period'].remedy, /add an interval/);
+
+  // A record for a plan no declaration covers.
+  assert.equal(byKind['undeclared-plan'].subject, 'plan-stray');
+
+  // A session naming a plan with no record is named rather than only counted.
+  assert.equal(byKind['unknown-subscription'].subject, 'plan-ghost');
+  assert.deepEqual(byKind['unknown-subscription'].cites, [
+    '.telemetry/sessions/2026-06/s-1.json',
+  ]);
+});
+
+test('configuration gaps name each kind and the command that closes it', () => {
+  const fixture = makeFixtureRepo();
+  const period = '2026-01';
+  const pull = openPullRequest(fixture, 'gap', [
+    [
+      trailered('feat(gap): work', { Session: 's-gap', Change: 'c-gap' }),
+      {
+        'src/gap.ts': 'v1',
+        // A plan declared but never closed for this period, and a session naming a plan with no record.
+        '.telemetry/subscriptions/plans.json': JSON.stringify({
+          schemaVersion: 1,
+          plans: [
+            {
+              planId: 'plan-declared',
+              provider: 'anthropic',
+              currency: 'USD',
+              intervals: [{ from: '2020-01', unit: 100, seats: 1 }],
+            },
+          ],
+        }),
+        [`.telemetry/sessions/${period}/s-gap.json`]: sessionJson('s-gap', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-unknown',
+          costUsd: 0,
+          endedAt: `${period}-15T10:00:00Z`,
+          startedAt: `${period}-15T09:00:00Z`,
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, pull, 'feat(gap): work', 'Session: s-gap', {
+    hours: 24,
+  });
+
+  const { repo } = build(registryFor(fixture.dir));
+  const gaps = repo.configurationGaps;
+  const kinds = gaps.map((gap) => gap.kind);
+
+  assert.ok(
+    kinds.includes('unknown-subscription'),
+    'a session naming a plan with no record is named, not only counted',
+  );
+  // Every gap names the command that closes it: the page reports and never repairs.
+  for (const gap of gaps) {
+    assert.ok(gap.remedy.length > 0, `${gap.kind} names its remedy`);
+    assert.ok(gap.cites.length > 0, `${gap.kind} cites what it read`);
+  }
+  const unknown = gaps.find((gap) => gap.kind === 'unknown-subscription')!;
+  assert.equal(unknown.subject, 'plan-unknown');
+
+  // The page names them and stays a page: no script, no resource, no form.
+  const html = renderLedgerHtml(build(registryFor(fixture.dir)).projection);
+  assert.match(html, /Subscription configuration/);
+  assert.match(html, /plan-unknown/);
+  assert.doesNotMatch(html, /<script/i);
+  assert.doesNotMatch(html, /<form/i);
+  assert.doesNotMatch(html, /<input/i);
+  assert.doesNotMatch(html, /<button/i);
 });
 
 test('a projection built over many synthetic changes stays well under a minute', () => {

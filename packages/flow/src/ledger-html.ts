@@ -581,6 +581,42 @@ ${panel(
 )}`;
 }
 
+/**
+ * Configuration gaps, each with the command that closes it. The Ledger reports; it does not repair. The
+ * published page reads only from the projection and carries no form, so there is nothing here to submit —
+ * a person runs the command.
+ */
+function configurationPanel(
+  repository: RepositoryProjection,
+  links: Links,
+): string {
+  const gaps = repository.configurationGaps ?? [];
+  if (gaps.length === 0) {
+    return panel(
+      'Subscription configuration',
+      '<p class="empty">Every declared plan has a record for every closed period, and every session names a plan that exists.</p>',
+      `${trustBadges(['reported'])} declarations, cost records, and the sessions that cite them`,
+    );
+  }
+  const label: Record<string, string> = {
+    'missing-record': 'no record for a closed period',
+    'undeclared-plan': 'a record for a plan no declaration covers',
+    'unknown-subscription': 'a session naming a plan with no record',
+    'uncovered-period': 'no interval covers this period',
+  };
+  const rows = gaps
+    .map(
+      (gap) =>
+        `<tr><td>${escapeHtml(gap.subject)}</td><td class="mono">${escapeHtml(gap.period ?? '')}</td><td>${escapeHtml(label[gap.kind] ?? gap.kind)}</td><td><code>${escapeHtml(gap.remedy)}</code></td><td>${cites('records', gap.cites, links)}</td></tr>`,
+    )
+    .join('');
+  return panel(
+    'Subscription configuration',
+    `<div class="scroll"><table><thead><tr><th>plan</th><th>period</th><th>gap</th><th>closes it</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    `${trustBadges(['reported'])} ${count(gaps.length, 'gap')} between the declarations, the records, and the sessions; the page names them and changes nothing`,
+  );
+}
+
 function operatorPanel(operators: Operators, links: Links): string {
   const agents = Object.entries(operators.agents).sort(
     ([, a], [, b]) => b.sessions - a.sessions,
@@ -1001,6 +1037,7 @@ ${panel(
   )}`,
   trustBadges(['observed']),
 )}
+${configurationPanel(repository, links)}
 ${panel('Local checks', figure(checks || 'none', checks ? 'session records with a check outcome' : 'no session recorded a check outcome yet'), `${trustBadges(['reported'])} from session records`)}
 </div>
 </section>

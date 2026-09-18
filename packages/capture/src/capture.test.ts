@@ -12,13 +12,22 @@ import { formatTrailers, parseTrailers, validateMessage } from './trailers.ts';
 import { gitEnvironment, sessionSummary } from './cli.ts';
 import { operatorPromptTimes, sumTranscriptUsage } from './figures.ts';
 import {
+  amountFor,
   buildSubscriptionFile,
+  intervalFor,
+  validatePlansFile,
   subscriptionFilePath,
   validateSubscriptionFile,
 } from './subscription.ts';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -761,6 +770,97 @@ test('a session recorded with a transcript carries its figures, and a stated fig
   );
 });
 
+test('a rate change appends an interval, and each period resolves to the one that held', () => {
+  const plan = {
+    planId: 'plan-x',
+    provider: 'anthropic',
+    currency: 'USD',
+    intervals: [
+      { from: '2026-01', unit: 100, seats: 5 },
+      { from: '2026-07', unit: 120, seats: 6 },
+    ],
+  };
+  assert.deepEqual(validatePlansFile({ schemaVersion: 1, plans: [plan] }), []);
+
+  // The period a change lands in resolves to the new interval; the one before it to the old.
+  assert.equal(intervalFor(plan, '2026-06')!.unit, 100);
+  assert.equal(intervalFor(plan, '2026-07')!.unit, 120);
+  assert.equal(intervalFor(plan, '2026-12')!.unit, 120);
+
+  // Seats times unit, so the amount is arithmetic a reviewer can check against an invoice.
+  assert.equal(amountFor(plan, '2026-06'), 500);
+  assert.equal(amountFor(plan, '2026-08'), 720);
+
+  // A period before the earliest interval is uncovered, never resolved to the nearest.
+  assert.equal(intervalFor(plan, '2025-12'), null);
+  assert.equal(amountFor(plan, '2025-12'), null);
+});
+
+test('overlapping, unordered, and unsafe plan declarations are rejected', () => {
+  const overlapping = validatePlansFile({
+    schemaVersion: 1,
+    plans: [
+      {
+        planId: 'plan-x',
+        provider: 'anthropic',
+        currency: 'USD',
+        intervals: [
+          { from: '2026-03', unit: 100, seats: 1 },
+          { from: '2026-03', unit: 120, seats: 1 },
+        ],
+      },
+    ],
+  });
+  assert.ok(
+    overlapping.some((error) => error.includes('never overlap')),
+    'two intervals claiming one period make the amount ambiguous',
+  );
+
+  const unordered = validatePlansFile({
+    schemaVersion: 1,
+    plans: [
+      {
+        planId: 'plan-x',
+        provider: 'anthropic',
+        currency: 'USD',
+        intervals: [
+          { from: '2026-07', unit: 120, seats: 1 },
+          { from: '2026-01', unit: 100, seats: 1 },
+        ],
+      },
+    ],
+  });
+  assert.ok(unordered.some((error) => error.includes('must come after')));
+
+  // A rate belongs to no record in this repository, declarations included.
+  const priced = validatePlansFile({
+    schemaVersion: 1,
+    plans: [
+      {
+        planId: 'plan-x',
+        provider: 'anthropic',
+        currency: 'USD',
+        hourlyRate: 120,
+        intervals: [{ from: '2026-01', unit: 100, seats: 1 }],
+      },
+    ],
+  });
+  assert.ok(priced.some((error) => error.includes('hourlyRate')));
+
+  const negative = validatePlansFile({
+    schemaVersion: 1,
+    plans: [
+      {
+        planId: 'plan-x',
+        provider: 'anthropic',
+        currency: 'USD',
+        intervals: [{ from: '2026-01', unit: -1, seats: 1 }],
+      },
+    ],
+  });
+  assert.ok(negative.some((error) => error.includes('non-negative')));
+});
+
 test('a subscription cost record validates, and a rate cannot enter it', () => {
   const file = buildSubscriptionFile({
     planId: 'plan-max',
@@ -787,6 +887,76 @@ test('a subscription cost record validates, and a rate cannot enter it', () => {
   assert.ok(errors.some((error) => error.startsWith('amount')));
   assert.ok(errors.some((error) => error.startsWith('currency')));
   assert.throws(() => subscriptionFilePath('plan', '2026-9'));
+});
+
+test('closing a period writes seats times unit, keeps an existing record, and commits nothing', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  const runCli = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      {
+        cwd: dir,
+        encoding: 'utf8',
+        env: gitEnvironment(),
+      },
+    );
+  mkdirSync(join(dir, '.telemetry/subscriptions'), { recursive: true });
+  writeFileSync(
+    join(dir, '.telemetry/subscriptions/plans.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      plans: [
+        {
+          planId: 'plan-x',
+          provider: 'anthropic',
+          currency: 'USD',
+          intervals: [{ from: '2020-01', unit: 100, seats: 3 }],
+        },
+      ],
+    }),
+  );
+
+  const written = runCli(['subscription', 'close', '2020-02']);
+  assert.match(written, /\.telemetry\/subscriptions\/2020-02\/plan-x\.json/);
+  assert.match(written, /nothing was committed/);
+  const record = JSON.parse(
+    readFileSync(
+      join(dir, '.telemetry/subscriptions/2020-02/plan-x.json'),
+      'utf8',
+    ),
+  ) as { amount: number; currency: string };
+  assert.equal(record.amount, 300, 'three seats at a hundred');
+  assert.equal(record.currency, 'USD');
+
+  // Nothing is committed: the commit is where a person confirms the figure, so the history is untouched.
+  const commits = () =>
+    execFileSync('git', ['rev-list', '--count', 'HEAD'], {
+      cwd: dir,
+      encoding: 'utf8',
+      env: gitEnvironment(),
+    }).trim();
+  const before = commits();
+  runCli(['subscription', 'close', '2020-03']);
+  assert.equal(commits(), before, 'closing a period creates no commit');
+  assert.ok(
+    existsSync(join(dir, '.telemetry/subscriptions/2020-03/plan-x.json')),
+    'and the record it proposes is on disk for review',
+  );
+
+  // A second run leaves the record alone and says what it would have changed.
+  const again = runCli(['subscription', 'close', '2020-02']);
+  assert.match(again, /kept .*plan-x\.json \(unchanged\)/);
+  assert.match(again, /Nothing written/);
+
+  // An open period is not settled, so closing it is refused without --force.
+  const future = `${new Date().getUTCFullYear() + 1}-01`;
+  assert.throws(() => runCli(['subscription', 'close', future]));
+  assert.equal(
+    existsSync(join(dir, `.telemetry/subscriptions/${future}`)),
+    false,
+  );
 });
 
 test('subscription record writes the period file and validate reads both record kinds', () => {

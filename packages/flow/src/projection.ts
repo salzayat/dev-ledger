@@ -23,7 +23,12 @@ import {
 } from './registry.ts';
 import { computeReleases } from './releases.ts';
 import { collectSessions, collectUnmergedSessions } from './sessions.ts';
-import { collectSubscriptions } from './subscriptions.ts';
+import {
+  collectPlans,
+  collectSubscriptions,
+  configurationGaps,
+  type ConfigurationGap,
+} from './subscriptions.ts';
 import {
   computeSignals,
   type ChangeFacts,
@@ -47,6 +52,7 @@ export type RepositoryProjection = {
   changes: Record<string, unknown>[];
   sessions: Record<string, unknown>[];
   subscriptions: Record<string, unknown>[];
+  configurationGaps: ConfigurationGap[];
   unmerged: unknown[];
   releases: unknown[];
   unreleased: string[];
@@ -152,6 +158,7 @@ export function buildRepositoryProjection(
       changes: [],
       sessions: [],
       subscriptions: [],
+      configurationGaps: [],
       unmerged: [],
       releases: [],
       unreleased: [],
@@ -244,6 +251,30 @@ export function buildRepositoryProjection(
     };
   });
   const subscriptions = collectSubscriptions(dir, branch);
+  const plans = collectPlans(dir, branch);
+  // A period is closed once its end has passed; an open month has no missing record yet.
+  const asOfMs = asOf ? Date.parse(asOf) : Date.now();
+  const periods = new Set<string>();
+  for (const fact of facts) {
+    periods.add(fact.change.mergeTime.slice(0, 7));
+  }
+  const closedPeriods = [...periods].sort().filter((period) => {
+    const [year, month] = period.split('-').map(Number);
+    return Date.UTC(year, month, 1) <= asOfMs;
+  });
+  const sessionPeriods = [...sessions.values()]
+    .filter((record) => record.file?.subscriptionId)
+    .map((record) => ({
+      planId: record.file!.subscriptionId!,
+      period: record.file!.endedAt.slice(0, 7),
+      path: record.path,
+    }));
+  const gaps = configurationGaps(
+    plans,
+    subscriptions,
+    sessionPeriods,
+    closedPeriods,
+  );
   const signals = computeSignals(
     facts,
     sessions,
@@ -292,6 +323,7 @@ export function buildRepositoryProjection(
       .sort((a, b) => a.sessionId.localeCompare(b.sessionId))
       .map((record) => ({ ...record })),
     subscriptions: subscriptions.map((record) => ({ ...record })),
+    configurationGaps: gaps,
     unmerged,
     releases: releaseView.releases,
     unreleased: releaseView.unreleased,
