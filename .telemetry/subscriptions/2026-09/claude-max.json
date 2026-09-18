@@ -1,0 +1,8 @@
+{
+  "amount": 100,
+  "currency": "USD",
+  "overageAmount": 0,
+  "period": "2026-09",
+  "planId": "claude-max",
+  "schemaVersion": 1
+}
