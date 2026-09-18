@@ -53,7 +53,7 @@ function ageFrom(asOf: string | null, from: string | null): number | null {
   return Math.max(0, Math.round((Date.parse(asOf) - Date.parse(from)) / 1000));
 }
 
-function count(
+export function count(
   value: number,
   singular: string,
   plural = `${singular}s`,
@@ -66,14 +66,14 @@ function count(
 const HASH = /^[0-9a-f]{40}$/;
 
 /** What the page needs to turn a cite string into a titled, linked citation. */
-type Links = {
+export type Links = {
   web: string | null;
   branch: string;
   subjects: Map<string, string>;
   records: Map<string, string>;
 };
 
-function linksFor(repository: RepositoryProjection): Links {
+export function linksFor(repository: RepositoryProjection): Links {
   const subjects = new Map<string, string>();
   for (const change of repository.changes as {
     id: string;
@@ -195,7 +195,7 @@ function pullRef(number: number | null, links: Links): string {
     : href(links, `pull/${number}`, `#${number}`);
 }
 
-function cites(label: string, ids: string[], links: Links): string {
+export function cites(label: string, ids: string[], links: Links): string {
   if (ids.length === 0) {
     return `<p class="cites-empty">cites: none</p>`;
   }
@@ -291,7 +291,7 @@ function notesPanel(notes: NoteRow[], links: Links): string {
 
 // --- Chrome ----------------------------------------------------------------------------------------
 
-function trustBadges(trust: string[]): string {
+export function trustBadges(trust: string[]): string {
   return trust
     .map(
       (value) =>
@@ -307,7 +307,7 @@ function excludedNote(excluded: Record<string, number>): string {
   return parts.length ? `excluded: ${parts.join(', ')}` : 'excluded: none';
 }
 
-function panel(
+export function panel(
   title: string,
   body: string,
   meta = '',
@@ -603,42 +603,6 @@ ${panel(
   `${figure(percent(compliance.recordedShare), `of ${count(compliance.changes, 'change')} recorded a local check; ${percent(compliance.passRate)} of those passed`)}<p class="help">The share matters more than the rate: a high pass rate over a tenth of the changes says very little.</p>`,
   trustBadges(compliance.trust),
 )}`;
-}
-
-/**
- * Configuration gaps, each with the command that closes it. The Ledger reports; it does not repair. The
- * published page reads only from the projection and carries no form, so there is nothing here to submit —
- * a person runs the command.
- */
-function configurationPanel(
-  repository: RepositoryProjection,
-  links: Links,
-): string {
-  const gaps = repository.configurationGaps ?? [];
-  if (gaps.length === 0) {
-    return panel(
-      'Subscription configuration',
-      '<p class="empty">Every declared plan has a record for every closed period, and every session names a plan that exists.</p>',
-      `${trustBadges(['reported'])} declarations, cost records, and the sessions that cite them`,
-    );
-  }
-  const label: Record<string, string> = {
-    'missing-record': 'no record for a closed period',
-    'undeclared-plan': 'a record for a plan no declaration covers',
-    'unknown-subscription': 'a session naming a plan with no record',
-    'uncovered-period': 'no interval covers this period',
-  };
-  const rows = gaps
-    .map(
-      (gap) =>
-        `<tr><td>${escapeHtml(gap.subject)}</td><td class="mono">${escapeHtml(gap.period ?? '')}</td><td>${escapeHtml(label[gap.kind] ?? gap.kind)}</td><td><code>${escapeHtml(gap.remedy)}</code></td><td>${cites('records', gap.cites, links)}</td></tr>`,
-    )
-    .join('');
-  return panel(
-    'Subscription configuration',
-    `<div class="scroll"><table><thead><tr><th>plan</th><th>period</th><th>gap</th><th>closes it</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div>`,
-    `${trustBadges(['reported'])} ${count(gaps.length, 'gap')} between the declarations, the records, and the sessions; the page names them and changes nothing`,
-  );
 }
 
 /**
@@ -1099,7 +1063,6 @@ ${panel(
   )}`,
   trustBadges(['observed']),
 )}
-${configurationPanel(repository, links)}
 ${panel('Local checks', figure(checks || 'none', checks ? 'session records with a check outcome' : 'no session recorded a check outcome yet'), `${trustBadges(['reported'])} from session records`)}
 </div>
 </section>

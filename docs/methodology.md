@@ -94,6 +94,31 @@ multi-currency for a while; the reported figure was the last part that was not. 
 cost with a currency, the historical field is read as USD so every committed record stays valid, and a record
 carrying both with different values is rejected — one session reports one cost, not two.
 
+## Configuration is local; the ledger is published
+
+The published page carries no subscription configuration: not the declarations, not the gaps between them
+and the records, not the remedies that name files to edit, and no control that writes. Configuration names
+plan identifiers, the periods they cover, and the files that hold them, and the published page is world
+readable.
+
+What the published page does keep is the spend it exists to publish. The allocation panel still names the
+plan and cites the cost record its figures came from, because that is the record behind a published figure
+rather than a setting.
+
+`telemetry configure` serves the configuration surface from the working copy on the loopback interface, and
+refuses to bind anything else. Its security model is that it is not on the network; there is no password
+because it grants no authority the shell that started it does not already have, and what it must never do is
+offer that authority to anyone else.
+
+The absence on the published page is containment, not hiding. The editor's markup lives in a module the
+published renderer never imports, so there is no disabled form to re-enable and no hidden element to reveal
+by reading the source.
+
+It writes plan declarations and subscription cost records and refuses every other path, including one that
+would escape the working copy. It never commits, stages, or runs git: the file changes, `git status` shows
+what, and a person reviews the diff. Session records, the projection, and anything the harness wrote stay
+unwritable, because a web page that could edit those would make every figure downstream unfalsifiable.
+
 ## A declaration is an intention; a record is what happened
 
 A plan declaration says what a plan is arranged to cost. A period record says what was actually paid. They

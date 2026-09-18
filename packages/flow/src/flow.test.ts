@@ -7,7 +7,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { renderLedger } from './ledger.ts';
-import { renderLedgerHtml } from './ledger-html.ts';
+import { linksFor, renderLedgerHtml } from './ledger-html.ts';
+import { renderConfigurationPage } from './configuration-html.ts';
+import {
+  applyWrite,
+  serveConfiguration,
+  writablePath,
+} from './configuration-server.ts';
 import { configurationGaps } from './subscriptions.ts';
 import { advanceCursor } from './cursor.ts';
 import {
@@ -1031,14 +1037,21 @@ test('configuration gaps name each kind and the command that closes it', () => {
   const unknown = gaps.find((gap) => gap.kind === 'unknown-subscription')!;
   assert.equal(unknown.subject, 'plan-unknown');
 
-  // The page names them and stays a page: no script, no resource, no form.
-  const html = renderLedgerHtml(build(registryFor(fixture.dir)).projection);
-  assert.match(html, /Subscription configuration/);
-  assert.match(html, /plan-unknown/);
-  assert.doesNotMatch(html, /<script/i);
-  assert.doesNotMatch(html, /<form/i);
-  assert.doesNotMatch(html, /<input/i);
-  assert.doesNotMatch(html, /<button/i);
+  // The gaps are configuration, so they are reported where the operator is and never on the published page.
+  const projection = build(registryFor(fixture.dir)).projection;
+  const published = renderLedgerHtml(projection);
+  assert.doesNotMatch(published, /Subscription configuration/);
+  assert.doesNotMatch(published, /plan-unknown/);
+  assert.doesNotMatch(published, /<script/i);
+  assert.doesNotMatch(published, /<form/i);
+
+  const local = renderConfigurationPage(
+    Object.values(projection.repositories),
+    linksFor(Object.values(projection.repositories)[0]),
+    '{}',
+  );
+  assert.match(local, /Subscription configuration/);
+  assert.match(local, /plan-unknown/);
 });
 
 test('two providers report metered rates separately and share no denominator', () => {
@@ -1149,6 +1162,120 @@ test('no source file branches on a provider identifier', () => {
       `${path} names a provider outside a data field`,
     );
   }
+});
+
+test('the published page carries no configuration, and the local surface refuses everything but it', async () => {
+  const fixture = makeFixtureRepo();
+  const pull = openPullRequest(fixture, 'cfg', [
+    [
+      trailered('feat(cfg): work', { Session: 'none', Change: 'c-cfg' }),
+      {
+        'src/cfg.ts': 'v1',
+        '.telemetry/subscriptions/plans.json': JSON.stringify({
+          schemaVersion: 1,
+          plans: [
+            {
+              planId: 'plan-secret',
+              provider: 'anthropic',
+              currency: 'USD',
+              intervals: [{ from: '2020-01', unit: 100, seats: 1 }],
+            },
+          ],
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, pull, 'feat(cfg): work', 'Session: none', { hours: 24 });
+  const { projection } = build(registryFor(fixture.dir));
+
+  // The published artifact carries no configuration panel, no gap, and nothing that writes. Absence is by
+  // containment: the published renderer does not import the module that holds this markup.
+  const published = renderLedgerHtml(projection);
+  assert.doesNotMatch(published, /Subscription configuration/);
+  assert.doesNotMatch(published, /plans\.json/);
+  assert.doesNotMatch(published, /<script/i);
+  assert.doesNotMatch(published, /<form/i);
+  assert.doesNotMatch(published, /<textarea/i);
+  assert.doesNotMatch(published, /<button/i);
+
+  // The local page carries both, because it is a different artifact served to one operator on loopback.
+  const local = renderConfigurationPage(
+    Object.values(projection.repositories),
+    linksFor(Object.values(projection.repositories)[0]),
+    '{"schemaVersion":1,"plans":[]}',
+  );
+  assert.match(local, /Subscription configuration/);
+  assert.match(local, /<form/);
+  assert.match(local, /Local only/);
+
+  // A host that is not loopback is refused rather than bound.
+  await assert.rejects(
+    serveConfiguration({
+      root: fixture.dir,
+      port: 0,
+      host: '0.0.0.0',
+      page: () => '',
+    }),
+    /loopback interface only/,
+  );
+
+  // Only configuration is writable, and a path that escapes the working copy is refused even so.
+  assert.equal(
+    writablePath(fixture.dir, '.telemetry/subscriptions/plans.json') !== null,
+    true,
+  );
+  assert.equal(
+    writablePath(
+      fixture.dir,
+      '.telemetry/subscriptions/2026-09/plan-x.json',
+    ) !== null,
+    true,
+  );
+  assert.equal(
+    writablePath(fixture.dir, '.telemetry/sessions/2026-09/s-1.json'),
+    null,
+  );
+  assert.equal(writablePath(fixture.dir, '.telemetry/projection.json'), null);
+  assert.equal(writablePath(fixture.dir, '../escape.json'), null);
+  assert.equal(writablePath(fixture.dir, '/etc/passwd'), null);
+
+  // Writing configuration changes the working copy and never the history.
+  const before = execFileSync('git', ['rev-list', '--count', 'HEAD'], {
+    cwd: fixture.dir,
+    encoding: 'utf8',
+    env: gitEnvironment(),
+  }).trim();
+  const result = applyWrite(fixture.dir, {
+    path: '.telemetry/subscriptions/plans.json',
+    body: {
+      schemaVersion: 1,
+      plans: [
+        {
+          planId: 'plan-new',
+          provider: 'anthropic',
+          currency: 'USD',
+          intervals: [{ from: '2026-01', unit: 10, seats: 1 }],
+        },
+      ],
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(
+    execFileSync('git', ['rev-list', '--count', 'HEAD'], {
+      cwd: fixture.dir,
+      encoding: 'utf8',
+      env: gitEnvironment(),
+    }).trim(),
+    before,
+    'writing configuration creates no commit',
+  );
+
+  // An invalid declaration is refused rather than written.
+  const refused = applyWrite(fixture.dir, {
+    path: '.telemetry/subscriptions/plans.json',
+    body: { schemaVersion: 1, plans: [{ planId: 'x' }] },
+  });
+  assert.equal(refused.ok, false);
 });
 
 test('a projection built over many synthetic changes stays well under a minute', () => {

@@ -48,3 +48,43 @@ require it, and the mechanism SHALL behave identically when it is never run.
 - GIVEN an operator who never runs the configuration surface
 - WHEN the projection is rebuilt and The Board is rendered
 - THEN both MUST behave exactly as they do today
+
+## MODIFIED Requirements
+
+### Requirement: Subscription configuration is reported on the local surface, not the published page
+
+The projection SHALL collect subscription configuration gaps: a declared plan with no cost record for a
+period that has closed, a cost record for a plan no declaration covers, a session naming a subscription
+identifier no cost record covers, and a period no interval of a plan's declaration covers. Each gap SHALL
+name the plan or session it concerns, SHALL cite the records behind it, and SHALL name the command that
+closes it.
+
+The gaps SHALL be rendered on the locally served configuration surface and SHALL NOT appear on the page
+written by `telemetry ledger --html`. What is withheld is the configuration itself — the declarations, the
+gaps between them and the records, the remedies that name files to edit, and any control that writes — not
+the spend the ledger exists to publish: the allocation panel SHALL keep naming the plan and citing the cost
+record its figures came from, because that is the record behind a published figure rather than a setting.
+Absence SHALL be by containment rather than by hiding or disabling, so a deployment cannot be made to reveal
+an editor it never held. The terminal render, which runs where the operator already is, MAY report the gaps.
+
+#### Scenario: A closed period with no record is a named gap
+
+- GIVEN a declared plan and a period that has closed with no cost record for it
+- WHEN an operator opens the local configuration surface
+- THEN that plan and period MUST be named as a gap
+- AND the gap MUST name the command that writes the record
+
+#### Scenario: A session naming an unknown plan is named, not only counted
+
+- GIVEN a session whose subscription identifier matches no cost record
+- WHEN an operator opens the local configuration surface
+- THEN that session MUST be named against the identifier it expected
+- AND it MUST still be counted in the allocation's excluded count
+
+#### Scenario: The configuration panel changes nothing
+
+- GIVEN a projection with configuration gaps
+- WHEN `telemetry ledger --html` runs
+- THEN the written page MUST contain no configuration panel, no gap, and no remedy naming a file to edit
+- AND it MUST contain no script element, no external resource, and no form
+- AND it MUST contain no control that writes a declaration or a record

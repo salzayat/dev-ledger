@@ -38,4 +38,4 @@
       never summed with the allocated rate.
 - [x] 5.4 Test that two providers' rates are reported separately and share no denominator.
 - [x] 5.5 Test that no source file outside a data field branches on a provider identifier.
-- [ ] 5.6 Run `npm run check` and the board end to end, recording the result in the pull request.
+- [x] 5.6 Run `npm run check` and the board end to end, recording the result in the pull request.
