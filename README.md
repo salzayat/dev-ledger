@@ -75,6 +75,18 @@ unreported changes, and records whose harness supplied no figures, are counted a
 zero — on unmerged pull requests as on merged changes. Nothing is keyed to a person.
 [`docs/methodology.md`](docs/methodology.md) explains each figure.
 
+## The Published Board
+
+This repository's own board is published to GitHub Pages at
+[salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/), rebuilt from the default branch.
+It is built by the same `telemetry board --html` that writes the local page, so what is published is what
+`npm run board` shows you.
+
+Publication is governed by the `add-board-publication` change and is not wired up yet: until that change is
+implemented and Pages is enabled for this repository, the link above does not resolve and the board is a
+local artifact only. Nothing generated is ever committed — `.telemetry/board.html` is untracked, and the
+published page is built in continuous integration rather than stored in the tree.
+
 ## What It Does Not See
 
 Reviews, approvals, check outcomes, pull request open and close times, and whether an unmerged pull
@@ -90,6 +102,8 @@ repository turns it on, every control that needs them reads as not observable.
 | `./scripts/telemetry.sh rebuild`           | Rebuild the projection and print its content hash.                                                                |
 | `./scripts/telemetry.sh board`             | Render The Board from the projection.                                                                             |
 | `./scripts/telemetry.sh board --html`      | Write the dashboard to `.telemetry/board.html` and print its path.                                                |
+| `npm run board`                            | Sync, rebuild, write the dashboard, and open it. The one command that goes from nothing to the page.              |
+| `npm run board -- --no-open`               | The same without opening a browser; `--output PATH` writes somewhere other than `.telemetry/board.html`.          |
 | `./scripts/telemetry.sh cursor <consumer>` | Replay changes since the consumer's cursor and advance it.                                                        |
 | `./scripts/telemetry.sh validate`          | Validate session files against the schema.                                                                        |
 | `./scripts/telemetry.sh session`           | Record a session start, or write and commit a session file at session end.                                        |
@@ -110,6 +124,7 @@ through the `@dev-ledger/source` export condition, so no build step is needed to
 | `packages/flow`           | Registry, sync, change grouping, association, timing, releases, signals, projection, cursors, The Board, the command line |
 | `.githooks/`              | `prepare-commit-msg`, `commit-msg`, `pre-commit`, `pre-push`                                                              |
 | `scripts/telemetry.sh`    | Entry point for every telemetry command                                                                                   |
+| `scripts/board.sh`        | Sync, rebuild, render, and open The Board in one step; backs `npm run board`                                              |
 | `telemetry.config.json`   | Effort vocabulary, spec pattern, cost allocation (off by default)                                                         |
 | `registry.json`           | The repositories the projection covers                                                                                    |
 | `.telemetry/sessions/`    | Session files, tracked, one per session                                                                                   |
