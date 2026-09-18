@@ -112,12 +112,14 @@ on operator-keyed figures; pseudonymity stays enforced where it always was, in t
 the flow efficiency and work mix row because both modify `Flow signals per repository and in aggregate`, and
 whichever archives second is rebased onto the first.
 
-The board publication row follows it because a published page should not lead with a spend panel reading
-zero over the repository's whole history. It builds The Board on every pull request as a run artifact and a
-job summary, and deploys it to Pages from the default branch only, gated on the repository being public —
-the repository is private until the first release, so the gate lives in the workflow rather than in a
-sequencing note. It also modifies `A registry of repositories synced over SSH`, which the flow efficiency
-and work mix row modifies too.
+The board publication row builds The Board on every pull request as a run artifact and a job summary, and
+deploys it to Pages from the default branch only, gated on the repository being public — the gate lives in
+the workflow rather than in a sequencing note, so it cannot be forgotten if visibility ever changes back. It
+was first sequenced after the subscription and operator spend row so a published page would not lead with a
+spend panel reading zero; the repository owner has since decided to publish ahead of that row, and the
+currency figures become real when it lands. Its implementation is complete and it stays `Blocked` only
+because it modifies `A registry of repositories synced over SSH`, which the flow efficiency and work mix row
+modifies too, and the two cannot be archived out of order.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

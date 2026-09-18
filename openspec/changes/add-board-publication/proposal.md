@@ -32,8 +32,10 @@ stands means putting a private key into a workflow, which `Sync needs no platfor
 
 ## Dependencies
 
-`add-subscription-and-operator-spend` (active, `Pending`). Until it is archived, every currency figure on
-the page renders `$0.00`, so this change is selected only after it is archived and verified.
+`add-subscription-and-operator-spend` was named here as a dependency so a published page would not lead with
+a spend panel reading `$0.00`. That was a judgement about presentation, not a technical requirement, and the
+repository owner has decided to publish ahead of it: the board publishes what the records currently say, and
+the currency figures become real when that change lands. It is no longer a dependency of this one.
 
 `add-flow-efficiency-and-work-mix` (active, `Pending`), which modifies `A registry of repositories synced
 over SSH` as this change does. Both deltas rewrite the same requirement, so whichever archives second is

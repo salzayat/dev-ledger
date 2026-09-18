@@ -78,14 +78,18 @@ zero — on unmerged pull requests as on merged changes. Nothing is keyed to a p
 ## The Published Board
 
 This repository's own board is published to GitHub Pages at
-[salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/), rebuilt from the default branch.
-It is built by the same `telemetry board --html` that writes the local page, so what is published is what
-`npm run board` shows you.
+[salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/), rebuilt on every push to `main` by
+the `Board` workflow. It is built by the same `telemetry board --html` that writes the local page, so what
+is published is what `npm run board` shows you.
 
-Publication is governed by the `add-board-publication` change and is not wired up yet: until that change is
-implemented and Pages is enabled for this repository, the link above does not resolve and the board is a
-local artifact only. Nothing generated is ever committed — `.telemetry/board.html` is untracked, and the
-published page is built in continuous integration rather than stored in the tree.
+Every pull request builds the same page without publishing it: the run uploads it as a `board` artifact and
+writes the terminal render into the run's job summary, so a reviewer sees what a change does to the board
+before it merges. Only a push to `main` deploys, and only while the repository is public — the deploy job
+checks that itself rather than relying on anyone to remember.
+
+Nothing generated is committed. `.telemetry/board.html` is untracked, the published page is built in the
+workflow rather than stored in the tree, and the workflow uses no credential beyond the token the platform
+issues to its own run.
 
 ## What It Does Not See
 
@@ -98,7 +102,7 @@ repository turns it on, every control that needs them reads as not observable.
 | Command                                    | What it does                                                                                                      |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
 | `npm run check`                            | The complete local quality gate: specs, harness, governance, docs, secrets, formatting, Nx checks, tests, builds. |
-| `./scripts/telemetry.sh sync`              | Mirror-fetch every registered repository over SSH.                                                                |
+| `./scripts/telemetry.sh sync`              | Mirror-fetch every registered repository over SSH. `--entry NAME --fetch-url URL` fetches one entry elsewhere.    |
 | `./scripts/telemetry.sh rebuild`           | Rebuild the projection and print its content hash.                                                                |
 | `./scripts/telemetry.sh board`             | Render The Board from the projection.                                                                             |
 | `./scripts/telemetry.sh board --html`      | Write the dashboard to `.telemetry/board.html` and print its path.                                                |

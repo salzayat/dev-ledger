@@ -1,0 +1,87 @@
+name: Board
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# The build is cheap and idempotent, so a superseded pull request run is cancelled. Deployments are not:
+# they are serialized by their own group below so two merges cannot race the single Pages site.
+concurrency:
+  group: board-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The projection is rebuilt from commit history, pull head refs, and tags, so a shallow checkout
+          # would build a different projection than an operator's.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Sync this repository over HTTPS
+        # The registry records an SSH URL for an operator's own git access. Continuous integration has no
+        # key and needs none: it fetches the same public repository over HTTPS with the token the platform
+        # issues to this run, overriding the URL for this one entry without touching registry.json.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./scripts/telemetry.sh sync \
+            --entry dev-ledger \
+            --fetch-url "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+      - name: Rebuild the projection
+        run: ./scripts/telemetry.sh rebuild
+      - name: Render The Board
+        run: |
+          mkdir -p site
+          ./scripts/telemetry.sh board --html site/index.html
+      - name: Write the terminal render into the run summary
+        run: |
+          {
+            printf '## The Board\n\n'
+            printf '```\n'
+            ./scripts/telemetry.sh board
+            printf '```\n'
+          } >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload the page
+        uses: actions/upload-artifact@v5
+        with:
+          name: board
+          path: site/index.html
+          if-no-files-found: error
+      - name: Upload the Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.private == false
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    # Never from a pull request, and never while the repository is private: a Pages site is public on every
+    # plan that offers one for a private repository, so the gate lives here rather than in someone's memory.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.private == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: board-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

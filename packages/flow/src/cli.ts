@@ -19,7 +19,8 @@ import { mirrorPath, syncAll } from './sync.ts';
 
 const USAGE = `Usage: telemetry <command> [options]
 
-  sync                                     Mirror-fetch every registered repository over SSH
+  sync [--entry NAME --fetch-url URL]       Mirror-fetch every registered repository over SSH, optionally
+                                           fetching one named entry from a different URL
   rebuild                                  Rebuild the projection from the mirrors and print its hash
   cursor <consumer> [--repo <name>]        Replay changes since the consumer's cursor and advance it
   board [--html [path]]                    Render The Board in the terminal, or as a static HTML page (default .telemetry/board.html)
@@ -60,7 +61,29 @@ export function main(argv: string[]): number {
   const root = repoRoot();
   switch (command) {
     case 'sync': {
-      const results = syncAll(stateRoot(root), loadRegistry(root));
+      const registry = loadRegistry(root);
+      const entry = option(args, '--entry');
+      const fetchUrl = option(args, '--fetch-url');
+      if ((entry === undefined) !== (fetchUrl === undefined)) {
+        process.stderr.write(
+          'sync: --entry and --fetch-url are used together\n',
+        );
+        return 1;
+      }
+      if (
+        entry !== undefined &&
+        !registry.repositories.some((candidate) => candidate.name === entry)
+      ) {
+        process.stderr.write(`sync: no registered repository named ${entry}\n`);
+        return 1;
+      }
+      const results = syncAll(
+        stateRoot(root),
+        registry,
+        entry !== undefined && fetchUrl !== undefined
+          ? { name: entry, url: fetchUrl }
+          : undefined,
+      );
       for (const result of results) {
         process.stdout.write(
           result.reachable
