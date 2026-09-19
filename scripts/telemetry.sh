@@ -12,7 +12,7 @@ if [ ! -d node_modules ]; then
 fi
 
 case "${1:-}" in
-  session | subscription | note | class | validate | validate-message)
+  session | subscription | timesheet | note | class | validate | validate-message)
     exec node --conditions=@dev-ledger/source --experimental-strip-types \
       "$repo_root/packages/capture/src/cli.ts" "$@"
     ;;

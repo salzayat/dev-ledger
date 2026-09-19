@@ -96,6 +96,16 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   lines.push(
     `  coverage: ${signals.coverage.agent} with an agent session, ${signals.coverage.humanOnly} human-only, ${signals.coverage.undeclared} undeclared, ${signals.coverage.unreported} unreported of ${signals.coverage.total}`,
   );
+  lines.push(
+    `  hours: ${signals.hours.measured.toFixed(1)} h measured, ${signals.hours.confirmed.toFixed(1)} h confirmed; ${
+      Object.entries(signals.hours.byOperator)
+        .map(
+          ([op, e]) =>
+            `${op} ${e.measured.toFixed(1)} h over ${e.sessions} sessions`,
+        )
+        .join('; ') || 'none'
+    } [reported]`,
+  );
   const allocation = signals.allocation;
   const money = (amount: number, currency: string) =>
     currency === 'USD'

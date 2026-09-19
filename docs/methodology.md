@@ -300,6 +300,13 @@ transcript kept across sessions never charges one the day's hours. Hours measure
 operator identifier are shown under `(no operator identifier)` rather than dropped; `session end` prints
 the command that sets one.
 
+## Timesheets: measured, then confirmed
+
+Hours are shown by operator, spec, and month from each record's operator active seconds. For billing, the
+measurement is proposed and a person confirms it: `timesheet close <YYYY-MM>` writes one sheet per operator
+from the month's records, with the measured hours by spec kept beside a confirmed column the operator
+edits before committing. The panel shows both, so a correction is visible. No sheet can hold a rate.
+
 ## Unit economics in two columns
 
 Every cost-per figure carries reported cost and allocated cost side by side and never sums them. On a

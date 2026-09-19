@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -30,6 +31,11 @@ import {
   validateSubscriptionFile,
 } from './subscription.ts';
 import { CLASSES_PATH, validateClassesFile } from './classes.ts';
+import {
+  TIMESHEETS_PATH,
+  timesheetFilePath,
+  validateTimesheetFile,
+} from './timesheets.ts';
 import { NOTES_PATH, noteFilePath, validateNoteFile } from './notes.ts';
 import { validateMessage } from './trailers.ts';
 import {
@@ -138,6 +144,7 @@ function recordFiles(root: string, paths: string[]): string[] {
     SUBSCRIPTIONS_PATH,
     NOTES_PATH,
     CLASSES_PATH,
+    TIMESHEETS_PATH,
   ].filter((path) => existsSync(join(root, path)));
   if (present.length === 0) {
     return [];
@@ -168,6 +175,9 @@ function validateRecord(
   }
   if (relative === CLASSES_PATH) {
     return validateClassesFile(value, config);
+  }
+  if (relative.startsWith(`${TIMESHEETS_PATH}/`)) {
+    return validateTimesheetFile(value, config);
   }
   return relative.startsWith(`${SUBSCRIPTIONS_PATH}/`)
     ? validateSubscriptionFile(value)
@@ -670,6 +680,96 @@ export function captureMain(argv: string[]): number {
         ]);
       }
       process.stdout.write(`${relative}\n`);
+      return 0;
+    }
+    case 'timesheet': {
+      if (args[0] !== 'close') {
+        fail(
+          'usage: telemetry timesheet close <YYYY-MM> [--overwrite] [--force]',
+        );
+      }
+      const period = args[1];
+      if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        fail(
+          'usage: telemetry timesheet close <YYYY-MM> [--overwrite] [--force]',
+        );
+      }
+      const [year, month] = period.split('-').map(Number);
+      const end = Date.UTC(
+        month === 12 ? year + 1 : year,
+        month === 12 ? 0 : month,
+        1,
+      );
+      if (end > Date.now() && !args.includes('--force')) {
+        fail(`${period} has not ended; pass --force to close it anyway`);
+      }
+      const config = loadConfig(root);
+      // Measured hours by operator and spec, from the session records that ended in the period.
+      const measured: Record<string, Record<string, number>> = {};
+      const monthDir = join(root, SESSIONS_PATH, period);
+      const files = existsSync(monthDir)
+        ? readdirSync(monthDir).filter((name) => name.endsWith('.json'))
+        : [];
+      for (const name of files) {
+        let record: {
+          operatorId?: string | null;
+          operatorActiveSeconds?: number;
+          spec?: string;
+        };
+        try {
+          record = JSON.parse(readFileSync(join(monthDir, name), 'utf8'));
+        } catch {
+          continue;
+        }
+        if (
+          typeof record.operatorId !== 'string' ||
+          typeof record.operatorActiveSeconds !== 'number'
+        ) {
+          continue;
+        }
+        const spec = record.spec ?? '(none)';
+        const byOperator = (measured[record.operatorId] ??= {});
+        byOperator[spec] =
+          Math.round(
+            ((byOperator[spec] ?? 0) + record.operatorActiveSeconds / 3600) *
+              100,
+          ) / 100;
+      }
+      if (Object.keys(measured).length === 0) {
+        fail(
+          `no session record in ${period} carries operator hours; nothing to close`,
+        );
+      }
+      for (const [operatorId, bySpec] of Object.entries(measured)) {
+        const relative = timesheetFilePath(operatorId, period);
+        const absolute = join(root, relative);
+        if (existsSync(absolute) && !args.includes('--overwrite')) {
+          process.stdout.write(
+            `${relative} exists; pass --overwrite to replace it\n`,
+          );
+          continue;
+        }
+        const sheet = {
+          schemaVersion: 1,
+          operatorId,
+          period,
+          bySpec: { ...bySpec },
+          measuredBySpec: { ...bySpec },
+          note: 'proposed from the session records; edit bySpec to what you confirm, then commit',
+        };
+        const sheetErrors = validateTimesheetFile(sheet, config);
+        if (sheetErrors.length > 0) {
+          fail(
+            `timesheet for ${operatorId} is invalid:\n  ${sheetErrors.join('\n  ')}`,
+          );
+        }
+        mkdirSync(dirname(absolute), { recursive: true });
+        writeFileSync(absolute, canonicalJson(sheet));
+        process.stdout.write(`${relative}\n`);
+      }
+      process.stdout.write(
+        'review bySpec against what you will bill, then commit the timesheets\n',
+      );
       return 0;
     }
     case 'class': {

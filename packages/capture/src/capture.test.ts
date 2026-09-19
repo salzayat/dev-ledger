@@ -1254,3 +1254,54 @@ test("class set declares a spec's cost class once, validated against the vocabul
   );
   assert.match(run(['validate']), /1 records valid/);
 });
+
+test("timesheet close proposes confirmed hours by spec from the period's records and commits nothing", () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  writeFileSync(
+    join(dir, 'telemetry.config.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: ['op-1'],
+        costClasses: ['rd'],
+      },
+    }),
+  );
+  writeRecord(dir, 's-t1', {
+    operatorId: 'op-1',
+    operatorActiveSeconds: 5400,
+    operatorActiveAlgorithm: 'prompt-attribution-v1:900',
+    spec: 'add-x',
+  });
+  writeRecord(dir, 's-t2', {
+    operatorId: 'op-1',
+    operatorActiveSeconds: 1800,
+    operatorActiveAlgorithm: 'prompt-attribution-v1:900',
+  });
+  const run = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      {
+        cwd: dir,
+        encoding: 'utf8',
+        env: gitEnvironment(),
+      },
+    );
+  assert.throws(() => run(['timesheet', 'close', '2099-01']), /has not ended/);
+  const out = run(['timesheet', 'close', '2026-09', '--force']);
+  assert.match(out, /\.telemetry\/timesheets\/2026-09\/op-1\.json/);
+  const sheet = JSON.parse(
+    readFileSync(join(dir, '.telemetry/timesheets/2026-09/op-1.json'), 'utf8'),
+  );
+  assert.deepEqual(sheet.bySpec, { 'add-x': 1.5, '(none)': 0.5 });
+  assert.deepEqual(sheet.measuredBySpec, sheet.bySpec);
+  assert.match(run(['validate']), /records valid/);
+  assert.match(
+    fixtureGit(dir, ['status', '--porcelain', '--untracked-files=all']),
+    /\?\? \.telemetry\/timesheets/,
+  );
+});

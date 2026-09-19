@@ -32,6 +32,7 @@ import {
 import { collectNotes } from './notes.ts';
 import { changeNameOf, completedTasks } from './tasks.ts';
 import { collectClasses } from './classes.ts';
+import { collectTimesheets } from './timesheets.ts';
 import {
   computeSignals,
   type ChangeFacts,
@@ -56,6 +57,7 @@ export type RepositoryProjection = {
   sessions: Record<string, unknown>[];
   subscriptions: Record<string, unknown>[];
   notes: Record<string, unknown>[];
+  timesheets: Record<string, unknown>[];
   classes: {
     path: string;
     valid: boolean;
@@ -169,6 +171,7 @@ export function buildRepositoryProjection(
       sessions: [],
       subscriptions: [],
       notes: [],
+      timesheets: [],
       classes: {
         path: '.telemetry/classes.json',
         valid: true,
@@ -295,6 +298,7 @@ export function buildRepositoryProjection(
   const plans = collectPlans(dir, branch);
   const notes = collectNotes(dir, branch);
   const classes = collectClasses(dir, branch, configAtRevision(branch));
+  const timesheets = collectTimesheets(dir, branch, configAtRevision(branch));
   // A period is closed once its end has passed; an open month has no missing record yet.
   const asOfMs = asOf ? Date.parse(asOf) : Date.now();
   const periods = new Set<string>();
@@ -337,6 +341,7 @@ export function buildRepositoryProjection(
       closedPullRequests: entry.closedPullRequests,
     },
     classes.classes,
+    timesheets,
   );
   return {
     name: entry.name,
@@ -374,6 +379,7 @@ export function buildRepositoryProjection(
     subscriptions: subscriptions.map((record) => ({ ...record })),
     notes: notes.map((record) => ({ ...record })),
     classes,
+    timesheets: timesheets.map((record) => ({ ...record })),
     configurationGaps: gaps,
     unmerged,
     releases: releaseView.releases,

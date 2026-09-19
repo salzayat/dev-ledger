@@ -64,6 +64,14 @@ export {
 } from './classes.ts';
 export type { ClassesFile } from './classes.ts';
 export {
+  TIMESHEETS_PATH,
+  TIMESHEET_SCHEMA_VERSION,
+  timesheetFilePath,
+  totalHours,
+  validateTimesheetFile,
+} from './timesheets.ts';
+export type { TimesheetFile } from './timesheets.ts';
+export {
   NOTES_PATH,
   NOTE_SCHEMA_VERSION,
   noteFilePath,

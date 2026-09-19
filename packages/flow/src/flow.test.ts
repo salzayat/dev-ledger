@@ -2138,3 +2138,66 @@ test('a spec declaration classifies sessions that declare nothing, and the class
   assert.match(html, /1 spec/);
   assert.match(html, /declared by/);
 });
+
+test('hours are reported by operator, spec, and month, with a committed timesheet confirming beside the measurement', () => {
+  const fixture = makeFixtureRepo();
+  const seed = openPullRequest(fixture, 'seed', [
+    [
+      'feat(seed): seed',
+      {
+        'seed.txt': 's',
+        'telemetry.config.json': JSON.stringify({
+          schemaVersion: 1,
+          costAllocation: {
+            enabled: true,
+            idleCapSeconds: 900,
+            operators: ['op-1'],
+            costClasses: ['rd'],
+          },
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const work = openPullRequest(fixture, 'work', [
+    [
+      trailered('feat(h): hours', {
+        Spec: 'add-h',
+        Session: 's-h',
+        Change: 'c-h',
+      }),
+      {
+        'h.txt': 'h',
+        '.telemetry/sessions/2026-09/s-h.json': sessionJson('s-h', {
+          startedAt: '2026-09-03T09:00:00Z',
+          endedAt: '2026-09-03T11:00:00Z',
+          operatorActiveSeconds: 7200,
+          operatorActiveAlgorithm: 'prompt-attribution-v1:900',
+          operatorId: 'op-1',
+        }),
+        '.telemetry/timesheets/2026-09/op-1.json': JSON.stringify({
+          schemaVersion: 1,
+          operatorId: 'op-1',
+          period: '2026-09',
+          bySpec: { 'add-h': 1.5 },
+          measuredBySpec: { 'add-h': 2 },
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, work, 'feat(h): hours', 'Spec: add-h\nSession: s-h');
+  const built = build(registryFor(fixture.dir));
+  const hours = built.repo.signals!.hours;
+  assert.equal(hours.byOperator['op-1'].measured, 2);
+  assert.deepEqual(hours.byOperator['op-1'].bySpec, { 'add-h': 2 });
+  assert.equal(hours.byOperator['op-1'].byMonth['2026-09'].confirmed, 1.5);
+  assert.equal(
+    hours.byOperator['op-1'].byMonth['2026-09'].timesheet,
+    '.telemetry/timesheets/2026-09/op-1.json',
+  );
+  assert.equal(hours.confirmed, 1.5);
+  assert.equal(built.repo.timesheets.length, 1);
+  const html = renderLedgerHtml(built.projection);
+  assert.match(html, /<h3>Hours<\/h3>/);
+  assert.match(html, /1\.5 h/);
+});
