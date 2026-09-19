@@ -1,0 +1,29 @@
+{
+  "agentRunSeconds": 900,
+  "billingKind": "subscription",
+  "branch": "ci/lighter-ledger-workflow",
+  "cacheReadTokens": 312354210,
+  "cacheWriteTokens": 2978354,
+  "cachedTokens": 315332564,
+  "commits": [
+    "50a16d7f2cd4d93d5cf1ec380f44ae20a35f6f99"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T01:57:52.551Z",
+  "figuresSource": "summed from 557 messages in the session transcript",
+  "inputTokens": 15705,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorId": "op-1",
+  "outputTokens": 990280,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-ci-lighter",
+  "spec": "lighten-ledger-workflow",
+  "startedAt": "2026-09-19T01:55:14.872Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 158
+}
