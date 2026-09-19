@@ -1,0 +1,29 @@
+{
+  "agentRunSeconds": 2400,
+  "billingKind": "subscription",
+  "branch": "flow/timesheets",
+  "cacheReadTokens": 278087460,
+  "cacheWriteTokens": 2906190,
+  "cachedTokens": 280993650,
+  "commits": [
+    "7426c4f06aabc6718dfd9257d60a10e618afb446"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T01:08:33.428Z",
+  "figuresSource": "summed from 519 messages in the session transcript",
+  "inputTokens": 14627,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorId": "op-1",
+  "outputTokens": 929016,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-timesheets",
+  "spec": "add-timesheets",
+  "startedAt": "2026-09-19T01:02:09.468Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 384
+}
