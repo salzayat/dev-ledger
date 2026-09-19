@@ -25,6 +25,8 @@ export type { Release, ReleaseView } from './releases.ts';
 export { computeSignals } from './signals.ts';
 export { collectSubscriptions } from './subscriptions.ts';
 export { collectNotes } from './notes.ts';
+export { changeNameOf, completedTasks, parseTasks } from './tasks.ts';
+export type { CompletedTask, TaskItem } from './tasks.ts';
 export type { NoteRecord } from './notes.ts';
 export type { SubscriptionRecord } from './subscriptions.ts';
 export type {

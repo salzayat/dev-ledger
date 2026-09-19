@@ -181,7 +181,9 @@ repository carries `refTips` (the refs the mirror held), `changes`, `sessions`, 
 the flow reads, `dora` (deployment frequency, lead time to release with its merge-to-tag part, change failure
 rate, time to fix, each with its approximation note), `trends.weekly`, `costClasses`, `coverage`, and
 `allocation` (the subscription periods, each session's share, aggregates per currency, and the excluded
-counts, all under trust `allocated` with basis `agentRunSeconds`).
+counts, all under trust `allocated` with basis `agentRunSeconds`). Each change carries `tasks`, the
+OpenSpec tasks it completed with their `~N` weight or `null`; each weekly bucket carries `tasks`,
+`complexity`, and `unweightedTasks`, and `velocity` reports complexity per week.
 
 Each change carries its identity (the last commit on the default branch), `kind`, `commits`,
 `association` (`pullRequest`, `method`: `subject`, `pull-head`, or `patch-identity`, and `classification`:

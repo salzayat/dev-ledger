@@ -1,0 +1,33 @@
+{
+  "agentAutonomousSeconds": 19163,
+  "agentRunSeconds": 1800,
+  "billingKind": "subscription",
+  "branch": "flow/task-velocity",
+  "cacheReadTokens": 248802452,
+  "cacheWriteTokens": 2810494,
+  "cachedTokens": 251612946,
+  "commits": [
+    "9d3fba7bcd820b212b8cce4a5829e7bac0f7d3fb"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-18T23:56:17.124Z",
+  "figuresSource": "summed from 483 messages in the session transcript",
+  "idleSeconds": 67217,
+  "inputTokens": 13529,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorActiveAlgorithm": "prompt-attribution-v1:900",
+  "operatorActiveSeconds": 19450,
+  "operatorId": null,
+  "outputTokens": 852612,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-task-velocity",
+  "spec": "add-task-velocity",
+  "startedAt": "2026-09-18T23:51:20.610Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 297
+}

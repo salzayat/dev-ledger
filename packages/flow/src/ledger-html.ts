@@ -364,8 +364,8 @@ function velocityChart(weekly: WeeklyBucket[]): string {
     return '';
   }
   return columnChart(
-    weekly.map((week) => ({ label: week.week, value: week.storyPoints })),
-    'story points merged per week over the measured window',
+    weekly.map((week) => ({ label: week.week, value: week.complexity })),
+    'relative complexity of tasks completed per week over the measured window',
   );
 }
 
@@ -1074,11 +1074,11 @@ ${efficiencyPanels(signals, links)}
 ${panel(
   'Velocity',
   `${figure(
-    signals.velocity.pointsPerWeek === null
+    signals.velocity.complexityPerWeek === null
       ? 'n/a'
-      : String(signals.velocity.pointsPerWeek),
-    `story points per week over ${count(signals.velocity.weeks, 'week')}; ${signals.velocity.changesPerWeek ?? 'n/a'} changes per week`,
-  )}${velocityChart(signals.trends.weekly)}<p class="help">${escapeHtml(signals.velocity.note)}${signals.velocity.excludedWithoutPoints > 0 ? ` ${signals.velocity.excludedWithoutPoints} of ${signals.velocity.changes} changes recorded no points and are excluded, never counted as zero.` : ''}</p>`,
+      : String(signals.velocity.complexityPerWeek),
+    `complexity per week over ${count(signals.velocity.weeks, 'week')}: ${signals.velocity.tasksPerWeek ?? 'n/a'} tasks, ${signals.velocity.changesPerWeek ?? 'n/a'} changes${signals.velocity.pointsPerWeek ? `, ${signals.velocity.pointsPerWeek} story points` : ''}`,
+  )}${velocityChart(signals.trends.weekly)}<p class="help">${escapeHtml(signals.velocity.note)}${signals.velocity.unweightedTasks > 0 ? ` ${signals.velocity.unweightedTasks} of ${signals.velocity.tasks} completed tasks declared no weight and count one each.` : ''}${signals.velocity.excludedWithoutPoints > 0 && signals.velocity.storyPoints > 0 ? ` ${signals.velocity.excludedWithoutPoints} of ${signals.velocity.changes} changes recorded no points and are excluded from the points figure.` : ''}</p>`,
   `${trustBadges(signals.velocity.trust)} per repository and per week, never keyed to a person`,
 )}
 ${panel(

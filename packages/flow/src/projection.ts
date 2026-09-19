@@ -30,6 +30,7 @@ import {
   type ConfigurationGap,
 } from './subscriptions.ts';
 import { collectNotes } from './notes.ts';
+import { changeNameOf, completedTasks } from './tasks.ts';
 import {
   computeSignals,
   type ChangeFacts,
@@ -254,6 +255,27 @@ export function buildRepositoryProjection(
       branchSubjects: change.branchCommits
         .map((hash) => commits.get(hash)?.subject)
         .filter((subject): subject is string => subject !== undefined),
+      tasks: filesOf(change).flatMap((path) => {
+        const name = changeNameOf(path);
+        if (name === null) {
+          return [];
+        }
+        // An archive move ticks nothing: the same task under the old path was already ticked at the base.
+        const before =
+          change.firstParent === null
+            ? null
+            : (readBlob(dir, change.firstParent, path) ??
+              readBlob(
+                dir,
+                change.firstParent,
+                `openspec/changes/${name}/tasks.md`,
+              ));
+        return completedTasks(
+          name,
+          before,
+          readBlob(dir, change.lastCommit, path),
+        );
+      }),
     };
   });
   const subscriptions = collectSubscriptions(dir, branch);
@@ -325,6 +347,7 @@ export function buildRepositoryProjection(
       files: fact.files.length,
       insertions: fact.insertions,
       deletions: fact.deletions,
+      tasks: fact.tasks,
       releases: releaseView.releasedChanges.get(fact.change.id) ?? [],
       gaps: [...fact.change.gaps, ...fact.sessions.gaps],
       producer: 'git',

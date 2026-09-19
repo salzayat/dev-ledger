@@ -37,6 +37,7 @@ contract.
 | Hook drift check (workflow governance)            | `add-hook-drift-check`                                        | Complete |
 | Ledger reads after review (defects)               | `fix-ledger-reads-after-review`                               | Complete |
 | Refinements after review (phase one addendum)     | `refine-ledger-after-review`                                  | Complete |
+| Task velocity (phase one addendum)                | `add-task-velocity`                                           | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -193,6 +194,10 @@ The refinements row follows the ledger reads row and removes the cause behind mo
 harness runs the session lifecycle, the workflow refuses undeclared work, recording a session is atomic,
 spec lead time starts at the proposal, flow efficiency counts only time inside the window, the registry
 declares where measurement starts and which pull requests are closed, and notes on figures are records.
+
+The task velocity row replaces a velocity nobody could feed. Story points were never recorded, so the panel
+read zero; the tasks in every change's list are the estimate the repository already makes, and a `~N`
+weight on a task line gives it a relative complexity. Velocity is now the complexity completed per week.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
