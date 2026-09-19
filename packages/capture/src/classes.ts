@@ -11,6 +11,8 @@ export type ClassesFile = {
   classes: Record<string, string>;
   /** The class for this repository's work that no session, trailer, or spec declares. Optional. */
   default?: string;
+  /** Release rule: a change carried by a release tag takes `released`; any other work takes `unreleased`. */
+  release?: { released: string; unreleased: string };
 };
 
 const FORBIDDEN_KEYS =
@@ -50,6 +52,20 @@ export function validateClassesFile(
     errors.push(
       `default must be one of ${config.costAllocation.costClasses.join(', ')}`,
     );
+  }
+  if (file.release !== undefined) {
+    const rule = file.release as Record<string, unknown> | null;
+    const known = config.costAllocation.costClasses;
+    if (
+      typeof rule !== 'object' ||
+      rule === null ||
+      !known.includes(rule.released as string) ||
+      !known.includes(rule.unreleased as string)
+    ) {
+      errors.push(
+        `release must name a released and an unreleased class from ${known.join(', ')}`,
+      );
+    }
   }
   const pattern = new RegExp(config.specPattern);
   for (const [spec, cls] of Object.entries(

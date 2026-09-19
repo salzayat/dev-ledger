@@ -410,8 +410,13 @@ collector replaces the tag with a deployment record without changing the shape o
 
 A class is a property of the work, and the work is named by its spec, so a class is declared once per spec
 with `telemetry class set <spec> <class>` and inherited by every change and session citing it. A session's
-then the spec's declaration, then the repository's declared default (`class set --default rd`); anything
-else is `unclassified`. Nothing is inferred: the default is a committed declaration shown as its own source. The panel shows reported cost, the allocated share, and operator hours
+own class wins, then a `Cost-Class:` trailer, then the spec's declaration, then the repository's release
+rule, then its declared default; anything else is `unclassified`.
+
+The release rule, `class set --release production rd`, follows what shipped. A change a release tag carries
+is production. Merged work no tag carries, and sessions on pull requests that never merged, are R&D. The
+class moves on the day a tag is cut, so work that reads R&D today reads production once it ships. Nothing
+is inferred: the rule and the default are committed declarations, each shown as its own source. The panel shows reported cost, the allocated share, and operator hours
 per class, because planning and tax credits count dollars and hours, and says how many records resolved
 by each source.
 

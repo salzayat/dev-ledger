@@ -346,6 +346,7 @@ export function buildRepositoryProjection(
     classes.classes,
     timesheets,
     classes.default,
+    classes.release,
   );
   return {
     name: entry.name,

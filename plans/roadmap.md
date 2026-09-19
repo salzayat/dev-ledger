@@ -47,7 +47,7 @@ contract.
 | Capture install (phase one addendum)                | `add-capture-install`                                         | Complete |
 | Transcript token window (defect)                    | `fix-transcript-token-window`                                 | Complete |
 | Default cost class (phase one addendum)             | `add-default-cost-class`                                      | Complete |
-| Default cost class (phase one addendum)             | `add-default-cost-class`                                      | Complete |
+| Release cost class (phase one addendum)             | `add-release-cost-class`                                      | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -237,8 +237,8 @@ The transcript token window row applies the session window hours already used to
 The default cost class row lets a repository declare its class once, so new specs and work citing no spec
 stop reading unclassified.
 
-The default cost class row lets a repository declare its class once, so new specs and work citing no spec
-stop reading unclassified.
+The release cost class row makes work a release tag carries production and every other effort R&D, so the
+class follows what shipped.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

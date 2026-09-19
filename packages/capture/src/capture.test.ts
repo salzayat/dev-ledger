@@ -1401,3 +1401,47 @@ test('class set --default declares the repository default, validated against the
     /default must be one of rd, production/,
   );
 });
+
+test('class set --release declares the release rule, validated against the vocabulary', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  writeFileSync(
+    join(dir, 'telemetry.config.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: [],
+        costClasses: ['rd', 'production'],
+      },
+    }),
+  );
+  const run = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+    );
+  run(['class', 'set', '--release', 'production', 'rd', '--no-commit']);
+  const file = JSON.parse(
+    readFileSync(join(dir, '.telemetry/classes.json'), 'utf8'),
+  );
+  assert.deepEqual(file.release, { released: 'production', unreleased: 'rd' });
+  assert.throws(
+    () =>
+      run([
+        'class',
+        'set',
+        '--release',
+        'production',
+        'marketing',
+        '--no-commit',
+      ]),
+    /release must name/,
+  );
+  assert.throws(
+    () => run(['class', 'set', '--release', 'production', '--no-commit']),
+    /requires a released class and an unreleased class/,
+  );
+});

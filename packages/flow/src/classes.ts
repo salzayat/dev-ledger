@@ -14,6 +14,8 @@ export type ClassesRecord = {
   classes: Record<string, string>;
   /** The repository's declared default class, or null when none is declared. */
   default: string | null;
+  /** The declared release rule, or null when none is declared. */
+  release: { released: string; unreleased: string } | null;
 };
 
 export function collectClasses(
@@ -21,7 +23,12 @@ export function collectClasses(
   branch: string,
   config: TelemetryConfig,
 ): ClassesRecord {
-  const empty = { path: CLASSES_PATH, classes: {}, default: null };
+  const empty = {
+    path: CLASSES_PATH,
+    classes: {},
+    default: null,
+    release: null,
+  };
   const text = readBlob(dir, branch, CLASSES_PATH);
   if (text === null) {
     return { ...empty, valid: true, errors: [] };
@@ -30,6 +37,7 @@ export function collectClasses(
     const parsed = JSON.parse(text) as {
       classes?: Record<string, string>;
       default?: string;
+      release?: { released: string; unreleased: string };
     };
     const errors = validateClassesFile(parsed, config);
     return errors.length === 0
@@ -39,6 +47,7 @@ export function collectClasses(
           errors,
           classes: parsed.classes ?? {},
           default: parsed.default ?? null,
+          release: parsed.release ?? null,
         }
       : { ...empty, valid: false, errors };
   } catch (error) {

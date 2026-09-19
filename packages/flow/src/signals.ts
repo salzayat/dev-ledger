@@ -1211,6 +1211,7 @@ export function computeSignals(
   specClasses: Record<string, string> = {},
   timesheets: TimesheetRecord[] = [],
   defaultClass: string | null = null,
+  releaseRule: { released: string; unreleased: string } | null = null,
 ): RepositorySignals {
   // Changes merged before the instrumentation existed are excluded with that reason, not measured as
   // gaps; a pull request an operator declared closed leaves the queue, because git cannot see closed.
@@ -1786,6 +1787,50 @@ export function computeSignals(
       hours: 0,
       sources: {},
     });
+  // A change carried by any release tag is released; merged work no tag carries, and unmerged pull
+  // requests, are not.
+  const releasedIds = new Set(releases.flatMap((release) => release.changes));
+  const classify = (
+    record: SessionRecord,
+    trailerClass: string | null,
+    specName: string | null,
+    released: boolean,
+  ): void => {
+    const file = record.file!;
+    const declared = specName ? specClasses[specName] : undefined;
+    const ruled = releaseRule
+      ? released
+        ? releaseRule.released
+        : releaseRule.unreleased
+      : undefined;
+    const [name, source] = file.costClass
+      ? [file.costClass, 'session']
+      : trailerClass
+        ? [trailerClass, 'trailer']
+        : declared
+          ? [declared, 'spec']
+          : ruled
+            ? [ruled, released ? 'released' : 'unreleased']
+            : defaultClass
+              ? [defaultClass, 'default']
+              : ['unclassified', 'none'];
+    const entry = classSpend(name);
+    entry.sources[source] = (entry.sources[source] ?? 0) + 1;
+    if (typeof file.operatorActiveSeconds === 'number') {
+      entry.hours += file.operatorActiveSeconds / 3600;
+    }
+    const share = allocation.bySession[record.sessionId];
+    if (share) {
+      entry.allocated =
+        Math.round((entry.allocated + share.amount + share.overage) * 1e6) /
+        1e6;
+      entry.currency ??= share.currency;
+    }
+    if (!add(entry, record)) {
+      entry.missingFigures += 1;
+      entry.cites.push(record.path);
+    }
+  };
   for (const fact of facts) {
     const trailerClass =
       typeof fact.change.trailers['Cost-Class'] === 'string'
@@ -1800,38 +1845,13 @@ export function computeSignals(
         typeof fact.change.trailers.Spec === 'string'
           ? fact.change.trailers.Spec
           : (record.file.spec ?? null);
-      const declared = specName ? specClasses[specName] : undefined;
-      const name =
-        record.file.costClass ??
-        trailerClass ??
-        declared ??
-        defaultClass ??
-        'unclassified';
-      const source = record.file.costClass
-        ? 'session'
-        : trailerClass
-          ? 'trailer'
-          : declared
-            ? 'spec'
-            : defaultClass
-              ? 'default'
-              : 'none';
-      const entry = classSpend(name);
-      entry.sources[source] = (entry.sources[source] ?? 0) + 1;
-      if (typeof record.file.operatorActiveSeconds === 'number') {
-        entry.hours += record.file.operatorActiveSeconds / 3600;
-      }
-      const share = allocation.bySession[id];
-      if (share) {
-        entry.allocated =
-          Math.round((entry.allocated + share.amount + share.overage) * 1e6) /
-          1e6;
-        entry.currency ??= share.currency;
-      }
-      if (!add(entry, record)) {
-        entry.missingFigures += 1;
-        entry.cites.push(record.path);
-      }
+      classify(record, trailerClass, specName, releasedIds.has(fact.change.id));
+    }
+  }
+  // Work on a pull request that never merged is effort that ended in no tag.
+  for (const record of sessions.values()) {
+    if (record.attribution.unmergedPullRequest !== null && record.file) {
+      classify(record, null, record.file.spec ?? null, false);
     }
   }
   const coverage: Coverage = {

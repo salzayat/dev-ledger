@@ -783,13 +783,21 @@ export function captureMain(argv: string[]): number {
     case 'class': {
       if (args[0] !== 'set') {
         fail(
-          'usage: telemetry class set <spec> <class> | telemetry class set --default <class> [--no-commit]',
+          'usage: telemetry class set <spec> <class> | --default <class> | --release <released-class> <unreleased-class> [--no-commit]',
         );
       }
       const isDefault = args[1] === '--default';
-      const spec = isDefault ? null : args[1];
+      const isRelease = args[1] === '--release';
+      const spec = isDefault || isRelease ? null : args[1];
       const cls = args[2];
-      if (!cls || (!isDefault && !spec)) {
+      const unreleasedClass =
+        isRelease && args[3] && !args[3].startsWith('--') ? args[3] : undefined;
+      if (isRelease && !unreleasedClass) {
+        fail(
+          'class set --release requires a released class and an unreleased class',
+        );
+      }
+      if (!cls || (!isDefault && !isRelease && !spec)) {
         fail('class set requires a spec and a class, or --default and a class');
       }
       const config = loadConfig(root);
@@ -800,7 +808,11 @@ export function captureMain(argv: string[]): number {
             classes: Record<string, string>;
           })
         : { schemaVersion: 1, classes: {} };
-      if (isDefault) {
+      if (isRelease) {
+        (
+          current as { release?: { released: string; unreleased: string } }
+        ).release = { released: cls, unreleased: unreleasedClass! };
+      } else if (isDefault) {
         (current as { default?: string }).default = cls;
       } else {
         current.classes[spec!] = cls;
@@ -817,7 +829,7 @@ export function captureMain(argv: string[]): number {
           'commit',
           '--quiet',
           '-m',
-          `chore(telemetry): class ${spec ?? 'default'} ${cls}`,
+          `chore(telemetry): class ${spec ?? (isRelease ? 'release' : 'default')} ${cls}`,
           '--',
           CLASSES_PATH,
         ]);

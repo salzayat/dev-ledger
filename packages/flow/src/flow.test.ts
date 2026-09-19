@@ -2377,3 +2377,96 @@ test('the declared default classifies work no session, trailer, or spec declares
   assert.equal(classes.unclassified, undefined);
   assert.equal(built.repo.classes.default, 'rd');
 });
+
+test('the release rule makes tagged work production and every other effort, merged or not, R&D', () => {
+  const fixture = makeFixtureRepo();
+  const seed = openPullRequest(fixture, 'seed', [
+    [
+      'feat(seed): seed',
+      {
+        'seed.txt': 's',
+        'telemetry.config.json': JSON.stringify({
+          schemaVersion: 1,
+          costAllocation: {
+            enabled: true,
+            idleCapSeconds: 900,
+            operators: ['op-1'],
+            costClasses: ['rd', 'production'],
+          },
+        }),
+        '.telemetry/classes.json': JSON.stringify({
+          schemaVersion: 1,
+          classes: { 'add-x': 'rd' },
+          release: { released: 'production', unreleased: 'rd' },
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const record = (id: string, spec?: string) =>
+    sessionJson(id, spec ? { spec } : {});
+  const shipped = openPullRequest(fixture, 'shipped', [
+    [
+      trailered('feat(a): shipped', { Session: 's-shipped', Change: 'c-a' }),
+      {
+        'a.txt': 'a',
+        '.telemetry/sessions/x/s-shipped.json': record('s-shipped'),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, shipped, 'feat(a): shipped', 'Session: s-shipped');
+  const declared = openPullRequest(fixture, 'declared', [
+    [
+      trailered('feat(x): declared', { Session: 's-declared', Change: 'c-x' }),
+      {
+        'x.txt': 'x',
+        '.telemetry/sessions/x/s-declared.json': record('s-declared', 'add-x'),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, declared, 'feat(x): declared', 'Session: s-declared');
+  tag(fixture, 'v1.0.0');
+  const later = openPullRequest(fixture, 'later', [
+    [
+      trailered('feat(b): merged, not tagged', {
+        Session: 's-later',
+        Change: 'c-b',
+      }),
+      { 'b.txt': 'b', '.telemetry/sessions/x/s-later.json': record('s-later') },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    later,
+    'feat(b): merged, not tagged',
+    'Session: s-later',
+  );
+  openPullRequest(fixture, 'abandoned', [
+    [
+      trailered('feat(c): never merged', { Session: 's-open', Change: 'c-c' }),
+      { 'c.txt': 'c', '.telemetry/sessions/x/s-open.json': record('s-open') },
+    ],
+  ]);
+  const { repo } = build(registryFor(fixture.dir));
+  const classes = repo.signals!.costClasses;
+  assert.deepEqual(
+    classes.production.sources,
+    { released: 1 },
+    'the tagged change',
+  );
+  assert.equal(
+    classes.rd.sources.unreleased,
+    2,
+    'the untagged merge and the unmerged pull request',
+  );
+  assert.equal(
+    classes.rd.sources.spec,
+    1,
+    'a spec declaration wins over the rule, even on tagged work',
+  );
+  assert.equal(classes.unclassified, undefined);
+  assert.deepEqual(repo.classes.release, {
+    released: 'production',
+    unreleased: 'rd',
+  });
+});
