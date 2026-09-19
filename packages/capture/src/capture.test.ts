@@ -1305,3 +1305,29 @@ test("timesheet close proposes confirmed hours by spec from the period's records
     /\?\? \.telemetry\/timesheets/,
   );
 });
+
+test('validate reads the plan declarations with their own schema', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  mkdirSync(join(dir, '.telemetry/subscriptions'), { recursive: true });
+  writeFileSync(
+    join(dir, '.telemetry/subscriptions/plans.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      plans: [
+        {
+          planId: 'plan-max',
+          provider: 'provider-a',
+          currency: 'USD',
+          intervals: [{ from: '2026-09', unit: 100, seats: 1 }],
+        },
+      ],
+    }),
+  );
+  const out = execFileSync(
+    process.execPath,
+    ['--experimental-strip-types', cli, 'validate'],
+    { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+  );
+  assert.match(out, /1 records valid/);
+});

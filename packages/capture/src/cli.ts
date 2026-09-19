@@ -173,6 +173,9 @@ function validateRecord(
   if (relative.startsWith(`${NOTES_PATH}/`)) {
     return validateNoteFile(value);
   }
+  if (relative === PLANS_PATH) {
+    return validatePlansFile(value);
+  }
   if (relative === CLASSES_PATH) {
     return validateClassesFile(value, config);
   }
