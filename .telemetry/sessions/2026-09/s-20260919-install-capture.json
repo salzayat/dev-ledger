@@ -1,0 +1,29 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "feat/install-capture",
+  "cacheReadTokens": 317383464,
+  "cacheWriteTokens": 3749073,
+  "cachedTokens": 321132537,
+  "commits": [
+    "f406fc550747ae26de7737e72214fd799971cd78"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T03:12:53.017Z",
+  "figuresSource": "summed from 566 messages in the session transcript",
+  "inputTokens": 15228,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-opus-5",
+  "operatorId": "op-1",
+  "outputTokens": 1000241,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-install-capture",
+  "spec": "add-capture-install",
+  "startedAt": "2026-09-19T03:08:08.685Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 284
+}
