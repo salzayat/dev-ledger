@@ -79,21 +79,22 @@ run's own token and uses no other credential. Nothing generated is committed.
 
 ## Commands
 
-| Command                                     | What it does                                                                            |
-| ------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `npm run check`                             | The full local gate: specs, harness, governance, docs, secrets, format, lint, tests.    |
-| `npm run ledger [-- --no-open]`             | Sync, rebuild, write `.telemetry/ledger.html`, and open it.                             |
-| `./scripts/telemetry.sh sync`               | Mirror-fetch every registered repository. `--entry NAME --fetch-url URL` overrides one. |
-| `./scripts/telemetry.sh rebuild`            | Rebuild the projection and print its hash.                                              |
-| `./scripts/telemetry.sh ledger [--html]`    | Render The Ledger in the terminal, or as the page.                                      |
-| `./scripts/telemetry.sh session ...`        | `start`, `end`, `human-only`, `figures`, `summary`.                                     |
-| `./scripts/telemetry.sh subscription ...`   | `close <YYYY-MM>` proposes period records from `plans.json`; `record` writes one.       |
-| `./scripts/telemetry.sh note add`           | Record why a figure reads the way it does.                                              |
-| `./scripts/telemetry.sh validate`           | Validate every session, subscription, and note record.                                  |
-| `./scripts/telemetry.sh configure`          | Serve the configuration surface on the loopback interface; never commits.               |
-| `./scripts/telemetry.sh cursor <consumer>`  | Replay changes since a consumer's cursor and advance it.                                |
-| `./scripts/check-declared.sh <base> <head>` | Fail when a range carries no `Session:` trailer and nothing declares it.                |
-| `./scripts/check-hooks-current.sh`          | Warn when the hooks git runs are not the hooks in this tree.                            |
+| Command                                          | What it does                                                                            |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `npm run check`                                  | The full local gate: specs, harness, governance, docs, secrets, format, lint, tests.    |
+| `npm run ledger [-- --no-open]`                  | Sync, rebuild, write `.telemetry/ledger.html`, and open it.                             |
+| `./scripts/telemetry.sh sync`                    | Mirror-fetch every registered repository. `--entry NAME --fetch-url URL` overrides one. |
+| `./scripts/telemetry.sh rebuild`                 | Rebuild the projection and print its hash.                                              |
+| `./scripts/telemetry.sh ledger [--html]`         | Render The Ledger in the terminal, or as the page.                                      |
+| `./scripts/telemetry.sh session ...`             | `start`, `end`, `human-only`, `figures`, `summary`.                                     |
+| `./scripts/telemetry.sh subscription ...`        | `close <YYYY-MM>` proposes period records from `plans.json`; `record` writes one.       |
+| `./scripts/telemetry.sh note add`                | Record why a figure reads the way it does.                                              |
+| `./scripts/telemetry.sh validate`                | Validate every session, subscription, and note record.                                  |
+| `./scripts/telemetry.sh configure`               | Serve the configuration surface on the loopback interface; never commits.               |
+| `./scripts/telemetry.sh cursor <consumer>`       | Replay changes since a consumer's cursor and advance it.                                |
+| `./scripts/telemetry.sh export --period YYYY-MM` | Write the month's statement as CSV (or `--format json`) to `.telemetry/statements/`.    |
+| `./scripts/check-declared.sh <base> <head>`      | Fail when a range carries no `Session:` trailer and nothing declares it.                |
+| `./scripts/check-hooks-current.sh`               | Warn when the hooks git runs are not the hooks in this tree.                            |
 
 Each command prints its usage with no arguments. `capture` and `flow` are source-only: consumers resolve
 the source through the `@dev-ledger/source` export condition, so nothing needs building to run.

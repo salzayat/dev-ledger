@@ -33,6 +33,7 @@ import { collectNotes } from './notes.ts';
 import { changeNameOf, completedTasks } from './tasks.ts';
 import { collectClasses } from './classes.ts';
 import { collectTimesheets } from './timesheets.ts';
+import { computeRollup, type Rollup } from './rollup.ts';
 import {
   computeSignals,
   type ChangeFacts,
@@ -41,7 +42,7 @@ import {
 import { mirrorPath, refTips } from './sync.ts';
 import { timingFor } from './timing.ts';
 
-export const PROJECTION_SCHEMA_VERSION = 5;
+export const PROJECTION_SCHEMA_VERSION = 6;
 export const CONFIG_PATH = 'telemetry.config.json';
 
 export type RepositoryProjection = {
@@ -79,6 +80,8 @@ export type Projection = {
   configSchemaVersion: number;
   builtAt: string;
   repositories: Record<string, RepositoryProjection>;
+  /** The same figures summed across the registry. */
+  registry: Rollup;
 };
 
 /** Canonical JSON: sorted keys at every level, two-space indent, trailing newline. */
@@ -407,5 +410,6 @@ export function buildProjection(root: string, registry: Registry): Projection {
     builtAt:
       'not recorded: the projection is a function of the ref tips, not of when it was built',
     repositories,
+    registry: computeRollup(repositories),
   };
 }

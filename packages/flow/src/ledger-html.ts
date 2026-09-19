@@ -327,6 +327,58 @@ function hoursPanel(hours: RepositorySignals['hours'], links: Links): string {
   );
 }
 
+/** Across the registry: one table per dimension, only when there is more than one repository to sum. */
+function registrySection(projection: Projection | null): string {
+  const rollup = projection?.registry;
+  if (!rollup || rollup.repositories.length < 2) {
+    return '';
+  }
+  const specRows = Object.entries(rollup.bySpec)
+    .sort(
+      ([, a], [, b]) => b.allocated + b.reported - (a.allocated + a.reported),
+    )
+    .map(
+      ([spec, row]) =>
+        `<tr><td><code>${escapeHtml(spec)}</code></td><td class="num">$${row.reported.toFixed(2)}</td><td class="num">${row.allocated > 0 ? escapeHtml(money(row.allocated, row.currency ?? 'USD')) : '<span class="dim">none</span>'}</td><td class="num">${row.hours > 0 ? row.hours.toFixed(1) + ' h' : '<span class="dim">none</span>'}</td><td class="num">${row.tokens.toLocaleString('en-US')}</td><td>${escapeHtml(row.repositories.join(', '))}</td></tr>`,
+    )
+    .join('');
+  const classRows = Object.entries(rollup.byClass)
+    .map(
+      ([cls, row]) =>
+        `<tr><td><code>${escapeHtml(cls)}</code></td><td class="num">$${row.reported.toFixed(2)}</td><td class="num">${row.allocated > 0 ? escapeHtml(money(row.allocated, row.currency ?? 'USD')) : '<span class="dim">none</span>'}</td><td class="num">${row.hours.toFixed(1)} h</td><td class="num">${row.sessions}</td></tr>`,
+    )
+    .join('');
+  const hourRows = Object.entries(rollup.hours)
+    .map(
+      ([operator, row]) =>
+        `<tr><td><code>${escapeHtml(operator)}</code></td><td class="num">${row.measured.toFixed(1)} h</td><td class="num">${row.confirmed.toFixed(1)} h</td><td>${escapeHtml(
+          Object.entries(row.bySpec)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([spec, h]) => `${spec} ${h.toFixed(1)} h`)
+            .join(', '),
+        )}</td></tr>`,
+    )
+    .join('');
+  return `<section class="repository" aria-label="All repositories"><h2>All repositories <span class="branch">${escapeHtml(rollup.repositories.join(', '))}</span></h2>
+<p class="meta">${escapeHtml(rollup.note)}</p>
+<div class="grid wide">
+${panel('Spend by spec, across the registry', `<div class="scroll"><table><thead><tr><th>spec</th><th class="num">reported</th><th class="num">allocated</th><th class="num">hours</th><th class="num">tokens</th><th>repositories</th></tr></thead><tbody>${specRows}</tbody></table></div>`, trustBadges(['reported', 'allocated']))}
+${panel('Spend by cost class, across the registry', `<div class="scroll"><table><thead><tr><th>class</th><th class="num">reported</th><th class="num">allocated</th><th class="num">hours</th><th class="num">sessions</th></tr></thead><tbody>${classRows}</tbody></table></div>`, trustBadges(['reported', 'allocated']))}
+${panel(
+  'Hours, across the registry',
+  `${figure(
+    `${Object.values(rollup.hours)
+      .reduce((sum, row) => sum + row.measured, 0)
+      .toFixed(1)} h`,
+    `measured; velocity ${rollup.velocity.complexity} complexity over ${rollup.velocity.changes} changes`,
+  )}<div class="scroll"><table><thead><tr><th>operator</th><th class="num">measured</th><th class="num">confirmed</th><th>by spec</th></tr></thead><tbody>${hourRows}</tbody></table></div>`,
+  trustBadges(['reported']),
+)}
+</div>
+</section>`;
+}
+
 // --- Chrome ----------------------------------------------------------------------------------------
 
 export function trustBadges(trust: string[]): string {
@@ -1425,7 +1477,7 @@ export function renderLedgerHtml(projection: Projection | null): string {
   const body =
     repositories.length === 0
       ? `<p class="empty">The Ledger is empty. Register a repository in <code>registry.json</code>, then run <code>telemetry sync</code> and <code>telemetry rebuild</code>.</p>`
-      : repositories.map(renderRepositoryHtml).join('\n');
+      : `${registrySection(projection)}${repositories.map(renderRepositoryHtml).join('\n')}`;
   const nav = repositories
     .map(
       (repository) =>

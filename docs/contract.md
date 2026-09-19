@@ -194,7 +194,9 @@ rate, time to fix, each with its approximation note), `trends.weekly`, `costClas
 `allocation` (the subscription periods, each session's share, aggregates per currency, and the excluded
 counts, all under trust `allocated` with basis `agentRunSeconds`). Each change carries `tasks`, the
 OpenSpec tasks it completed with their `~N` weight or `null`; each weekly bucket carries `tasks`,
-`complexity`, and `unweightedTasks`, and `velocity` reports complexity per week. Every cost-per figure carries `costUsd` (reported) and
+`complexity`, and `unweightedTasks`, and `velocity` reports complexity per week. The projection's top level carries `registry`, the rollup across
+reachable repositories (`bySpec`, `byClass`, `hours`, `velocity`). `telemetry export --period YYYY-MM`
+writes rows of `period, repository, kind, key, metric, value, unit, trust, scope`. Every cost-per figure carries `costUsd` (reported) and
 `allocated` with `currency`; effort units include `tasks` and `taskComplexity`.
 
 Each change carries its identity (the last commit on the default branch), `kind`, `commits`,

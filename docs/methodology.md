@@ -314,6 +314,14 @@ subscription the reported column reads zero and the allocated column carries the
 `tasks` and `taskComplexity` from each change's task list, so cost per unit of declared work needs no
 story points. The terminal render prints both columns on each cost-per line.
 
+## Across the registry, and the period statement
+
+The rollup folds every reachable repository's signals over the same keys: spec to spec, class to class,
+operator to operator, reported and allocated apart, hours as hours. It renders only when there is more
+than one repository. `telemetry export --period YYYY-MM` writes the month as rows: allocations and hours
+are period facts, classes, specs, and velocity are window facts, and each row says which and names its
+trust class, so a spreadsheet never adds the two kinds by accident.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It

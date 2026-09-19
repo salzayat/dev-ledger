@@ -39,6 +39,7 @@ import {
   type RepositoryProjection,
 } from './projection.ts';
 import { parseRegistry, type Registry } from './registry.ts';
+import { buildStatement, statementCsv } from './statement.ts';
 import { mirrorPath, syncAll } from './sync.ts';
 
 function registryFor(
@@ -2200,4 +2201,112 @@ test('hours are reported by operator, spec, and month, with a committed timeshee
   const html = renderLedgerHtml(built.projection);
   assert.match(html, /<h3>Hours<\/h3>/);
   assert.match(html, /1\.5 h/);
+});
+
+test('the registry rollup sums a spec across repositories, and a period statement exports as rows', () => {
+  const config = JSON.stringify({
+    schemaVersion: 1,
+    costAllocation: {
+      enabled: true,
+      idleCapSeconds: 900,
+      operators: ['op-1'],
+      costClasses: ['rd'],
+    },
+  });
+  const repos = ['one', 'two'].map((label) => {
+    const fixture = makeFixtureRepo();
+    const seed = openPullRequest(fixture, 'seed', [
+      [
+        'feat(seed): seed',
+        { 'seed.txt': 's', 'telemetry.config.json': config },
+      ],
+    ]);
+    mergeSquash(fixture, seed, 'feat(seed): seed');
+    const period = git(fixture.dir, ['log', '-1', '--format=%cI'])
+      .trim()
+      .slice(0, 7);
+    const work = openPullRequest(fixture, 'work', [
+      [
+        trailered(`feat(${label}): shared spec`, {
+          Spec: 'add-shared',
+          Session: `s-${label}`,
+          Change: `c-${label}`,
+        }),
+        {
+          [`${label}.txt`]: label,
+          [`.telemetry/sessions/x/s-${label}.json`]: sessionJson(`s-${label}`, {
+            billingKind: 'subscription',
+            subscriptionId: 'plan-max',
+            costUsd: 0,
+            startedAt: `${period}-02T09:00:00Z`,
+            endedAt: `${period}-02T10:00:00Z`,
+            agentRunSeconds: 600,
+            operatorActiveSeconds: 1800,
+            operatorActiveAlgorithm: 'prompt-attribution-v1:900',
+            operatorId: 'op-1',
+            spec: 'add-shared',
+          }),
+          [`.telemetry/subscriptions/${period}/plan-max.json`]:
+            subscriptionJson('plan-max', period, 10),
+        },
+      ],
+    ]);
+    mergeSquash(
+      fixture,
+      work,
+      `feat(${label}): shared spec`,
+      `Spec: add-shared\nSession: s-${label}`,
+    );
+    return { fixture, period };
+  });
+  const registry = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: repos.map((r, i) => ({
+        name: ['one', 'two'][i],
+        url: r.fixture.dir,
+      })),
+    }),
+  ).registry;
+  const built = build(registry);
+  const rollup = built.projection.registry;
+  assert.deepEqual(rollup.repositories, ['one', 'two']);
+  assert.equal(
+    rollup.bySpec['add-shared'].allocated,
+    20,
+    '$10 from each repository',
+  );
+  assert.deepEqual(rollup.bySpec['add-shared'].repositories, ['one', 'two']);
+  assert.equal(rollup.bySpec['add-shared'].hours, 1);
+  assert.equal(rollup.hours['op-1'].measured, 1);
+  const html = renderLedgerHtml(built.projection);
+  assert.match(html, /All repositories/);
+  assert.match(html, /Spend by spec, across the registry/);
+  const rows = buildStatement(built.projection, repos[0].period);
+  const allocationRows = rows.filter(
+    (row) => row.kind === 'allocation' && row.metric === 'amount',
+  );
+  assert.equal(allocationRows.length, 2);
+  assert.ok(
+    rows.some(
+      (row) => row.kind === 'hours' && row.key === 'op-1' && row.value === 0.5,
+    ),
+  );
+  const csv = statementCsv(rows);
+  assert.match(
+    csv,
+    /^period,repository,kind,key,metric,value,unit,trust,scope\n/,
+  );
+  assert.match(
+    csv,
+    new RegExp(
+      `${repos[0].period},one,allocation,plan-max,amount,10,USD,allocated,period`,
+    ),
+  );
+  assert.equal(
+    buildStatement(built.projection, '1999-01').filter(
+      (row) => row.scope === 'period',
+    ).length,
+    0,
+  );
 });

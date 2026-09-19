@@ -59,3 +59,4 @@ Thumbs.db
 .telemetry/projection.json
 .telemetry/ledger.html
 .telemetry/cursors
+.telemetry/statements

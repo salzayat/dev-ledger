@@ -6,42 +6,43 @@ contract.
 
 ## Milestone Tracking
 
-| Phase                                             | Governing changes                                             | Status   |
-| ------------------------------------------------- | ------------------------------------------------------------- | -------- |
-| Repository evolution conventions                  | `add-repository-evolution-markers`                            | Complete |
-| Executable PR and dependency governance           | `add-executable-pr-and-dependency-governance`                 | Complete |
-| Foundation                                        | None                                                          | Complete |
-| Agent harness and MCP governance                  | `improve-agentic-boiler-governance`                           | Complete |
-| Template and example expansion                    | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
-| Fork rename automation                            | `add-project-rename-tooling`                                  | Complete |
-| Flow observability (phase one)                    | `add-flow-observability`                                      | Complete |
-| Ledger dashboard (phase one addendum)             | `add-board-dashboard`                                         | Complete |
-| Ledger links and charts (phase one addendum)      | `improve-board-presentation`                                  | Complete |
-| Per pull request spend (phase one addendum)       | `add-per-pull-request-spend`                                  | Complete |
-| DORA signals (phase one addendum)                 | `add-dora-signals`                                            | Complete |
-| Pull request telemetry (workflow governance)      | `add-telemetry-in-pull-request-body`                          | Complete |
-| Capture git environment (defect)                  | `fix-capture-git-environment`                                 | Complete |
-| Session figures (telemetry capture)               | `add-session-figures-from-transcript`                         | Complete |
-| Review fixes (session figures, Ledger links)      | `fix-transcript-figures-and-board-links`                      | Complete |
-| Session trailer default (defect)                  | `fix-session-none-default`                                    | Complete |
-| Flow efficiency and work mix (phase one addendum) | `add-flow-efficiency-and-work-mix`                            | Complete |
-| Subscription spend (phase one addendum)           | `add-subscription-spend`                                      | Complete |
-| Operator dimension (phase one addendum)           | `add-operator-dimension`                                      | Complete |
-| Operator hours from transcript (defect)           | `add-operator-hours-from-transcript`                          | Complete |
-| Allocated token rate (phase one addendum)         | `add-allocated-token-rate`                                    | Complete |
-| Subscription declarations (phase one addendum)    | `add-subscription-declarations`                               | Complete |
-| Provider neutral spend (phase one addendum)       | `add-provider-neutral-spend`                                  | Complete |
-| Local configuration surface (phase one addendum)  | `add-local-configuration-surface`                             | Pending  |
-| Ledger presentation (phase one addendum)          | `improve-ledger-presentation`                                 | Complete |
-| Ledger publication (phase one)                    | `add-board-publication`                                       | Complete |
-| Hook drift check (workflow governance)            | `add-hook-drift-check`                                        | Complete |
-| Ledger reads after review (defects)               | `fix-ledger-reads-after-review`                               | Complete |
-| Refinements after review (phase one addendum)     | `refine-ledger-after-review`                                  | Complete |
-| Task velocity (phase one addendum)                | `add-task-velocity`                                           | Complete |
-| Hours and unit economics (phase one addendum)     | `refine-hours-and-unit-economics`                             | Complete |
-| Spec cost classes (phase one addendum)            | `add-spec-cost-classes`                                       | Complete |
-| Timesheets (phase one addendum)                   | `add-timesheets`                                              | Complete |
-| Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
+| Phase                                               | Governing changes                                             | Status   |
+| --------------------------------------------------- | ------------------------------------------------------------- | -------- |
+| Repository evolution conventions                    | `add-repository-evolution-markers`                            | Complete |
+| Executable PR and dependency governance             | `add-executable-pr-and-dependency-governance`                 | Complete |
+| Foundation                                          | None                                                          | Complete |
+| Agent harness and MCP governance                    | `improve-agentic-boiler-governance`                           | Complete |
+| Template and example expansion                      | `add-second-example-package`, `add-template-onboarding-guide` | Complete |
+| Fork rename automation                              | `add-project-rename-tooling`                                  | Complete |
+| Flow observability (phase one)                      | `add-flow-observability`                                      | Complete |
+| Ledger dashboard (phase one addendum)               | `add-board-dashboard`                                         | Complete |
+| Ledger links and charts (phase one addendum)        | `improve-board-presentation`                                  | Complete |
+| Per pull request spend (phase one addendum)         | `add-per-pull-request-spend`                                  | Complete |
+| DORA signals (phase one addendum)                   | `add-dora-signals`                                            | Complete |
+| Pull request telemetry (workflow governance)        | `add-telemetry-in-pull-request-body`                          | Complete |
+| Capture git environment (defect)                    | `fix-capture-git-environment`                                 | Complete |
+| Session figures (telemetry capture)                 | `add-session-figures-from-transcript`                         | Complete |
+| Review fixes (session figures, Ledger links)        | `fix-transcript-figures-and-board-links`                      | Complete |
+| Session trailer default (defect)                    | `fix-session-none-default`                                    | Complete |
+| Flow efficiency and work mix (phase one addendum)   | `add-flow-efficiency-and-work-mix`                            | Complete |
+| Subscription spend (phase one addendum)             | `add-subscription-spend`                                      | Complete |
+| Operator dimension (phase one addendum)             | `add-operator-dimension`                                      | Complete |
+| Operator hours from transcript (defect)             | `add-operator-hours-from-transcript`                          | Complete |
+| Allocated token rate (phase one addendum)           | `add-allocated-token-rate`                                    | Complete |
+| Subscription declarations (phase one addendum)      | `add-subscription-declarations`                               | Complete |
+| Provider neutral spend (phase one addendum)         | `add-provider-neutral-spend`                                  | Complete |
+| Local configuration surface (phase one addendum)    | `add-local-configuration-surface`                             | Pending  |
+| Ledger presentation (phase one addendum)            | `improve-ledger-presentation`                                 | Complete |
+| Ledger publication (phase one)                      | `add-board-publication`                                       | Complete |
+| Hook drift check (workflow governance)              | `add-hook-drift-check`                                        | Complete |
+| Ledger reads after review (defects)                 | `fix-ledger-reads-after-review`                               | Complete |
+| Refinements after review (phase one addendum)       | `refine-ledger-after-review`                                  | Complete |
+| Task velocity (phase one addendum)                  | `add-task-velocity`                                           | Complete |
+| Hours and unit economics (phase one addendum)       | `refine-hours-and-unit-economics`                             | Complete |
+| Spec cost classes (phase one addendum)              | `add-spec-cost-classes`                                       | Complete |
+| Timesheets (phase one addendum)                     | `add-timesheets`                                              | Complete |
+| Registry rollup and statements (phase one addendum) | `add-registry-rollup-and-statements`                          | Complete |
+| Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
 sequence every later capability. The executable PR and dependency governance milestone extends those
@@ -212,6 +213,9 @@ reported cost.
 
 The timesheets row gives hours the shape a retainer needs: by operator, spec, and month, proposed from
 the records and confirmed by a committed sheet, never priced.
+
+The registry rollup and statements row completes the multi-repository read the contract promised and
+writes the month as rows for finance or a client, each row scoped as a period or window fact.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
