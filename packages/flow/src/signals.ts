@@ -80,6 +80,9 @@ export type Abandonment = {
 export type CostPer = {
   /** Cost over the population, or null when no cost was reported. */
   costUsd: number | null;
+  /** Allocated subscription spend over the population, in `currency`, or null when nothing was allocated. */
+  allocated: number | null;
+  currency: string | null;
   tokens: number;
   count: number;
   excluded: number;
@@ -173,6 +176,8 @@ export type RepositorySignals = {
       {
         unit: string;
         costPerUnit: number | null;
+        allocatedPerUnit: number | null;
+        currency: string | null;
         changes: number;
         excluded: number;
         cites: string[];
@@ -467,11 +472,13 @@ function median(values: number[]): number | null {
 function emptyCostPer(): CostPer {
   return {
     costUsd: null,
+    allocated: null,
+    currency: null,
     tokens: 0,
     count: 0,
     excluded: 0,
     tokensOnly: false,
-    trust: ['reported'],
+    trust: ['reported', 'allocated'],
   };
 }
 
@@ -819,14 +826,17 @@ function computeOperators(
 
       // Hours, never money. `operatorActiveSeconds` is absent on every record written before cost
       // allocation was enabled, and those are counted rather than read as an operator working no hours.
-      if (
-        typeof file.operatorId !== 'string' ||
-        typeof file.operatorActiveSeconds !== 'number'
-      ) {
+      if (typeof file.operatorActiveSeconds !== 'number') {
         operators.excluded.noOperator += 1;
         continue;
       }
-      const human = (operators.humans[file.operatorId] ??= {
+      // Hours were measured but no identifier was configured: they stay on the page under one label rather
+      // than vanishing, and the label says the identifier is missing, not that nobody was there.
+      const humanKey =
+        typeof file.operatorId === 'string'
+          ? file.operatorId
+          : '(no operator identifier)';
+      const human = (operators.humans[humanKey] ??= {
         hours: 0,
         sessions: 0,
         cites: [],
@@ -1224,6 +1234,8 @@ export function computeSignals(
     {
       unit: string;
       cost: number;
+      allocated: number;
+      currency: string | null;
       units: number;
       changes: number;
       excluded: number;
@@ -1288,6 +1300,14 @@ export function computeSignals(
         true,
         wallClock(fact.sessions.sessions, sessions),
       ],
+      ['tasks', true, fact.tasks.length > 0 ? fact.tasks.length : null],
+      [
+        'taskComplexity',
+        true,
+        fact.tasks.length > 0
+          ? fact.tasks.reduce((sum, task) => sum + (task.weight ?? 1), 0)
+          : null,
+      ],
     ];
     for (const [unit, enabled, value] of units) {
       if (!enabled) {
@@ -1296,6 +1316,8 @@ export function computeSignals(
       const accumulator = (effortAccumulators[unit] ??= {
         unit,
         cost: 0,
+        allocated: 0,
+        currency: null as string | null,
         units: 0,
         changes: 0,
         excluded: 0,
@@ -1303,6 +1325,15 @@ export function computeSignals(
       });
       if (complete && value !== null && value > 0) {
         accumulator.cost += changeSpend.costUsd;
+        for (const [currency, aggregates] of Object.entries(
+          allocation.currencies,
+        )) {
+          const share = aggregates.byChange[fact.change.id];
+          if (share) {
+            accumulator.allocated += share.amount + share.overage;
+            accumulator.currency ??= currency;
+          }
+        }
         accumulator.units += value;
         accumulator.changes += 1;
         accumulator.cites.push(fact.change.id);
@@ -1318,6 +1349,11 @@ export function computeSignals(
         accumulator.units > 0
           ? Math.round((accumulator.cost / accumulator.units) * 1e6) / 1e6
           : null,
+      allocatedPerUnit:
+        accumulator.units > 0 && accumulator.allocated > 0
+          ? Math.round((accumulator.allocated / accumulator.units) * 1e6) / 1e6
+          : null,
+      currency: accumulator.currency,
       changes: accumulator.changes,
       excluded: accumulator.excluded,
       cites: accumulator.cites,
@@ -1703,11 +1739,24 @@ export function computeSignals(
       if (changeSpend.costUsd > 0) {
         anyCost = true;
       }
+      for (const [currency, aggregates] of Object.entries(
+        allocation.currencies,
+      )) {
+        const share = aggregates.byChange[fact.change.id];
+        if (share) {
+          figure.allocated =
+            (figure.allocated ?? 0) + share.amount + share.overage;
+          figure.currency ??= currency;
+        }
+      }
     }
     const divisor = units > 0 ? units : figure.count;
     if (divisor > 0 && figure.costUsd !== null) {
       figure.costUsd = Math.round((figure.costUsd / divisor) * 1e6) / 1e6;
       figure.tokens = Math.round(figure.tokens / divisor);
+    }
+    if (divisor > 0 && figure.allocated !== null) {
+      figure.allocated = Math.round((figure.allocated / divisor) * 1e6) / 1e6;
     }
     // Every contributing session reported no cost, which on a subscription is the rule rather than a gap.
     figure.tokensOnly = !anyCost;

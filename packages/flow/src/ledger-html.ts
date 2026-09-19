@@ -209,7 +209,7 @@ function allocatedTotal(allocation: Allocation): string {
     .filter(([, aggregates]) => aggregates.total.sessions > 0)
     .map(
       ([currency, aggregates]) =>
-        `${money(aggregates.total.amount + aggregates.total.overage, currency)}${aggregates.total.provisional ? ' ~' : ''}`,
+        `${money(aggregates.total.amount + aggregates.total.overage, currency)}${aggregates.total.provisional ? ' (provisional)' : ''}`,
     );
   if (totals.length > 0) {
     return totals.join(' + ');
@@ -231,7 +231,7 @@ function allocationPanel(allocation: Allocation, links: Links): string {
     : `<p class="empty">No subscription cost record yet. Record one with <code>telemetry subscription record</code>; until then every subscription session reads as excluded for lacking a period record.</p>`;
   return panel(
     'Subscription spend',
-    `${figure(escapeHtml(allocatedTotal(allocation)), 'allocated across the sessions of each recorded period, by agent run seconds; ~ marks a period that has not closed')}${body}${rateBlock(allocation)}`,
+    `${figure(escapeHtml(allocatedTotal(allocation)), 'allocated across the sessions of each recorded period, by agent run seconds; provisional means the period has not closed')}${body}${rateBlock(allocation)}`,
     `${trustBadges(allocation.trust)} ${escapeHtml(allocation.note)}; excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
   );
 }
@@ -932,8 +932,12 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
     ['typical cycle', seconds(signals.cycleTime.p50), 'observed'],
     ['queue', `${signals.queue.count}`, 'observed'],
     ['merges / day', `${signals.mergeFrequency.perDay ?? 'n/a'}`, 'observed'],
-    ['spend', `$${signals.spend.total.costUsd.toFixed(2)}`, 'reported'],
     ['allocated', allocatedTotal(signals.allocation), 'allocated'],
+    [
+      'reported spend',
+      `$${signals.spend.total.costUsd.toFixed(2)}`,
+      'reported',
+    ],
     ['out-of-band', `${outOfBand.length}`, 'observed'],
   ]
     .map(
@@ -983,7 +987,7 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
   const effortRows = Object.values(signals.spend.perEffortUnit)
     .map(
       (unit) =>
-        `<tr><td>${escapeHtml(unit.unit)}</td><td class="num">${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)}</td><td class="num">${unit.changes}</td><td class="num">${unit.excluded}</td><td>${cites('changes', unit.cites, links)}</td></tr>`,
+        `<tr><td>${escapeHtml(unit.unit)}</td><td class="num">${unit.allocatedPerUnit === null ? '<span class="dim">none</span>' : escapeHtml(money(unit.allocatedPerUnit, unit.currency ?? 'USD'))}</td><td class="num">${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)}</td><td class="num">${unit.changes}</td><td class="num">${unit.excluded}</td><td>${cites('changes', unit.cites, links)}</td></tr>`,
     )
     .join('');
   const checks = Object.entries(signals.localChecks)
@@ -1023,9 +1027,9 @@ ${operatorPanel(signals.operators, links)}
 ${panel(
   'Cost per unit of effort',
   effortRows
-    ? `<div class="scroll"><table><thead><tr><th>unit</th><th class="num">cost per unit</th><th class="num">changes</th><th class="num">excluded</th><th>cites</th></tr></thead><tbody>${effortRows}</tbody></table></div>`
+    ? `<div class="scroll"><table><thead><tr><th>unit</th><th class="num">allocated per unit</th><th class="num">reported per unit</th><th class="num">changes</th><th class="num">excluded</th><th>cites</th></tr></thead><tbody>${effortRows}</tbody></table></div>`
     : '<p class="empty">No effort units enabled.</p>',
-  `${trustBadges(['reported'])} excluded changes lack the unit or a complete session record`,
+  `${trustBadges(['allocated', 'reported'])} allocated is the subscription share per unit, reported is metered cost per unit; tasks and their complexity come from each change's task list; excluded changes lack the unit or a complete session record`,
 )}
 ${
   Object.keys(signals.spend.perUnmergedPullRequest).length > 0
@@ -1283,6 +1287,8 @@ h3 {
 .badge-observed { color: var(--observed); }
 .badge-reported { color: var(--reported); }
 .badge-allocated { color: var(--allocated); }
+.stat { min-width: 0; }
+.stat-value { overflow-wrap: anywhere; }
 .alloc { color: var(--allocated); font-size: 12px; white-space: nowrap; }
 .gap {
   display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px;

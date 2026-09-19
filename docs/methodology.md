@@ -293,6 +293,20 @@ An explanation of a figure belongs beside it, under the same rules as every othe
 read and optionally a period, carries text and a date, is committed under `.telemetry/notes/`, and renders
 on the records tab citing its file. It explains a number and never changes one.
 
+## Hours are windowed, and a missing identifier is a label
+
+Operator hours come from the transcript events between the session's recorded start and its end, so a
+transcript kept across sessions never charges one the day's hours. Hours measured without a configured
+operator identifier are shown under `(no operator identifier)` rather than dropped; `session end` prints
+the command that sets one.
+
+## Unit economics in two columns
+
+Every cost-per figure carries reported cost and allocated cost side by side and never sums them. On a
+subscription the reported column reads zero and the allocated column carries the number. The units include
+`tasks` and `taskComplexity` from each change's task list, so cost per unit of declared work needs no
+story points. The terminal render prints both columns on each cost-per line.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It

@@ -238,7 +238,7 @@ export function renderRepository(repository: RepositoryProjection): string[] {
   }
   for (const unit of Object.values(signals.spend.perEffortUnit)) {
     lines.push(
-      `  cost per ${unit.unit}: ${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)} over ${unit.changes} changes; excluded ${unit.excluded} for lacking the unit or a complete session record; cites: ${unit.cites.map(short).join(' ') || '(none)'}`,
+      `  cost per ${unit.unit}: allocated ${unit.allocatedPerUnit === null ? 'none' : unit.allocatedPerUnit.toFixed(4) + ' ' + (unit.currency ?? '')}, reported ${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)} over ${unit.changes} changes; excluded ${unit.excluded} for lacking the unit or a complete session record; cites: ${unit.cites.map(short).join(' ') || '(none)'}`,
     );
   }
   if (signals.spend.unmergedPullRequests.sessions > 0) {
