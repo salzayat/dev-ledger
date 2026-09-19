@@ -29,6 +29,7 @@ import {
   validatePlansFile,
   validateSubscriptionFile,
 } from './subscription.ts';
+import { CLASSES_PATH, validateClassesFile } from './classes.ts';
 import { NOTES_PATH, noteFilePath, validateNoteFile } from './notes.ts';
 import { validateMessage } from './trailers.ts';
 import {
@@ -132,9 +133,12 @@ function recordFiles(root: string, paths: string[]): string[] {
   if (paths.length > 0) {
     return paths.map((path) => resolve(root, path));
   }
-  const present = [SESSIONS_PATH, SUBSCRIPTIONS_PATH, NOTES_PATH].filter(
-    (path) => existsSync(join(root, path)),
-  );
+  const present = [
+    SESSIONS_PATH,
+    SUBSCRIPTIONS_PATH,
+    NOTES_PATH,
+    CLASSES_PATH,
+  ].filter((path) => existsSync(join(root, path)));
   if (present.length === 0) {
     return [];
   }
@@ -161,6 +165,9 @@ function validateRecord(
   const relative = path.startsWith(root) ? path.slice(root.length + 1) : path;
   if (relative.startsWith(`${NOTES_PATH}/`)) {
     return validateNoteFile(value);
+  }
+  if (relative === CLASSES_PATH) {
+    return validateClassesFile(value, config);
   }
   return relative.startsWith(`${SUBSCRIPTIONS_PATH}/`)
     ? validateSubscriptionFile(value)
@@ -663,6 +670,43 @@ export function captureMain(argv: string[]): number {
         ]);
       }
       process.stdout.write(`${relative}\n`);
+      return 0;
+    }
+    case 'class': {
+      if (args[0] !== 'set') {
+        fail('usage: telemetry class set <spec> <class> [--no-commit]');
+      }
+      const [, spec, cls] = args;
+      if (!spec || !cls) {
+        fail('class set requires a spec and a class');
+      }
+      const config = loadConfig(root);
+      const absolute = join(root, CLASSES_PATH);
+      const current = existsSync(absolute)
+        ? (JSON.parse(readFileSync(absolute, 'utf8')) as {
+            schemaVersion: number;
+            classes: Record<string, string>;
+          })
+        : { schemaVersion: 1, classes: {} };
+      current.classes[spec] = cls;
+      const classErrors = validateClassesFile(current, config);
+      if (classErrors.length > 0) {
+        fail(`classes file is invalid:\n  ${classErrors.join('\n  ')}`);
+      }
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(absolute, canonicalJson(current));
+      if (!args.includes('--no-commit')) {
+        git(root, ['add', '--', CLASSES_PATH]);
+        git(root, [
+          'commit',
+          '--quiet',
+          '-m',
+          `chore(telemetry): class ${spec} ${cls}`,
+          '--',
+          CLASSES_PATH,
+        ]);
+      }
+      process.stdout.write(`${CLASSES_PATH}\n`);
       return 0;
     }
     case 'note': {

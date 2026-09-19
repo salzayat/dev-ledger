@@ -2048,3 +2048,93 @@ test('unit economics carry an allocated figure per task complexity, and unidenti
   assert.match(html, /reported spend/);
   assert.match(html, /allocated per unit/);
 });
+
+test('a spec declaration classifies sessions that declare nothing, and the class carries allocated spend and hours', () => {
+  const fixture = makeFixtureRepo();
+  const seed = openPullRequest(fixture, 'seed', [
+    [
+      'feat(seed): seed',
+      {
+        'seed.txt': 's',
+        'telemetry.config.json': JSON.stringify({
+          schemaVersion: 1,
+          costAllocation: {
+            enabled: true,
+            idleCapSeconds: 900,
+            operators: ['op-1'],
+            costClasses: ['rd', 'production'],
+          },
+        }),
+        '.telemetry/classes.json': JSON.stringify({
+          schemaVersion: 1,
+          classes: { 'add-r': 'rd' },
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const period = git(fixture.dir, ['log', '-1', '--format=%cI'])
+    .trim()
+    .slice(0, 7);
+  const sub = (id: string, extra: Record<string, unknown>) =>
+    sessionJson(id, {
+      billingKind: 'subscription',
+      subscriptionId: 'plan-max',
+      costUsd: 0,
+      startedAt: `${period}-02T09:00:00Z`,
+      endedAt: `${period}-02T10:00:00Z`,
+      agentRunSeconds: 600,
+      operatorActiveSeconds: 3600,
+      operatorActiveAlgorithm: 'prompt-attribution-v1:900',
+      operatorId: 'op-1',
+      ...extra,
+    });
+  const work = openPullRequest(fixture, 'work', [
+    [
+      trailered('feat(r): research', {
+        Spec: 'add-r',
+        Session: 's-a',
+        Change: 'c-r',
+      }),
+      {
+        'r.txt': 'r',
+        '.telemetry/sessions/x/s-a.json': sub('s-a', { spec: 'add-r' }),
+        '.telemetry/sessions/x/s-b.json': sub('s-b', {
+          spec: 'add-r',
+          costClass: 'production',
+        }),
+        [`.telemetry/subscriptions/${period}/plan-max.json`]: subscriptionJson(
+          'plan-max',
+          period,
+          20,
+        ),
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    work,
+    'feat(r): research',
+    'Spec: add-r\nSession: s-a\nSession: s-b',
+  );
+  const built = build(registryFor(fixture.dir));
+  const classes = built.repo.signals!.costClasses;
+  assert.equal(classes.rd.sessions, 1, 'declared by the spec');
+  assert.equal(classes.rd.sources.spec, 1);
+  assert.equal(classes.production.sessions, 1, 'the session class wins');
+  assert.equal(classes.production.sources.session, 1);
+  assert.equal(
+    classes.rd.allocated,
+    10,
+    'half of the $20 period by agent seconds',
+  );
+  assert.equal(classes.rd.hours, 1);
+  assert.equal(classes.unclassified, undefined);
+  assert.deepEqual(built.repo.classes.classes, { 'add-r': 'rd' });
+  assert.ok(
+    (built.repo.signals!.flowEfficiency.outsideBySpec['add-r'] ?? 0) >= 0,
+  );
+  const html = renderLedgerHtml(built.projection);
+  assert.match(html, /1 spec/);
+  assert.match(html, /declared by/);
+});

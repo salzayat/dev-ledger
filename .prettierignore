@@ -7,3 +7,4 @@
 .telemetry/sessions
 .telemetry/notes
 .telemetry/subscriptions
+.telemetry/classes.json

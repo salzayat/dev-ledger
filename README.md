@@ -44,6 +44,8 @@ Every record is committed with the work and read back from git. Schemas and fiel
   to cost, and what was paid each month. A subscription session records no marginal cost; the period
   record is apportioned across its sessions by agent run seconds under the trust class `allocated`.
 - **Notes** under `.telemetry/notes/`: an operator's dated explanation of a figure, shown beside it.
+- **Cost classes** in `.telemetry/classes.json`: one class per spec, set with
+  `./scripts/telemetry.sh class set <spec> <rd|production>`, inherited by every record citing the spec.
 
 With Claude Code, `.claude/settings.json` wires `scripts/harness/claude-code.sh` to `SessionStart` and
 `SessionEnd`, so sessions start and end themselves. Any other harness runs `session start --id <id>` first

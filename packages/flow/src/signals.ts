@@ -211,7 +211,12 @@ export type RepositorySignals = {
     weekly: Record<string, Record<string, WorkMixEntry>>;
     note: string;
   };
-  flowEfficiency: Distribution & { outsideSeconds: number; note: string };
+  flowEfficiency: Distribution & {
+    outsideSeconds: number;
+    /** Active seconds outside any window, by the spec the session or change cited. */
+    outsideBySpec: Record<string, number>;
+    note: string;
+  };
   iterations: {
     sessionsPerChange: Distribution;
     commitsPerChange: Distribution;
@@ -421,7 +426,19 @@ export type WeeklyBucket = {
   cites: string[];
 };
 
-export type CostClassSpend = Record<string, Spend & { missingFigures: number }>;
+export type CostClassSpend = Record<
+  string,
+  Spend & {
+    missingFigures: number;
+    /** Allocated subscription share of this class's sessions, in `currency`. */
+    allocated: number;
+    currency: string | null;
+    /** Operator hours recorded on this class's sessions. */
+    hours: number;
+    /** How the class was resolved for each record: session, trailer, spec declaration, or none. */
+    sources: Record<string, number>;
+  }
+>;
 
 export type Coverage = {
   total: number;
@@ -698,8 +715,13 @@ function changeWorkMixType(fact: ChangeFacts): WorkMixType {
 function computeFlowEfficiency(
   facts: ChangeFacts[],
   sessions: Map<string, SessionRecord>,
-): Distribution & { outsideSeconds: number; note: string } {
+): Distribution & {
+  outsideSeconds: number;
+  outsideBySpec: Record<string, number>;
+  note: string;
+} {
   let outsideSeconds = 0;
+  const outsideBySpec: Record<string, number> = {};
   const distribution = distributionOf(
     facts.map((fact) => {
       const cycle = fact.timing.cycleTimeSeconds;
@@ -741,6 +763,13 @@ function computeFlowEfficiency(
         const share = Number.isNaN(span) ? 1 : Math.min(1, overlap / span);
         inside += active * share;
         outsideSeconds += active * (1 - share);
+        const spec =
+          typeof fact.change.trailers.Spec === 'string'
+            ? fact.change.trailers.Spec
+            : (file.spec ?? '(none)');
+        outsideBySpec[spec] = Math.round(
+          (outsideBySpec[spec] ?? 0) + active * (1 - share),
+        );
       }
       if (!sawFigure) {
         return {
@@ -755,6 +784,7 @@ function computeFlowEfficiency(
   return {
     ...distribution,
     outsideSeconds: Math.round(outsideSeconds),
+    outsideBySpec,
     note: "active seconds inside the cycle window over cycle seconds; a session's active time is spread over its own window and the part outside the cycle is reported as worked outside the window",
   };
 }
@@ -1063,6 +1093,7 @@ export function computeSignals(
     measuredFrom: null,
     closedPullRequests: [],
   },
+  specClasses: Record<string, string> = {},
 ): RepositorySignals {
   // Changes merged before the instrumentation existed are excluded with that reason, not measured as
   // gaps; a pull request an operator declared closed leaves the queue, because git cannot see closed.
@@ -1619,7 +1650,14 @@ export function computeSignals(
   // Spend by cost class: the session's own class, then the change's trailer, never a default.
   const costClasses: CostClassSpend = {};
   const classSpend = (name: string) =>
-    (costClasses[name] ??= { ...emptySpend(), missingFigures: 0 });
+    (costClasses[name] ??= {
+      ...emptySpend(),
+      missingFigures: 0,
+      allocated: 0,
+      currency: null,
+      hours: 0,
+      sources: {},
+    });
   for (const fact of facts) {
     const trailerClass =
       typeof fact.change.trailers['Cost-Class'] === 'string'
@@ -1630,10 +1668,35 @@ export function computeSignals(
       if (!record?.file) {
         continue;
       }
-      const name = record.file.costClass ?? trailerClass ?? 'unclassified';
-      if (!add(classSpend(name), record)) {
-        classSpend(name).missingFigures += 1;
-        classSpend(name).cites.push(record.path);
+      const specName =
+        typeof fact.change.trailers.Spec === 'string'
+          ? fact.change.trailers.Spec
+          : (record.file.spec ?? null);
+      const declared = specName ? specClasses[specName] : undefined;
+      const name =
+        record.file.costClass ?? trailerClass ?? declared ?? 'unclassified';
+      const source = record.file.costClass
+        ? 'session'
+        : trailerClass
+          ? 'trailer'
+          : declared
+            ? 'spec'
+            : 'none';
+      const entry = classSpend(name);
+      entry.sources[source] = (entry.sources[source] ?? 0) + 1;
+      if (typeof record.file.operatorActiveSeconds === 'number') {
+        entry.hours += record.file.operatorActiveSeconds / 3600;
+      }
+      const share = allocation.bySession[id];
+      if (share) {
+        entry.allocated =
+          Math.round((entry.allocated + share.amount + share.overage) * 1e6) /
+          1e6;
+        entry.currency ??= share.currency;
+      }
+      if (!add(entry, record)) {
+        entry.missingFigures += 1;
+        entry.cites.push(record.path);
       }
     }
   }

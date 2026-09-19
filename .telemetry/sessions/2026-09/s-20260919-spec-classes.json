@@ -1,0 +1,29 @@
+{
+  "agentRunSeconds": 2400,
+  "billingKind": "subscription",
+  "branch": "flow/spec-cost-classes",
+  "cacheReadTokens": 272978918,
+  "cacheWriteTokens": 2882406,
+  "cachedTokens": 275861324,
+  "commits": [
+    "5bfc68f64deba2ee1e1dcd2cd9f683b5088f2ed6"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T00:59:34.356Z",
+  "figuresSource": "summed from 513 messages in the session transcript",
+  "inputTokens": 14430,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorId": "op-1",
+  "outputTokens": 907115,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-spec-classes",
+  "spec": "add-spec-cost-classes",
+  "startedAt": "2026-09-19T00:54:17.273Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 317
+}

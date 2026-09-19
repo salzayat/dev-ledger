@@ -585,7 +585,17 @@ function efficiencyPanels(signals: RepositorySignals, links: Links): string {
   const compliance = signals.checkCompliance;
   return `${panel(
     'Flow efficiency',
-    `${figure(percent(signals.flowEfficiency.p50), `typical share of cycle time someone was working; ${count(signals.flowEfficiency.count, 'change')} measured`)}<p class="help">Active seconds are the agent's run time plus the operator's active time, counted only where the session window overlaps the cycle window; ${escapeHtml(seconds(signals.flowEfficiency.outsideSeconds))} of active time fell outside any change's window and is reported here rather than hidden.</p>${cites('changes', signals.flowEfficiency.cites, links)}`,
+    `${figure(percent(signals.flowEfficiency.p50), `typical share of cycle time someone was working; ${count(signals.flowEfficiency.count, 'change')} measured`)}<p class="help">Active seconds are the agent's run time plus the operator's active time, counted only where the session window overlaps the cycle window; ${escapeHtml(seconds(signals.flowEfficiency.outsideSeconds))} of active time fell outside any change's window and is reported here rather than hidden${
+      Object.keys(signals.flowEfficiency.outsideBySpec).length
+        ? `: ${escapeHtml(
+            Object.entries(signals.flowEfficiency.outsideBySpec)
+              .sort(([, a], [, b]) => b - a)
+              .slice(0, 4)
+              .map(([spec, secs]) => `${spec} ${seconds(secs)}`)
+              .join(', '),
+          )}`
+        : ''
+    }.</p>${cites('changes', signals.flowEfficiency.cites, links)}`,
     `${trustBadges(signals.flowEfficiency.trust)} ${escapeHtml(excludedNote(signals.flowEfficiency.excluded))}`,
   )}
 ${panel(
@@ -892,17 +902,21 @@ function costClassPanel(
   const rows = entries
     .map(
       ([name, spend]) =>
-        `<tr><td><code>${escapeHtml(name)}</code></td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num">${spend.sessions}</td><td class="num">${spend.missingFigures}</td><td>${cites('records', spend.cites, links)}</td></tr>`,
+        `<tr><td><code>${escapeHtml(name)}</code></td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num">${spend.allocated > 0 ? escapeHtml(money(spend.allocated, spend.currency ?? 'USD')) : '<span class="dim">none</span>'}</td><td class="num">${spend.hours > 0 ? spend.hours.toFixed(1) + ' h' : '<span class="dim">none</span>'}</td><td class="num">${spend.sessions}</td><td class="num">${spend.missingFigures}</td><td class="dim">${escapeHtml(
+          Object.entries(spend.sources)
+            .map(([source, n]) => `${n} ${source}`)
+            .join(', '),
+        )}</td><td>${cites('records', spend.cites, links)}</td></tr>`,
     )
     .join('');
   const table = rows
-    ? `<div class="scroll"><table><thead><tr><th>class</th><th class="num">cost</th><th class="num">sessions</th><th class="num">no figures</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    ? `<div class="scroll"><table><thead><tr><th>class</th><th class="num">reported</th><th class="num">allocated</th><th class="num">hours</th><th class="num">sessions</th><th class="num">no figures</th><th>declared by</th><th>cites</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : '<p class="empty">No session records yet.</p>';
   const coverageLine = `${coverage.agent} with an agent session, ${coverage.humanOnly} human-only, ${coverage.undeclared} undeclared, ${coverage.unreported} unreported, of ${count(coverage.total, 'change')}`;
   return panel(
     'Spend by cost class',
     `${table}<p class="help">Coverage: ${escapeHtml(coverageLine)}.</p>`,
-    `${trustBadges(['reported'])} the session's own class, then the change's Cost-Class trailer, never defaulted`,
+    `${trustBadges(['reported', 'allocated'])} the session's own class, then the change's Cost-Class trailer, then the spec's declared class, never defaulted; declare one with telemetry class set`,
   );
 }
 
