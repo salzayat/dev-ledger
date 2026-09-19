@@ -49,6 +49,7 @@ contract.
 | Default cost class (phase one addendum)             | `add-default-cost-class`                                      | Complete |
 | Release cost class (phase one addendum)             | `add-release-cost-class`                                      | Complete |
 | Ship states (phase one addendum)                    | `add-ship-states`                                             | Complete |
+| Agent run seconds (defect)                          | `fix-agent-run-seconds`                                       | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -243,6 +244,9 @@ class follows what shipped.
 
 The ship states row places every change and pull request as shipped, pending, or discarded by release tags
 and blame at each tag, and the release rule classifies by that state.
+
+The agent run seconds row fills the figure subscription spend is allocated by from the transcript, so a
+session the hook ends takes its share instead of none.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

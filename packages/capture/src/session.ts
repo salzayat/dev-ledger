@@ -122,6 +122,40 @@ export function attributeTranscriptTime(
 }
 
 /**
+ * Agent run seconds from transcript timestamps: each turn runs from its prompt (or, for work already under
+ * way, the first record in the window) to the last agent record before the next prompt, the session's final
+ * turn included. A gap between two records of one turn longer than the idle cap counts as the cap, because
+ * the agent was waiting on someone, for a permission or an answer, rather than executing. One prompt is
+ * enough; a window with no agent record leaves the figure absent.
+ */
+export function computeAgentRunSeconds(
+  events: { timestamp: string; kind: 'prompt' | 'agent' }[],
+  idleCapSeconds: number,
+): number | undefined {
+  const at = (value: string) => Date.parse(value);
+  const ordered = events
+    .filter((event) => !Number.isNaN(at(event.timestamp)))
+    .sort((a, b) => at(a.timestamp) - at(b.timestamp));
+  if (!ordered.some((event) => event.kind === 'agent')) {
+    return undefined;
+  }
+  let total = 0;
+  let previous: number | null = null;
+  for (const event of ordered) {
+    const when = at(event.timestamp);
+    if (event.kind === 'prompt') {
+      previous = when;
+      continue;
+    }
+    if (previous !== null) {
+      total += Math.min((when - previous) / 1000, idleCapSeconds);
+    }
+    previous = when;
+  }
+  return Math.round(total);
+}
+
+/**
  * Operator active seconds: the sum of gaps between the operator's own events, each gap capped at the
  * idle cap. A single event contributes nothing; the figure is about engagement between events.
  */

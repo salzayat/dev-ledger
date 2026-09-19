@@ -1,0 +1,28 @@
+{
+  "agentRunSeconds": 301,
+  "billingKind": "subscription",
+  "branch": "capture/agent-run-seconds",
+  "cacheReadTokens": 3290989,
+  "cacheWriteTokens": 23531,
+  "cachedTokens": 3314520,
+  "commits": [
+    "9c76af9be3e0df980353d4b74fec353bbb8f67cc"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T05:16:02.492Z",
+  "figuresSource": "summed from 18 messages in the session transcript",
+  "inputTokens": 36,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "not-run"
+  },
+  "model": "claude-opus-5",
+  "operatorId": "op-1",
+  "outputTokens": 11478,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-run-seconds",
+  "startedAt": "2026-09-19T05:10:59.230Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 303
+}
