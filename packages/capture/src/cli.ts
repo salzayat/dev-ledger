@@ -11,6 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { DEFAULT_CONFIG, parseConfig, type TelemetryConfig } from './config.ts';
 import {
   attributeTranscriptTime,
+  computeAgentRunSeconds,
   SESSIONS_PATH,
   buildSessionFile,
   sessionFilePath,
@@ -274,6 +275,30 @@ function readTranscriptFigures(
     return null;
   }
   return sumTranscriptUsage(readFileSync(absolute, 'utf8'), window);
+}
+
+/** Agent run seconds from the transcript's records inside the session's own window. */
+function readTranscriptRunSeconds(
+  root: string,
+  path: string,
+  idleCapSeconds: number,
+  window: { from?: string; to?: string },
+): number | undefined {
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute)) {
+    return undefined;
+  }
+  const fromMs = window.from
+    ? Date.parse(window.from)
+    : Number.NEGATIVE_INFINITY;
+  const toMs = window.to ? Date.parse(window.to) : Number.POSITIVE_INFINITY;
+  return computeAgentRunSeconds(
+    transcriptEvents(readFileSync(absolute, 'utf8')).filter((event) => {
+      const at = Date.parse(event.timestamp);
+      return at >= fromMs && at <= toMs;
+    }),
+    idleCapSeconds,
+  );
 }
 
 /**
@@ -548,6 +573,16 @@ export function captureMain(argv: string[]): number {
             if (filled) {
               input.figuresSource = transcriptFiguresSource(figures);
             }
+          }
+          // Run seconds are what subscription spend is allocated by, so they fill whether or not operator
+          // time is configured; a harness that stated its own figure keeps it.
+          if (input.agentRunSeconds === undefined) {
+            input.agentRunSeconds = readTranscriptRunSeconds(
+              root,
+              transcript,
+              config.costAllocation.idleCapSeconds,
+              { from: input.startedAt, to: input.endedAt },
+            );
           }
           // Operator seconds come from the same file and fill the same way: a payload that stated its own
           // figure keeps it, because the harness knew something the transcript cannot show.
