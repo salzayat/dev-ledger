@@ -21,6 +21,8 @@ prose in their respective documents; do not duplicate contracts across README an
 
 ## Local Setup
 
+This is setup for changing dev-ledger itself. To measure your own repositories, follow the README.
+
 ```bash
 npm ci
 ./scripts/install-git-hooks.sh

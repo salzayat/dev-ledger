@@ -44,6 +44,7 @@ contract.
 | Registry rollup and statements (phase one addendum) | `add-registry-rollup-and-statements`                          | Complete |
 | Zero figures (presentation)                         | `remove-zero-figures`                                         | Complete |
 | Ledger redesign (presentation)                      | `redesign-ledger-presentation`                                | Complete |
+| Capture install (phase one addendum)                | `add-capture-install`                                         | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -224,6 +225,9 @@ and only a measured zero reads as a count.
 
 The lighter ledger workflow row caches the mirror, skips prose-only pull request builds and unchanged
 deploys, and moves the declared-work gate to the check workflow so it still runs on every pull request.
+
+The capture install row makes the ledger adoptable: capture installs into any repository from the ledger
+checkout, so a team measures its own repositories rather than only this one.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

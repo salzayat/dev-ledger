@@ -1,35 +1,51 @@
 # Dev Ledger
 
-Dev Ledger reads the commit histories of the repositories a team runs and turns them into the signals an
-engineer needs to find where work waits and what it cost. It needs only the SSH access a developer already
-has: it mirror-fetches each repository, including tags and pull head refs, and rebuilds a projection that is
-byte-identical on any machine holding the same ref tips. No platform API, no token, no service.
+Engineering management numbers for teams that include agents: what a feature cost, how much of the spend
+was R&D, how many hours a person billed, how fast the work moves, and where it waits. Dev Ledger reads them
+from git, using the access your engineers already have, and shows them on one page where every number
+links to the commit or record behind it. No platform token and no service.
 
-Phase one is observability: capture hooks and session records, a registry, the projection, the flow and
-DORA reads, spend in three trust classes, and The Ledger, published for this repository at
-[salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/). Phase two, `add-change-audit`,
-layers compliance over the same records and is drafted in `openspec/changes/`. Nothing is resolved to a
-person. The repository is a fork of [spec-loop](https://github.com/salzayat/spec-loop) and keeps its
-discipline: specs before code, evidence over trust, an agent harness with no credentials.
+See it running on this repository: [salzayat.github.io/dev-ledger](https://salzayat.github.io/dev-ledger/).
 
-## Quick start
+## Measure your repositories
 
-```bash
-npm ci
-./scripts/install-git-hooks.sh
-npm run check
-```
+1. **Install the ledger.**
 
-Register repositories in `registry.json`, then build and open the page:
+   ```bash
+   git clone git@github.com:salzayat/dev-ledger.git && cd dev-ledger && npm ci
+   ```
 
-```bash
-npm run ledger
-```
+2. **Register the repositories** in `registry.json`: a name, the SSH URL, the default branch, and the release
+   tag pattern for each. Fields are in [`docs/contract.md`](docs/contract.md).
 
-That runs `telemetry sync`, `telemetry rebuild`, and `telemetry ledger --html`, and opens the result.
-`sync` is the only step that reaches the network, through `git fetch`. Registry fields, including
-`measuredFrom`, `closedPullRequests`, `rework.ignore`, and `webUrl`, are listed in
-[`docs/contract.md`](docs/contract.md).
+3. **Build the page.**
+
+   ```bash
+   npm run ledger
+   ```
+
+   Wait and cycle time, the queue, the DORA keys, and velocity from task lists work on any repository
+   straight away, from git alone.
+
+4. **Install capture in each repository** for spend, hours, and R&D against production. From the ledger
+   checkout, run the following, then commit the `telemetry.config.json` it writes into that repository:
+
+   ```bash
+   ./scripts/install-capture.sh ~/code/your-repo --operator op-1 --plan claude-max --provider anthropic --claude
+   ```
+
+   It adds two hook shims to that repository's `.git/hooks` and never touches its commit style or checks.
+   With `--claude`, Claude Code sessions there start and end themselves. Any other harness runs
+   `session start` before the work and `session end` after it.
+
+5. **Record what the plan cost** each month, from that repository:
+   `<ledger>/scripts/telemetry.sh subscription record --plan claude-max --period 2026-09 --amount 100 --currency USD`.
+   Declare each spec's class once with `class set <spec> rd`, close each month's hours with
+   `timesheet close <YYYY-MM>`, and export the month with `export --period <YYYY-MM>` from the ledger
+   checkout.
+
+A plan shared across repositories is recorded in one of them today, and only that repository's sessions take
+a share of it.
 
 ## What gets recorded
 
@@ -84,22 +100,23 @@ run's own token and uses no other credential. Nothing generated is committed.
 
 ## Commands
 
-| Command                                          | What it does                                                                            |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `npm run check`                                  | The full local gate: specs, harness, governance, docs, secrets, format, lint, tests.    |
-| `npm run ledger [-- --no-open]`                  | Sync, rebuild, write `.telemetry/ledger.html`, and open it.                             |
-| `./scripts/telemetry.sh sync`                    | Mirror-fetch every registered repository. `--entry NAME --fetch-url URL` overrides one. |
-| `./scripts/telemetry.sh rebuild`                 | Rebuild the projection and print its hash.                                              |
-| `./scripts/telemetry.sh ledger [--html]`         | Render The Ledger in the terminal, or as the page.                                      |
-| `./scripts/telemetry.sh session ...`             | `start`, `end`, `human-only`, `figures`, `summary`.                                     |
-| `./scripts/telemetry.sh subscription ...`        | `close <YYYY-MM>` proposes period records from `plans.json`; `record` writes one.       |
-| `./scripts/telemetry.sh note add`                | Record why a figure reads the way it does.                                              |
-| `./scripts/telemetry.sh validate`                | Validate every session, subscription, and note record.                                  |
-| `./scripts/telemetry.sh configure`               | Serve the configuration surface on the loopback interface; never commits.               |
-| `./scripts/telemetry.sh cursor <consumer>`       | Replay changes since a consumer's cursor and advance it.                                |
-| `./scripts/telemetry.sh export --period YYYY-MM` | Write the month's statement as CSV (or `--format json`) to `.telemetry/statements/`.    |
-| `./scripts/check-declared.sh <base> <head>`      | Fail when a range carries no `Session:` trailer and nothing declares it.                |
-| `./scripts/check-hooks-current.sh`               | Warn when the hooks git runs are not the hooks in this tree.                            |
+| Command                                          | What it does                                                                                    |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `npm run check`                                  | The full local gate: specs, harness, governance, docs, secrets, format, lint, tests.            |
+| `npm run ledger [-- --no-open]`                  | Sync, rebuild, write `.telemetry/ledger.html`, and open it.                                     |
+| `./scripts/telemetry.sh sync`                    | Mirror-fetch every registered repository. `--entry NAME --fetch-url URL` overrides one.         |
+| `./scripts/telemetry.sh rebuild`                 | Rebuild the projection and print its hash.                                                      |
+| `./scripts/telemetry.sh ledger [--html]`         | Render The Ledger in the terminal, or as the page.                                              |
+| `./scripts/telemetry.sh session ...`             | `start`, `end`, `human-only`, `figures`, `summary`.                                             |
+| `./scripts/telemetry.sh subscription ...`        | `close <YYYY-MM>` proposes period records from `plans.json`; `record` writes one.               |
+| `./scripts/telemetry.sh note add`                | Record why a figure reads the way it does.                                                      |
+| `./scripts/telemetry.sh validate`                | Validate every session, subscription, and note record.                                          |
+| `./scripts/telemetry.sh configure`               | Serve the configuration surface on the loopback interface; never commits.                       |
+| `./scripts/telemetry.sh cursor <consumer>`       | Replay changes since a consumer's cursor and advance it.                                        |
+| `./scripts/telemetry.sh export --period YYYY-MM` | Write the month's statement as CSV (or `--format json`) to `.telemetry/statements/`.            |
+| `./scripts/install-capture.sh <repo>`            | Install capture in another repository: hook shims, operator, plan, and the Claude Code adapter. |
+| `./scripts/check-declared.sh <base> <head>`      | Fail when a range carries no `Session:` trailer and nothing declares it.                        |
+| `./scripts/check-hooks-current.sh`               | Warn when the hooks git runs are not the hooks in this tree.                                    |
 
 Each command prints its usage with no arguments. `capture` and `flow` are source-only: consumers resolve
 the source through the `@dev-ledger/source` export condition, so nothing needs building to run.

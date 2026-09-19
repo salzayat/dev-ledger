@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "packageManager": "npm@11.5.2",
-  "description": "SDLC observability from git alone, with compliance as a second phase over the same records: session files, trailers, a rebuildable projection, flow signals, rules, and evidence packs.",
+  "description": "Engineering management numbers for teams that include agents, from git: cost per feature, R&D against production, billable hours, velocity, and bottlenecks.",
   "author": {
     "name": "Shady Alzayat",
     "url": "https://github.com/salzayat"

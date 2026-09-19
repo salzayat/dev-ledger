@@ -4,9 +4,11 @@
 # (hook_event_name, session_id, transcript_path) and needs nothing but git and this repository.
 set -eu
 
+tool_root=$(cd "$(dirname "$0")/../.." && pwd)
+telemetry="$tool_root/scripts/telemetry.sh"
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
-[ -d node_modules ] || exit 0
+[ -d "$tool_root/node_modules" ] || exit 0
 
 input=$(cat)
 field() {
@@ -19,7 +21,7 @@ id="s-$(date -u +%Y%m%d)-$(printf '%s' "$session" | cut -c1-8)"
 
 case "$event" in
   SessionStart)
-    ./scripts/telemetry.sh session start --id "$id" >/dev/null
+    "$telemetry" session start --id "$id" >/dev/null
     ;;
   SessionEnd)
     active=$(git config --get telemetry.session 2>/dev/null || true)
@@ -29,10 +31,12 @@ case "$event" in
     started=$(git config --get telemetry.session-started 2>/dev/null || true)
     branch=$(git branch --show-current)
     commits=$(git log --format=%H --since="$started" --grep="^Session: $active" 2>/dev/null | tr '\n' ' ')
-    plan=$(node -e 'try{const p=require("./.telemetry/subscriptions/plans.json").plans[0];process.stdout.write(p?p.planId:"")}catch{}')
-    provider=$(node -e 'try{const p=require("./.telemetry/subscriptions/plans.json").plans[0];process.stdout.write(p?p.provider:"")}catch{}')
+    # The plan and provider come from this repository's git configuration (set by install-capture.sh),
+    # then from its plan declarations.
+    plan=$(git config --get telemetry.plan 2>/dev/null || node -e 'try{const p=require(process.cwd()+"/.telemetry/subscriptions/plans.json").plans[0];process.stdout.write(p?p.planId:"")}catch{}')
+    provider=$(git config --get telemetry.provider 2>/dev/null || node -e 'try{const p=require(process.cwd()+"/.telemetry/subscriptions/plans.json").plans[0];process.stdout.write(p?p.provider:"")}catch{}')
     model=$(node --conditions=@dev-ledger/source --experimental-strip-types \
-      "$repo_root/packages/capture/src/cli.ts" session figures --transcript "$transcript" --model-only 2>/dev/null || true)
+      "$tool_root/packages/capture/src/cli.ts" session figures --transcript "$transcript" --model-only 2>/dev/null || true)
     billing=subscription
     [ -n "$plan" ] || billing=metered
     node -e '
@@ -46,8 +50,8 @@ case "$event" in
       };
       process.stdout.write(JSON.stringify(payload));
     ' "$active" "$provider" "$model" "$branch" "$commits" "$billing" "$plan" |
-      ./scripts/telemetry.sh session end --payload - --transcript "$transcript" >/dev/null || {
-        printf '%s\n' "telemetry: session end failed; the session stays active, run ./scripts/telemetry.sh session end by hand" >&2
+      "$telemetry" session end --payload - --transcript "$transcript" >/dev/null || {
+        printf '%s\n' "telemetry: session end failed; the session stays active, run "$telemetry" session end by hand" >&2
       }
     ;;
 esac

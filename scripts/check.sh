@@ -10,6 +10,7 @@ npm exec openspec -- validate --all --strict
 ./scripts/test-governance.sh
 ./scripts/test-pr-body.sh
 ./scripts/test-trailers.sh
+./scripts/test-capture-install.sh
 ./scripts/test-hooks-current.sh
 ./scripts/check-repository-conventions.sh
 ./scripts/check-agent-attribution.sh
