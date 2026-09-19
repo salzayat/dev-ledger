@@ -1210,6 +1210,7 @@ export function computeSignals(
   },
   specClasses: Record<string, string> = {},
   timesheets: TimesheetRecord[] = [],
+  defaultClass: string | null = null,
 ): RepositorySignals {
   // Changes merged before the instrumentation existed are excluded with that reason, not measured as
   // gaps; a pull request an operator declared closed leaves the queue, because git cannot see closed.
@@ -1801,14 +1802,20 @@ export function computeSignals(
           : (record.file.spec ?? null);
       const declared = specName ? specClasses[specName] : undefined;
       const name =
-        record.file.costClass ?? trailerClass ?? declared ?? 'unclassified';
+        record.file.costClass ??
+        trailerClass ??
+        declared ??
+        defaultClass ??
+        'unclassified';
       const source = record.file.costClass
         ? 'session'
         : trailerClass
           ? 'trailer'
           : declared
             ? 'spec'
-            : 'none';
+            : defaultClass
+              ? 'default'
+              : 'none';
       const entry = classSpend(name);
       entry.sources[source] = (entry.sources[source] ?? 0) + 1;
       if (typeof record.file.operatorActiveSeconds === 'number') {

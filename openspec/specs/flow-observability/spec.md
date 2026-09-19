@@ -956,8 +956,8 @@ and SHALL show allocated and reported per unit side by side.
 ### Requirement: Cost classes resolve through the spec, and carry allocated spend and hours
 
 A record's cost class SHALL resolve as the session's own class, then the change's `Cost-Class:` trailer,
-then the declared class of the spec the change or session cites, else `unclassified`; nothing SHALL be
-defaulted. Spend by class SHALL report reported cost, allocated spend in its currency, operator hours, and
+then the declared class of the spec the change or session cites, then the repository's declared default
+class, else `unclassified`; nothing SHALL be inferred. Spend by class SHALL report reported cost, allocated spend in its currency, operator hours, and
 how many records resolved by each source. Flow efficiency SHALL report active time outside any change's
 window by spec.
 
@@ -972,6 +972,13 @@ window by spec.
 - GIVEN a spec declared `rd` and a session citing it that carries `production`
 - WHEN spend by class is computed
 - THEN that session MUST fall under `production`
+
+#### Scenario: The declared default covers work nothing else classifies
+
+- GIVEN a repository declaring a default class of `rd` and a spec declared `production`
+- WHEN a session citing that spec and a session citing no spec are classified
+- THEN the first MUST fall under `production`, resolved by the spec
+- AND the second MUST fall under `rd`, resolved by the default
 
 ### Requirement: Hours by operator, spec, and month, measured beside confirmed
 

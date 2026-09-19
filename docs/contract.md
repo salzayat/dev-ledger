@@ -87,7 +87,8 @@ Token figures summed from a transcript count only records timestamped inside the
 ## Cost classes (schema version 1)
 
 `.telemetry/classes.json`, written by `telemetry class set`: `schemaVersion` and `classes`, a map from spec
-name to a class in the configured vocabulary. Inherited by every record citing the spec.
+name to a class in the configured vocabulary. Inherited by every record citing the spec. An optional `default` holds the
+class for the repository's other work, set with `telemetry class set --default <class>`.
 
 ## Timesheet (schema version 1)
 

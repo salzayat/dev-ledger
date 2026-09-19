@@ -2310,3 +2310,70 @@ test('the registry rollup sums a spec across repositories, and a period statemen
     0,
   );
 });
+
+test('the declared default classifies work no session, trailer, or spec declares, and a spec declaration wins over it', () => {
+  const fixture = makeFixtureRepo();
+  const seed = openPullRequest(fixture, 'seed', [
+    [
+      'feat(seed): seed',
+      {
+        'seed.txt': 's',
+        'telemetry.config.json': JSON.stringify({
+          schemaVersion: 1,
+          costAllocation: {
+            enabled: true,
+            idleCapSeconds: 900,
+            operators: ['op-1'],
+            costClasses: ['rd', 'production'],
+          },
+        }),
+        '.telemetry/classes.json': JSON.stringify({
+          schemaVersion: 1,
+          default: 'rd',
+          classes: { 'add-p': 'production' },
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const record = (id: string, spec?: string) =>
+    sessionJson(id, {
+      operatorActiveSeconds: 1800,
+      operatorActiveAlgorithm: 'prompt-attribution-v1:900',
+      operatorId: 'op-1',
+      ...(spec ? { spec } : {}),
+    });
+  const work = openPullRequest(fixture, 'work', [
+    [
+      trailered('feat(w): two kinds of work', {
+        Session: 's-p',
+        Change: 'c-w',
+      }),
+      {
+        'w.txt': 'w',
+        '.telemetry/sessions/x/s-p.json': record('s-p', 'add-p'),
+        '.telemetry/sessions/x/s-n.json': record('s-n'),
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    work,
+    'feat(w): two kinds of work',
+    'Session: s-p\nSession: s-n',
+  );
+  const built = build(registryFor(fixture.dir));
+  const classes = built.repo.signals!.costClasses;
+  assert.equal(
+    classes.production.sources.spec,
+    1,
+    'the spec declaration wins over the default',
+  );
+  assert.equal(
+    classes.rd.sources.default,
+    1,
+    'the record citing no spec takes the default',
+  );
+  assert.equal(classes.unclassified, undefined);
+  assert.equal(built.repo.classes.default, 'rd');
+});

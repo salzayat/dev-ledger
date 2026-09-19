@@ -1147,7 +1147,7 @@ function costClassPanel(
   return panel(
     'Spend by cost class',
     `${table}<p class="help">Coverage: ${escapeHtml(coverageLine)}.</p>`,
-    `${trustBadges(['reported', 'allocated'])} the session's own class, then the change's Cost-Class trailer, then the spec's declared class, never defaulted; declare one with telemetry class set`,
+    `${trustBadges(['reported', 'allocated'])} the session's own class, then the change's Cost-Class trailer, then the spec's declared class, then the repository's declared default; nothing is inferred. Declare with telemetry class set`,
   );
 }
 

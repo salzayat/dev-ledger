@@ -1367,3 +1367,37 @@ test('token figures count only the transcript records inside the session window'
     null,
   );
 });
+
+test('class set --default declares the repository default, validated against the vocabulary', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  writeFileSync(
+    join(dir, 'telemetry.config.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: [],
+        costClasses: ['rd', 'production'],
+      },
+    }),
+  );
+  const run = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+    );
+  run(['class', 'set', '--default', 'rd', '--no-commit']);
+  run(['class', 'set', 'add-x', 'production', '--no-commit']);
+  const file = JSON.parse(
+    readFileSync(join(dir, '.telemetry/classes.json'), 'utf8'),
+  );
+  assert.equal(file.default, 'rd');
+  assert.deepEqual(file.classes, { 'add-x': 'production' });
+  assert.throws(
+    () => run(['class', 'set', '--default', 'marketing', '--no-commit']),
+    /default must be one of rd, production/,
+  );
+});

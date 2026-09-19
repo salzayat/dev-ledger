@@ -782,11 +782,15 @@ export function captureMain(argv: string[]): number {
     }
     case 'class': {
       if (args[0] !== 'set') {
-        fail('usage: telemetry class set <spec> <class> [--no-commit]');
+        fail(
+          'usage: telemetry class set <spec> <class> | telemetry class set --default <class> [--no-commit]',
+        );
       }
-      const [, spec, cls] = args;
-      if (!spec || !cls) {
-        fail('class set requires a spec and a class');
+      const isDefault = args[1] === '--default';
+      const spec = isDefault ? null : args[1];
+      const cls = args[2];
+      if (!cls || (!isDefault && !spec)) {
+        fail('class set requires a spec and a class, or --default and a class');
       }
       const config = loadConfig(root);
       const absolute = join(root, CLASSES_PATH);
@@ -796,7 +800,11 @@ export function captureMain(argv: string[]): number {
             classes: Record<string, string>;
           })
         : { schemaVersion: 1, classes: {} };
-      current.classes[spec] = cls;
+      if (isDefault) {
+        (current as { default?: string }).default = cls;
+      } else {
+        current.classes[spec!] = cls;
+      }
       const classErrors = validateClassesFile(current, config);
       if (classErrors.length > 0) {
         fail(`classes file is invalid:\n  ${classErrors.join('\n  ')}`);
@@ -809,7 +817,7 @@ export function captureMain(argv: string[]): number {
           'commit',
           '--quiet',
           '-m',
-          `chore(telemetry): class ${spec} ${cls}`,
+          `chore(telemetry): class ${spec ?? 'default'} ${cls}`,
           '--',
           CLASSES_PATH,
         ]);

@@ -49,5 +49,6 @@
     "refine-ledger-after-review": "rd",
     "trim-skill-description-overhead": "rd"
   },
+  "default": "rd",
   "schemaVersion": 1
 }

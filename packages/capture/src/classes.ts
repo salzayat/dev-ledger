@@ -9,6 +9,8 @@ export const CLASSES_PATH = '.telemetry/classes.json';
 export type ClassesFile = {
   schemaVersion: number;
   classes: Record<string, string>;
+  /** The class for this repository's work that no session, trailer, or spec declares. Optional. */
+  default?: string;
 };
 
 const FORBIDDEN_KEYS =
@@ -39,6 +41,15 @@ export function validateClassesFile(
   ) {
     errors.push('classes must be an object mapping spec to class');
     return errors;
+  }
+  if (
+    file.default !== undefined &&
+    (typeof file.default !== 'string' ||
+      !config.costAllocation.costClasses.includes(file.default))
+  ) {
+    errors.push(
+      `default must be one of ${config.costAllocation.costClasses.join(', ')}`,
+    );
   }
   const pattern = new RegExp(config.specPattern);
   for (const [spec, cls] of Object.entries(

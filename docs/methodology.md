@@ -410,8 +410,8 @@ collector replaces the tag with a deployment record without changing the shape o
 
 A class is a property of the work, and the work is named by its spec, so a class is declared once per spec
 with `telemetry class set <spec> <class>` and inherited by every change and session citing it. A session's
-own class wins, then the change's `Cost-Class:` trailer, then the spec's declaration; anything else is
-`unclassified` and never defaulted. The panel shows reported cost, the allocated share, and operator hours
+then the spec's declaration, then the repository's declared default (`class set --default rd`); anything
+else is `unclassified`. Nothing is inferred: the default is a committed declaration shown as its own source. The panel shows reported cost, the allocated share, and operator hours
 per class, because planning and tax credits count dollars and hours, and says how many records resolved
 by each source.
 
