@@ -1,0 +1,28 @@
+{
+  "agentRunSeconds": 600,
+  "billingKind": "subscription",
+  "branch": "fix/validate-plans-schema",
+  "cacheReadTokens": 291321013,
+  "cacheWriteTokens": 2935710,
+  "cachedTokens": 294256723,
+  "commits": [
+    "759fb1014990898a7a0e987119b698632b23c382"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T01:34:41.615Z",
+  "figuresSource": "summed from 534 messages in the session transcript",
+  "inputTokens": 15092,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorId": "op-1",
+  "outputTokens": 952793,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-validate-plans",
+  "startedAt": "2026-09-19T01:33:13.139Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 88
+}
