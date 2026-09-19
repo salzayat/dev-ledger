@@ -1,0 +1,29 @@
+{
+  "agentRunSeconds": 2400,
+  "billingKind": "subscription",
+  "branch": "flow/rollup-and-export",
+  "cacheReadTokens": 283331441,
+  "cacheWriteTokens": 2925344,
+  "cachedTokens": 286256785,
+  "commits": [
+    "3c9c1057397d6fdfd4a0e9fb34e842a1df7a3c20"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T01:16:20.949Z",
+  "figuresSource": "summed from 525 messages in the session transcript",
+  "inputTokens": 14824,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorId": "op-1",
+  "outputTokens": 945857,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-rollup-export",
+  "spec": "add-registry-rollup-and-statements",
+  "startedAt": "2026-09-19T01:11:09.339Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 312
+}
