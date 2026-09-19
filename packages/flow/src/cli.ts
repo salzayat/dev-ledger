@@ -14,6 +14,7 @@ import {
   writeProjection,
 } from './projection.ts';
 import { parseRegistry } from './registry.ts';
+import { buildStatement, statementCsv } from './statement.ts';
 import { mirrorPath, syncAll } from './sync.ts';
 
 // `scripts/telemetry.sh` delegates here. Subcommands: sync, rebuild,
@@ -27,6 +28,8 @@ const USAGE = `Usage: telemetry <command> [options]
   cursor <consumer> [--repo <name>]        Replay changes since the consumer's cursor and advance it
   configure [--port N]                     Serve the configuration surface on the loopback interface only
   ledger [--html [path]]                    Render The Ledger in the terminal, or as a static HTML page (default .telemetry/ledger.html)
+  export --period YYYY-MM [--format csv|json] [--output path]
+                                           Write a period statement from the projection (default .telemetry/statements/<period>.<format>)
 `;
 
 function repoRoot(): string {
@@ -194,6 +197,36 @@ export function main(argv: string[]): number {
         return 0;
       }
       process.stdout.write(renderLedger(projection) + '\n');
+      return 0;
+    }
+    case 'export': {
+      const projection = readProjection(stateRoot(root));
+      if (!projection) {
+        fail('no projection; run telemetry rebuild first');
+      }
+      const periodIndex = args.indexOf('--period');
+      const period = periodIndex >= 0 ? args[periodIndex + 1] : undefined;
+      if (!period || !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        fail('export requires --period YYYY-MM');
+      }
+      const formatIndex = args.indexOf('--format');
+      const format = formatIndex >= 0 ? args[formatIndex + 1] : 'csv';
+      if (format !== 'csv' && format !== 'json') {
+        fail('--format must be csv or json');
+      }
+      const outputIndex = args.indexOf('--output');
+      const output =
+        outputIndex >= 0
+          ? args[outputIndex + 1]
+          : join('.telemetry', 'statements', `${period}.${format}`);
+      const rows = buildStatement(projection, period);
+      const absolute = resolve(root, output);
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(
+        absolute,
+        format === 'csv' ? statementCsv(rows) : canonicalJson({ period, rows }),
+      );
+      process.stdout.write(`${output} (${rows.length} rows)\n`);
       return 0;
     }
     case 'hash': {

@@ -212,7 +212,7 @@ test('the projection records the derived web URL, never the registry path', () =
   const projection = fixtureProjection();
   assert.equal(projection.repositories.fixture.webUrl, null);
   assert.equal(projection.repositories.gone.webUrl, null);
-  assert.equal(projection.schemaVersion, 5);
+  assert.equal(projection.schemaVersion, 6);
 });
 
 test('every panel carries trust classes, excluded counts, and citations', () => {
