@@ -39,6 +39,7 @@ contract.
 | Refinements after review (phase one addendum)     | `refine-ledger-after-review`                                  | Complete |
 | Task velocity (phase one addendum)                | `add-task-velocity`                                           | Complete |
 | Hours and unit economics (phase one addendum)     | `refine-hours-and-unit-economics`                             | Complete |
+| Spec cost classes (phase one addendum)            | `add-spec-cost-classes`                                       | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -203,6 +204,10 @@ weight on a task line gives it a relative complexity. Velocity is now the comple
 The hours and unit economics row windows operator hours to the session, keeps hours without an identifier
 on the page, puts an allocated figure beside every reported cost-per figure with tasks and their complexity
 as units, and fixes the summary strip.
+
+The spec cost classes row answers the research against production question: a class declared once per spec
+is inherited by every record citing it, and the class panel carries allocated spend and hours beside
+reported cost.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

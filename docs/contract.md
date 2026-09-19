@@ -78,6 +78,11 @@ The record rejects the same forbidden keys a session file does. The projection a
 carries the trust class `allocated` (the record itself is `reported` with producer `operator`), names its
 basis, and is provisional while the period has not closed as of the newest commit the mirror holds.
 
+## Cost classes (schema version 1)
+
+`.telemetry/classes.json`, written by `telemetry class set`: `schemaVersion` and `classes`, a map from spec
+name to a class in the configured vocabulary. Inherited by every record citing the spec.
+
 ## Note (schema version 1)
 
 `.telemetry/notes/<id>.json`, written by `telemetry note add`: `schemaVersion`, `noteId`, `figure` (one word

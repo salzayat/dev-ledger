@@ -70,7 +70,9 @@ repo's own `add-hypothesis-trial-registration` change). Match its structure prec
 - `proposal.md` — Why (grounded in file:line evidence), What Changes, Non-Goals
 - `design.md` — the architectural reasoning behind non-obvious decisions, each tied to a real location in
   the code
-- `tasks.md` — numbered checklist grouped by section, always ending in a verification section
+- `tasks.md` — numbered checklist grouped by section, always ending in a verification section; each task line
+  carries a relative complexity after its id (`- [ ] 1.2 ~3 ...`), on a 1, 2, 3, 5, 8 scale, so velocity
+  can be read from the list
 - `specs/<capability>/spec.md` — the delta itself: `ADDED`/`MODIFIED`/`REMOVED`/`RENAMED` Requirements,
   each with MUST/MUST NOT prose and at least one Given/When/Then Scenario
 

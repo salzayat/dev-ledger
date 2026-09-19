@@ -369,12 +369,14 @@ shows all four anyway, each computed to the release tag and labeled that way:
 A team that deploys every tag reads these as they stand. A team that does not reads the note. Phase two's
 collector replaces the tag with a deployment record without changing the shape of the read.
 
-## Cost by class
+## Cost by class, declared at the spec
 
-A session may carry its own cost class, and a change may carry a `Cost-Class:` trailer. The session's value
-wins for that session's figures, the change's value covers its other sessions, and anything else is
-`unclassified` and never defaulted. Spend by class is the read a preparer asks for first; records without
-figures are counted beside it, never as zero.
+A class is a property of the work, and the work is named by its spec, so a class is declared once per spec
+with `telemetry class set <spec> <class>` and inherited by every change and session citing it. A session's
+own class wins, then the change's `Cost-Class:` trailer, then the spec's declaration; anything else is
+`unclassified` and never defaulted. The panel shows reported cost, the allocated share, and operator hours
+per class, because planning and tax credits count dollars and hours, and says how many records resolved
+by each source.
 
 ## Trends
 

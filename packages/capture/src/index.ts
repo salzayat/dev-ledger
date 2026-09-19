@@ -58,6 +58,12 @@ export type {
   SubscriptionInput,
 } from './subscription.ts';
 export {
+  CLASSES_PATH,
+  CLASSES_SCHEMA_VERSION,
+  validateClassesFile,
+} from './classes.ts';
+export type { ClassesFile } from './classes.ts';
+export {
   NOTES_PATH,
   NOTE_SCHEMA_VERSION,
   noteFilePath,

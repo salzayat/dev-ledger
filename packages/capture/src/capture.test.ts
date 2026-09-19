@@ -1211,3 +1211,46 @@ test('session end attributes only the transcript events inside the session windo
   );
   assert.ok(record.operatorActiveSeconds > 0);
 });
+
+test("class set declares a spec's cost class once, validated against the vocabulary", () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  writeFileSync(
+    join(dir, 'telemetry.config.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: [],
+        costClasses: ['rd', 'production'],
+      },
+    }),
+  );
+  const run = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      {
+        cwd: dir,
+        encoding: 'utf8',
+        env: gitEnvironment(),
+      },
+    );
+  assert.equal(
+    run(['class', 'set', 'add-x', 'rd', '--no-commit']).trim(),
+    '.telemetry/classes.json',
+  );
+  assert.deepEqual(
+    JSON.parse(readFileSync(join(dir, '.telemetry/classes.json'), 'utf8'))
+      .classes,
+    {
+      'add-x': 'rd',
+    },
+  );
+  assert.throws(
+    () => run(['class', 'set', 'add-y', 'marketing', '--no-commit']),
+    /must be one of rd, production/,
+  );
+  assert.match(run(['validate']), /1 records valid/);
+});
