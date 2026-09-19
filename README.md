@@ -58,11 +58,15 @@ undeclared on purpose.
 
 ## What The Ledger shows
 
-One page per repository, in four tabs: **flow** (wait and cycle time, velocity as the relative complexity of tasks completed per week, the queue, batch size,
-work mix, flow efficiency, iterations, spec lead time, rework, escapes, check compliance), **DORA** (the
-four keys approximated to the release tag), **spend** (reported and allocated spend by period, cost class,
-spec, provider, model, and operator; the plan's cost per token; cost per change and per release), and
-**records** (recent changes, session and subscription records, notes).
+One page per repository. A headline states the typical wait, cycle, active share, and the period's spend in
+words, each linked to its panel, above five figures with a trend beside each. Below it, three views, each with
+sub-views: **Metrics** (Flow: wait and cycle time, flow efficiency, rework, escapes, check compliance,
+iterations, spec lead time; DORA: the four keys approximated to the release tag; Throughput: velocity as the
+relative complexity of tasks completed per week, merge frequency, batch size, work mix), **Economics**
+(Spend: reported and allocated spend by period, cost class, spec, provider, and model, and the plan's cost
+per token; Effort: hours, operators, cost per unit of effort, spend on unmerged pull requests), and
+**Records** (Changes, Queue, Notes). Every panel leads with its figure; its methodology and excluded count
+fold beneath it, and its citations follow.
 
 Every figure names its trust class (`observed` from git, `reported` from a harness or an operator,
 `allocated` from an apportioned amount), its excluded count, and the changes and records behind it.

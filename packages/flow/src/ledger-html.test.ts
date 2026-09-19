@@ -231,7 +231,10 @@ test('every panel carries trust classes, excluded counts, and citations', () => 
     'Population',
     'Spend over time',
     'Spend by cost class',
-    'DORA keys, approximated to the release tag',
+    'Deployment frequency',
+    'Lead time to release',
+    'Change failure rate',
+    'Time to fix',
     'Spend by spec',
     'Spend by provider',
     'Spend by model',
@@ -321,7 +324,11 @@ test('the queue and changes tables show spend, or say why there is none', () => 
   );
   assert.ok(blindRow, 'a pull request with no figures says so');
   assert.doesNotMatch(blindRow!, /\$0\.00/);
-  const undeclaredRow = rows.find((row) => row.includes('no trailers at all'));
+  // Scoped to the recent-changes row: the work-mix table cites the same change and renders first.
+  const undeclaredRow = rows.find(
+    (row) =>
+      row.includes('no trailers at all') && row.includes('class="subject"'),
+  );
   assert.ok(undeclaredRow, 'the undeclared change has a row');
   assert.match(undeclaredRow!, /undeclared/);
   assert.doesNotMatch(undeclaredRow!, /\$0\.00/);
@@ -334,7 +341,7 @@ test('the queue and changes tables show spend, or say why there is none', () => 
   assert.match(declaredRow!, /\$0\.50/);
 });
 
-test('tabs need no script and no form, and separate DORA from flow', () => {
+test('views need no script and no form, come in two levels, and separate DORA from flow', () => {
   const html = renderLedgerHtml(fixtureProjection());
 
   // The page may not execute anything and may not carry a control that submits: the published artifact is
@@ -345,20 +352,54 @@ test('tabs need no script and no form, and separate DORA from flow', () => {
   assert.doesNotMatch(html, /<button/i);
   assert.doesNotMatch(html, /<select/i);
 
-  // Every tab is a fragment on this page, so a tab is a URL and a link to one opens it.
+  // Every sub-view is a fragment on this page, so a view is a URL and a link to one opens it.
   const tabIds = [
     ...html.matchAll(/<section class="tab[^"]*" id="([^"]+)"/g),
   ].map((match) => match[1]);
-  assert.ok(tabIds.length >= 4, 'four tabs per repository');
-  for (const name of ['flow', 'dora', 'spend', 'records']) {
+  const views = [
+    'metrics-flow',
+    'metrics-dora',
+    'metrics-throughput',
+    'economics-spend',
+    'economics-effort',
+    'records-changes',
+    'records-queue',
+    'records-notes',
+  ];
+  assert.equal(tabIds.length, views.length, 'eight sub-views per repository');
+  for (const name of views) {
     assert.ok(
       tabIds.some((id) => id.endsWith(`-${name}`)),
-      `${name} has its own tab`,
+      `${name} has its own sub-view`,
     );
-    assert.match(html, new RegExp(`href="#[^"]*-${name}"`));
+    assert.match(html, new RegExp(`<a class="sub" href="#[^"]*-${name}"`));
   }
+  // Three parents, each pointing at its first sub-view, and a sub-row per parent.
+  for (const [parent, first] of [
+    ['Metrics', 'metrics-flow'],
+    ['Economics', 'economics-spend'],
+    ['Records', 'records-changes'],
+  ]) {
+    assert.match(
+      html,
+      new RegExp(`<a class="top" href="#[^"]*-${first}">${parent}</a>`),
+    );
+    assert.match(
+      html,
+      new RegExp(`class="row sub sub-${parent.toLowerCase()}"`),
+    );
+  }
+  // The parent marks itself current from its children's targets, and the sub-row shows on the same rule.
+  assert.match(
+    html,
+    /body:has\(#fixture-heading-economics-spend:target, #fixture-heading-economics-effort:target\) nav\.tabs a\.top\[href="#fixture-heading-economics-spend"\]/,
+  );
+  assert.match(
+    html,
+    /body:has\(#fixture-heading-economics-spend:target, #fixture-heading-economics-effort:target\) nav\.tabs \.row\.sub-economics/,
+  );
 
-  // DORA and flow are different tabs, not two panels in one scroll.
+  // DORA and flow are different sub-views, not two groups in one scroll.
   const section = (name: string) => {
     const open = html.indexOf(
       `id="${tabIds.find((id) => id.endsWith(`-${name}`))}"`,
@@ -368,14 +409,81 @@ test('tabs need no script and no form, and separate DORA from flow', () => {
     const next = rest.indexOf('<section class="tab', 1);
     return next === -1 ? rest : rest.slice(0, next);
   };
-  assert.match(section('dora'), /DORA keys/);
-  assert.doesNotMatch(section('dora'), /Merge frequency/);
-  assert.match(section('flow'), /Merge frequency/);
-  assert.doesNotMatch(section('flow'), /DORA keys/);
+  assert.match(section('metrics-dora'), /Lead time to release/);
+  assert.doesNotMatch(section('metrics-dora'), /Wait time/);
+  assert.match(section('metrics-flow'), /Wait time/);
+  assert.doesNotMatch(section('metrics-flow'), /Lead time to release/);
+  assert.match(section('metrics-throughput'), /Merge frequency/);
+  assert.match(section('economics-effort'), /Cost per unit of effort/);
+  assert.match(section('records-queue'), /Unmerged queue/);
 
-  // One tab renders without a fragment, chosen by CSS rather than by a script.
-  assert.match(html, /class="tab tab--default"/);
+  // One view renders without a fragment, chosen by CSS rather than by a script, and is last in the document.
+  assert.match(
+    html,
+    /class="tab tab--default" id="fixture-heading-metrics-flow"/,
+  );
   assert.match(html, /\.tabbed > \.tab:target ~ \.tab--default/);
+  assert.equal(tabIds[tabIds.length - 1], 'fixture-heading-metrics-flow');
+});
+
+test('the headline composes figures the page already shows and links each to its view', () => {
+  const projection = fixtureProjection();
+  const html = renderLedgerHtml(projection);
+  const signals = projection.repositories.fixture.signals!;
+  const lede = /<p class="lede">([\s\S]*?)<\/p>/.exec(html)![1];
+  // The typical wait in the sentence is the wait panel's value, linked to the flow view.
+  const wait = new RegExp(
+    `<a href="#fixture-heading-metrics-flow"><strong>${signals.waitTime.p50! < 60 ? Math.round(signals.waitTime.p50!) + ' s' : ''}`,
+  );
+  assert.match(lede, wait);
+  assert.match(lede, /finished work waits/);
+  assert.match(
+    lede,
+    /Reported spend is <a href="#fixture-heading-economics-spend"><strong>\$/,
+  );
+  // Five figures, each a link to a view, each with a trust class, none a currency zero.
+  const kpis = /<div class="kpis">([\s\S]*?)<\/div>\n<nav/.exec(html)![1];
+  const cards =
+    kpis.match(/<a class="kpi" href="#fixture-heading-[a-z-]+">/g) ?? [];
+  assert.equal(cards.length, 5);
+  assert.equal((kpis.match(/class="badge badge-/g) ?? []).length, 5);
+  assert.doesNotMatch(kpis, /\$0\.00/);
+  assert.match(kpis, /<svg class="spark"/);
+  // Provenance sits in the footer, not above the first headline.
+  const footer = html.indexOf('<footer>');
+  assert.ok(html.indexOf('Projection schema') > footer);
+  assert.ok(
+    html.indexOf('projection schema', 0) === -1 ||
+      html.indexOf('projection schema') > footer,
+  );
+});
+
+test('in every panel the figure precedes the folded methodology, and trailing citations follow it', () => {
+  const html = renderLedgerHtml(fixtureProjection());
+  const panels =
+    html.match(/<section class="panel[^"]*">[\s\S]*?<\/section>/g) ?? [];
+  assert.ok(panels.length > 10);
+  const wait = panels.find((panel) => panel.includes('<h3>Wait time</h3>'))!;
+  const figureAt = wait.indexOf('<p class="figure">');
+  const howAt = wait.indexOf(
+    '<details class="how"><summary>How it\'s measured</summary>',
+  );
+  const citesAt = wait.lastIndexOf('<details class="cites">');
+  assert.ok(figureAt > 0 && howAt > figureAt && citesAt > howAt);
+  // The methodology note and the help text are inside the fold, closed by default.
+  assert.match(wait, /<details class="how">(?!\s*open)/);
+  assert.match(wait.slice(howAt), /excluded: /);
+  assert.match(wait.slice(howAt), /Typical is the median/);
+  // The trust classes sit beside the title, not in the prose.
+  assert.match(
+    wait,
+    /<div class="head"><h3>Wait time<\/h3><span class="trust"><span class="badge badge-observed">/,
+  );
+  // A citation inside a table row stays in its row.
+  const spec = panels.find((panel) =>
+    panel.includes('<h3>Spend by spec</h3>'),
+  )!;
+  assert.match(spec, /<td><details class="cites">/);
 });
 
 test('allocated subscription spend renders beside reported spend, with its class and provisional mark', () => {
