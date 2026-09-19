@@ -26,6 +26,8 @@ export { computeSignals } from './signals.ts';
 export { collectSubscriptions } from './subscriptions.ts';
 export { collectNotes } from './notes.ts';
 export { collectClasses } from './classes.ts';
+export { collectTimesheets } from './timesheets.ts';
+export type { TimesheetRecord } from './timesheets.ts';
 export type { ClassesRecord } from './classes.ts';
 export { changeNameOf, completedTasks, parseTasks } from './tasks.ts';
 export type { CompletedTask, TaskItem } from './tasks.ts';

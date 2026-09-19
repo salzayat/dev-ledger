@@ -40,6 +40,7 @@ contract.
 | Task velocity (phase one addendum)                | `add-task-velocity`                                           | Complete |
 | Hours and unit economics (phase one addendum)     | `refine-hours-and-unit-economics`                             | Complete |
 | Spec cost classes (phase one addendum)            | `add-spec-cost-classes`                                       | Complete |
+| Timesheets (phase one addendum)                   | `add-timesheets`                                              | Complete |
 | Change audit (phase two)                          | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -208,6 +209,9 @@ as units, and fixes the summary strip.
 The spec cost classes row answers the research against production question: a class declared once per spec
 is inherited by every record citing it, and the class panel carries allocated spend and hours beside
 reported cost.
+
+The timesheets row gives hours the shape a retainer needs: by operator, spec, and month, proposed from
+the records and confirmed by a committed sheet, never priced.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

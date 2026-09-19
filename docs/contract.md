@@ -83,6 +83,12 @@ basis, and is provisional while the period has not closed as of the newest commi
 `.telemetry/classes.json`, written by `telemetry class set`: `schemaVersion` and `classes`, a map from spec
 name to a class in the configured vocabulary. Inherited by every record citing the spec.
 
+## Timesheet (schema version 1)
+
+`.telemetry/timesheets/<yyyy-mm>/<operatorId>.json`, proposed by `telemetry timesheet close`: `schemaVersion`,
+`operatorId` (declared in the configuration), `period`, `bySpec` (confirmed hours by spec, `(none)` for no
+spec), `measuredBySpec`, optional `note`. Rejects the forbidden keys.
+
 ## Note (schema version 1)
 
 `.telemetry/notes/<id>.json`, written by `telemetry note add`: `schemaVersion`, `noteId`, `figure` (one word

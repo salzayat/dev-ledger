@@ -5,6 +5,7 @@ import type { Thresholds } from './registry.ts';
 import type { ChangeSessions, SessionRecord } from './sessions.ts';
 import type { SubscriptionRecord } from './subscriptions.ts';
 import type { CompletedTask } from './tasks.ts';
+import type { TimesheetRecord } from './timesheets.ts';
 import type { Timing } from './timing.ts';
 
 // The flow signals. Every read states the trust classes it used and how many changes it excluded, cites
@@ -229,6 +230,7 @@ export type RepositorySignals = {
   coverage: Coverage;
   allocation: Allocation;
   operators: Operators;
+  hours: Hours;
   /** What the registry declared about where measurement starts and what git cannot see. */
   boundary: {
     measuredFrom: string | null;
@@ -324,6 +326,27 @@ export type HumanOperator = {
   hours: number;
   sessions: number;
   cites: string[];
+};
+
+/** Operator hours by spec and by month, measured from records and confirmed by timesheets, never priced. */
+export type Hours = {
+  trust: string[];
+  byOperator: Record<
+    string,
+    {
+      measured: number;
+      bySpec: Record<string, number>;
+      byMonth: Record<
+        string,
+        { measured: number; confirmed: number | null; timesheet: string | null }
+      >;
+      sessions: number;
+      cites: string[];
+    }
+  >;
+  measured: number;
+  confirmed: number;
+  note: string;
 };
 
 export type Operators = {
@@ -880,6 +903,96 @@ function computeOperators(
 }
 
 /**
+ * Hours by operator, spec, and month. Measured hours come from each record's `operatorActiveSeconds`; a
+ * committed timesheet for the operator and month carries the confirmed figure beside them. Hours are
+ * never multiplied by anything.
+ */
+function computeHours(
+  facts: ChangeFacts[],
+  sessions: Map<string, SessionRecord>,
+  timesheets: TimesheetRecord[],
+): Hours {
+  const hours: Hours = {
+    trust: ['reported'],
+    byOperator: {},
+    measured: 0,
+    confirmed: 0,
+    note: "measured from each record's operator active seconds inside its session window; confirmed is the committed timesheet for that operator and month, proposed by timesheet close and edited by the operator; never priced",
+  };
+  const specOfSession = new Map<string, string>();
+  for (const fact of facts) {
+    const spec =
+      typeof fact.change.trailers.Spec === 'string'
+        ? fact.change.trailers.Spec
+        : null;
+    if (spec) {
+      for (const id of fact.sessions.sessions) {
+        specOfSession.set(id, spec);
+      }
+    }
+  }
+  const round = (value: number) => Math.round(value * 100) / 100;
+  for (const record of [...sessions.values()].sort((a, b) =>
+    a.sessionId.localeCompare(b.sessionId),
+  )) {
+    const file = record.file;
+    if (!file || typeof file.operatorActiveSeconds !== 'number') {
+      continue;
+    }
+    const operator =
+      typeof file.operatorId === 'string'
+        ? file.operatorId
+        : '(no operator identifier)';
+    const spec = specOfSession.get(record.sessionId) ?? file.spec ?? '(none)';
+    const month = file.endedAt.slice(0, 7);
+    const value = file.operatorActiveSeconds / 3600;
+    const entry = (hours.byOperator[operator] ??= {
+      measured: 0,
+      bySpec: {},
+      byMonth: {},
+      sessions: 0,
+      cites: [],
+    });
+    entry.measured = round(entry.measured + value);
+    entry.bySpec[spec] = round((entry.bySpec[spec] ?? 0) + value);
+    const bucket = (entry.byMonth[month] ??= {
+      measured: 0,
+      confirmed: null,
+      timesheet: null,
+    });
+    bucket.measured = round(bucket.measured + value);
+    entry.sessions += 1;
+    entry.cites.push(record.path);
+    hours.measured = round(hours.measured + value);
+  }
+  for (const sheet of timesheets) {
+    if (!sheet.file) {
+      continue;
+    }
+    const entry = (hours.byOperator[sheet.file.operatorId] ??= {
+      measured: 0,
+      bySpec: {},
+      byMonth: {},
+      sessions: 0,
+      cites: [],
+    });
+    const confirmed = round(
+      Object.values(sheet.file.bySpec).reduce((sum, h) => sum + h, 0),
+    );
+    const bucket = (entry.byMonth[sheet.file.period] ??= {
+      measured: 0,
+      confirmed: null,
+      timesheet: null,
+    });
+    bucket.confirmed = confirmed;
+    bucket.timesheet = sheet.path;
+    entry.cites.push(sheet.path);
+    hours.confirmed = round(hours.confirmed + confirmed);
+  }
+  return hours;
+}
+
+/**
  * Subscription spend, allocated by agent run seconds. A session's marginal cost on a subscription is
  * zero and stays zero in its record; what the plan cost is a period fact, apportioned here across the
  * period's sessions. A session with no agent seconds takes no share and is counted, never given zero.
@@ -1094,6 +1207,7 @@ export function computeSignals(
     closedPullRequests: [],
   },
   specClasses: Record<string, string> = {},
+  timesheets: TimesheetRecord[] = [],
 ): RepositorySignals {
   // Changes merged before the instrumentation existed are excluded with that reason, not measured as
   // gaps; a pull request an operator declared closed leaves the queue, because git cannot see closed.
@@ -1116,6 +1230,7 @@ export function computeSignals(
   };
   const allocation = computeAllocation(facts, sessions, subscriptions, now);
   const operators = computeOperators(facts, sessions, allocation);
+  const hours = computeHours(facts, sessions, timesheets);
   const cycleTime = distribution(facts, (timing) => timing.cycleTimeSeconds);
   const waitTime = distribution(facts, (timing) => timing.waitTimeSeconds);
   const nowMs = Date.parse(now);
@@ -2086,6 +2201,7 @@ export function computeSignals(
     operators,
     coverage,
     allocation,
+    hours,
     boundary,
     signals,
   };

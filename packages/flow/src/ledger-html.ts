@@ -289,6 +289,44 @@ function notesPanel(notes: NoteRow[], links: Links): string {
   );
 }
 
+/** Hours by operator and month, measured beside confirmed, with the specs the hours went to. */
+function hoursPanel(hours: RepositorySignals['hours'], links: Links): string {
+  const operators = Object.entries(hours.byOperator);
+  if (operators.length === 0) {
+    return panel(
+      'Hours',
+      '<p class="empty">No operator hours recorded yet.</p>',
+      `${trustBadges(hours.trust)} ${escapeHtml(hours.note)}`,
+    );
+  }
+  const rows = operators
+    .flatMap(([operator, entry]) =>
+      Object.entries(entry.byMonth)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(
+          ([month, bucket]) =>
+            `<tr><td><code>${escapeHtml(operator)}</code></td><td class="mono">${escapeHtml(month)}</td><td class="num">${bucket.measured.toFixed(1)} h</td><td class="num">${bucket.confirmed === null ? '<span class="dim">not closed</span>' : bucket.confirmed.toFixed(1) + ' h'}</td><td>${bucket.timesheet ? cites('timesheet', [bucket.timesheet], links) : '<span class="dim">timesheet close ' + escapeHtml(month) + '</span>'}</td></tr>`,
+        ),
+    )
+    .join('');
+  const specs = operators
+    .map(
+      ([operator, entry]) =>
+        `<p class="help"><code>${escapeHtml(operator)}</code> by spec: ${escapeHtml(
+          Object.entries(entry.bySpec)
+            .sort(([, a], [, b]) => b - a)
+            .map(([spec, h]) => `${spec} ${h.toFixed(1)} h`)
+            .join(', '),
+        )}</p>`,
+    )
+    .join('');
+  return panel(
+    'Hours',
+    `${figure(`${hours.measured.toFixed(1)} h`, `measured; ${hours.confirmed.toFixed(1)} h confirmed by timesheets`)}<div class="scroll"><table><thead><tr><th>operator</th><th>month</th><th class="num">measured</th><th class="num">confirmed</th><th>timesheet</th></tr></thead><tbody>${rows}</tbody></table></div>${specs}`,
+    `${trustBadges(hours.trust)} ${escapeHtml(hours.note)}`,
+  );
+}
+
 // --- Chrome ----------------------------------------------------------------------------------------
 
 export function trustBadges(trust: string[]): string {
@@ -1038,6 +1076,7 @@ ${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, lin
 ${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byProvider)}
 ${spendTable('Spend by model', signals.spend.byModel, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byModel)}
 ${operatorPanel(signals.operators, links)}
+${hoursPanel(signals.hours, links)}
 ${panel(
   'Cost per unit of effort',
   effortRows
