@@ -1,0 +1,7 @@
+{
+  "at": "2026-09-19T06:38:47.481Z",
+  "figure": "queue",
+  "noteId": "closed-44",
+  "schemaVersion": 1,
+  "text": "Pull request #44 was closed without merging; git cannot see closed, so the registry declares it."
+}

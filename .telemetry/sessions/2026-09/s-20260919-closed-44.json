@@ -1,0 +1,28 @@
+{
+  "agentRunSeconds": 119,
+  "billingKind": "subscription",
+  "branch": "flow/declare-closed-44",
+  "cacheReadTokens": 1509413,
+  "cacheWriteTokens": 4005,
+  "cachedTokens": 1513418,
+  "commits": [
+    "859331b2a4b731a4ced2804f83330aad035a63d5"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T06:40:49.398Z",
+  "figuresSource": "summed from 5 messages in the session transcript",
+  "inputTokens": 10,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "not-run"
+  },
+  "model": "claude-opus-5",
+  "operatorId": "op-1",
+  "outputTokens": 2847,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-closed-44",
+  "startedAt": "2026-09-19T06:38:47.388Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 122
+}
