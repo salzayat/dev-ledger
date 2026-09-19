@@ -264,6 +264,7 @@ export function sessionSummary(
 function readTranscriptFigures(
   root: string,
   path: string | undefined,
+  window: { from?: string; to?: string } = {},
 ): Figures | null {
   if (!path) {
     fail('--transcript requires a file path');
@@ -272,7 +273,7 @@ function readTranscriptFigures(
   if (!existsSync(absolute)) {
     return null;
   }
-  return sumTranscriptUsage(readFileSync(absolute, 'utf8'));
+  return sumTranscriptUsage(readFileSync(absolute, 'utf8'), window);
 }
 
 /**
@@ -464,6 +465,7 @@ export function captureMain(argv: string[]): number {
         const figures = readTranscriptFigures(
           root,
           option(args, '--transcript'),
+          { from: option(args, '--from'), to: option(args, '--to') },
         );
         if (!figures) {
           fail(
@@ -529,7 +531,10 @@ export function captureMain(argv: string[]): number {
         // a payload written before the sum can only describe figures it did not have.
         const transcript = option(args, '--transcript');
         if (transcript !== undefined) {
-          const figures = readTranscriptFigures(root, transcript);
+          const figures = readTranscriptFigures(root, transcript, {
+            from: input.startedAt,
+            to: input.endedAt,
+          });
           if (figures) {
             const filled =
               input.inputTokens === undefined ||

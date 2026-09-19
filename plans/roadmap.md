@@ -45,6 +45,7 @@ contract.
 | Zero figures (presentation)                         | `remove-zero-figures`                                         | Complete |
 | Ledger redesign (presentation)                      | `redesign-ledger-presentation`                                | Complete |
 | Capture install (phase one addendum)                | `add-capture-install`                                         | Complete |
+| Transcript token window (defect)                    | `fix-transcript-token-window`                                 | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -228,6 +229,8 @@ deploys, and moves the declared-work gate to the check workflow so it still runs
 
 The capture install row makes the ledger adoptable: capture installs into any repository from the ledger
 checkout, so a team measures its own repositories rather than only this one.
+
+The transcript token window row applies the session window hours already used to the token sum.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

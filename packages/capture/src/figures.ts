@@ -34,14 +34,27 @@ function whole(value: unknown): number {
  * null when no usage record is present, so the caller records the session as missing figures rather than
  * as zeros.
  */
-export function sumTranscriptUsage(text: string): Figures | null {
+export function sumTranscriptUsage(
+  text: string,
+  window: { from?: string; to?: string } = {},
+): Figures | null {
+  // A harness may keep one transcript across many sessions, so with a window only the records timestamped
+  // inside it count; a record with no timestamp cannot be placed and is left out.
+  const windowed = window.from !== undefined || window.to !== undefined;
+  const fromMs = window.from
+    ? Date.parse(window.from)
+    : Number.NEGATIVE_INFINITY;
+  const toMs = window.to ? Date.parse(window.to) : Number.POSITIVE_INFINITY;
   const byId = new Map<string, Usage>();
   const anonymous: Usage[] = [];
   for (const line of text.split('\n')) {
     if (line.trim().length === 0) {
       continue;
     }
-    let record: { message?: { id?: unknown; usage?: Usage } };
+    let record: {
+      timestamp?: unknown;
+      message?: { id?: unknown; usage?: Usage };
+    };
     try {
       record = JSON.parse(line) as typeof record;
     } catch {
@@ -51,6 +64,15 @@ export function sumTranscriptUsage(text: string): Figures | null {
     const usage = message?.usage;
     if (!usage || typeof usage !== 'object') {
       continue;
+    }
+    if (windowed) {
+      const at =
+        typeof record.timestamp === 'string'
+          ? Date.parse(record.timestamp)
+          : NaN;
+      if (Number.isNaN(at) || at < fromMs || at > toMs) {
+        continue;
+      }
     }
     const id = typeof message?.id === 'string' ? message.id : null;
     if (id === null) {

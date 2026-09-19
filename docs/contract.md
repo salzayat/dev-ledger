@@ -78,6 +78,9 @@ The record rejects the same forbidden keys a session file does. The projection a
 carries the trust class `allocated` (the record itself is `reported` with producer `operator`), names its
 basis, and is provisional while the period has not closed as of the newest commit the mirror holds.
 
+Token figures summed from a transcript count only records timestamped inside the session window;
+`session figures --transcript <file>` takes the window as `--from` and `--to`.
+
 `telemetry validate` checks every tracked record with its own schema: session files, period cost records,
 `plans.json`, classes, timesheets, and notes.
 
