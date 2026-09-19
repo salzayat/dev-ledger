@@ -1,0 +1,29 @@
+{
+  "agentRunSeconds": 3000,
+  "billingKind": "subscription",
+  "branch": "refine/hours-unit-economics-ui",
+  "cacheReadTokens": 259039038,
+  "cacheWriteTokens": 2850274,
+  "cachedTokens": 261889312,
+  "commits": [
+    "86e814dd57581064ed448667fbff7af3d86af0d6"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T00:10:03.255Z",
+  "figuresSource": "summed from 496 messages in the session transcript",
+  "inputTokens": 13928,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorId": "op-1",
+  "outputTokens": 878516,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260918-hours-units-ui",
+  "spec": "refine-hours-and-unit-economics",
+  "startedAt": "2026-09-19T00:03:31.152Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 392
+}
