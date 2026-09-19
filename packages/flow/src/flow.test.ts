@@ -1967,3 +1967,84 @@ test('velocity is the relative complexity of tasks completed per week, unweighte
   );
   assert.match(renderLedgerHtml(built.projection), /complexity per week/);
 });
+
+test('unit economics carry an allocated figure per task complexity, and unidentified hours stay visible', () => {
+  const fixture = makeFixtureRepo();
+  // The configuration is read at each change's base, so it lands before the change that needs it.
+  const seed = openPullRequest(fixture, 'seed', [
+    [
+      'feat(seed): seed',
+      {
+        'seed.txt': 's',
+        'telemetry.config.json': JSON.stringify({
+          schemaVersion: 1,
+          costAllocation: {
+            enabled: true,
+            idleCapSeconds: 900,
+            operators: ['op-1'],
+            costClasses: ['rd'],
+          },
+        }),
+      },
+    ],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const period = git(fixture.dir, ['log', '-1', '--format=%cI'])
+    .trim()
+    .slice(0, 7);
+  const work = openPullRequest(fixture, 'work', [
+    [
+      trailered('feat(w): weighted work', {
+        Spec: 'add-w',
+        Session: 's-w',
+        Change: 'c-w',
+      }),
+      {
+        'openspec/changes/add-w/tasks.md':
+          '# Tasks\n- [x] 1.1 ~3 build\n- [x] 1.2 ~5 test\n',
+        '.telemetry/sessions/x/s-w.json': sessionJson('s-w', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-max',
+          costUsd: 0,
+          startedAt: `${period}-02T09:00:00Z`,
+          endedAt: `${period}-02T10:00:00Z`,
+          agentRunSeconds: 1200,
+          operatorActiveSeconds: 1800,
+          operatorActiveAlgorithm: 'prompt-attribution-v1:900',
+          operatorId: null,
+          spec: 'add-w',
+        }),
+        [`.telemetry/subscriptions/${period}/plan-max.json`]: subscriptionJson(
+          'plan-max',
+          period,
+          16,
+        ),
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    work,
+    'feat(w): weighted work',
+    'Spec: add-w\nSession: s-w',
+  );
+  const built = build(registryFor(fixture.dir));
+  const signals = built.repo.signals!;
+  const unit = signals.spend.perEffortUnit.taskComplexity;
+  assert.equal(unit.allocatedPerUnit, 2, '$16 over complexity 8');
+  assert.equal(unit.costPerUnit, 0, 'reported stays zero, never summed');
+  assert.equal(unit.currency, 'USD');
+  assert.equal(signals.spend.perEffortUnit.tasks.allocatedPerUnit, 8);
+  assert.equal(signals.spend.perMergedChange.allocated, 16);
+  const humans = signals.operators.humans;
+  assert.ok(
+    humans['(no operator identifier)'],
+    'hours without an identifier stay on the page',
+  );
+  assert.equal(humans['(no operator identifier)'].hours, 0.5);
+  const html = renderLedgerHtml(built.projection);
+  assert.match(html, /\(provisional\)/);
+  assert.doesNotMatch(html, /\$16\.00 ~/);
+  assert.match(html, /reported spend/);
+  assert.match(html, /allocated per unit/);
+});

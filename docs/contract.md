@@ -183,7 +183,8 @@ rate, time to fix, each with its approximation note), `trends.weekly`, `costClas
 `allocation` (the subscription periods, each session's share, aggregates per currency, and the excluded
 counts, all under trust `allocated` with basis `agentRunSeconds`). Each change carries `tasks`, the
 OpenSpec tasks it completed with their `~N` weight or `null`; each weekly bucket carries `tasks`,
-`complexity`, and `unweightedTasks`, and `velocity` reports complexity per week.
+`complexity`, and `unweightedTasks`, and `velocity` reports complexity per week. Every cost-per figure carries `costUsd` (reported) and
+`allocated` with `currency`; effort units include `tasks` and `taskComplexity`.
 
 Each change carries its identity (the last commit on the default branch), `kind`, `commits`,
 `association` (`pullRequest`, `method`: `subject`, `pull-head`, or `patch-identity`, and `classification`:

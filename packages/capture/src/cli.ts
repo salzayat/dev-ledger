@@ -264,6 +264,7 @@ function readTranscriptAttribution(
   root: string,
   path: string | undefined,
   idleCapSeconds: number,
+  window: { from?: string; to?: string } = {},
 ): TimeAttribution | null {
   if (!path) {
     return null;
@@ -272,7 +273,18 @@ function readTranscriptAttribution(
   if (!existsSync(absolute)) {
     return null;
   }
-  const events = transcriptEvents(readFileSync(absolute, 'utf8'));
+  // A harness may keep one transcript across many sessions, so only the events inside this session's
+  // own window count; otherwise every record would carry the whole day's hours.
+  const fromMs = window.from
+    ? Date.parse(window.from)
+    : Number.NEGATIVE_INFINITY;
+  const toMs = window.to ? Date.parse(window.to) : Number.POSITIVE_INFINITY;
+  const events = transcriptEvents(readFileSync(absolute, 'utf8')).filter(
+    (event) => {
+      const at = Date.parse(event.timestamp);
+      return at >= fromMs && at <= toMs;
+    },
+  );
   if (events.filter((event) => event.kind === 'prompt').length < 2) {
     return null;
   }
@@ -522,6 +534,7 @@ export function captureMain(argv: string[]): number {
               root,
               transcript,
               config.costAllocation.idleCapSeconds,
+              { from: input.startedAt, to: input.endedAt },
             );
             if (attribution !== null) {
               input.operatorActiveSeconds = attribution.operatorActiveSeconds;
@@ -540,6 +553,9 @@ export function captureMain(argv: string[]): number {
             ]).trim();
           } catch {
             input.operatorId = null;
+            process.stderr.write(
+              'telemetry: cost allocation is enabled but no operator is configured; hours are recorded without an identifier. Set one with: git config telemetry.operator <declared-id>\n',
+            );
           }
         }
         const file = buildSessionFile(input, config);

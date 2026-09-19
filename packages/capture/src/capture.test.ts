@@ -1135,3 +1135,79 @@ test('a note validates, rejects a rate, and is written by the command', () => {
     /1 records valid/,
   );
 });
+
+test('session end attributes only the transcript events inside the session window', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  writeFileSync(
+    join(dir, 'telemetry.config.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: ['op-1'],
+        costClasses: ['rd'],
+      },
+    }),
+  );
+  const line = (t: string, type: 'user' | 'assistant', content: unknown) =>
+    JSON.stringify({
+      type,
+      timestamp: t,
+      message: {
+        content,
+        ...(type === 'assistant'
+          ? { usage: { input_tokens: 1, output_tokens: 1 }, id: `m-${t}` }
+          : {}),
+      },
+    });
+  // Two prompts an hour apart before the window, and two ten minutes apart inside it.
+  writeFileSync(
+    join(dir, 'transcript.jsonl'),
+    [
+      line('2026-09-01T06:00:00Z', 'user', 'early'),
+      line('2026-09-01T07:00:00Z', 'user', 'early two'),
+      line('2026-09-01T09:00:00Z', 'user', 'inside'),
+      line('2026-09-01T09:05:00Z', 'assistant', [{ type: 'text', text: 'ok' }]),
+      line('2026-09-01T09:10:00Z', 'user', 'inside two'),
+    ].join('\n'),
+  );
+  writeFileSync(
+    join(dir, 'payload.json'),
+    JSON.stringify({
+      sessionId: 's-window',
+      provider: 'provider-a',
+      model: 'model-x',
+      figuresSource: '',
+      startedAt: '2026-09-01T08:55:00Z',
+      endedAt: '2026-09-01T09:15:00Z',
+      billingKind: 'subscription',
+      subscriptionId: 'plan',
+      branch: 'work',
+      commits: [],
+      localCheck: { outcome: 'passed', command: 'npm run check' },
+    }),
+  );
+  const written = execFileSync(
+    process.execPath,
+    [
+      '--experimental-strip-types',
+      cli,
+      'session',
+      'end',
+      '--payload',
+      'payload.json',
+      '--transcript',
+      'transcript.jsonl',
+      '--no-commit',
+    ],
+    { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+  ).trim();
+  const record = JSON.parse(readFileSync(join(dir, written), 'utf8'));
+  assert.ok(
+    record.operatorActiveSeconds <= 600,
+    `inside the window only: ${record.operatorActiveSeconds}`,
+  );
+  assert.ok(record.operatorActiveSeconds > 0);
+});

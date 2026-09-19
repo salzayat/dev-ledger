@@ -1,0 +1,8 @@
+{
+  "at": "2026-09-18T22:00:00Z",
+  "figure": "operators",
+  "noteId": "early-hours-inflated",
+  "period": "2026-09",
+  "schemaVersion": 1,
+  "text": "The first records with operator hours attributed a transcript shared across sessions, so each carries most of a day; hours are windowed to the session since."
+}
