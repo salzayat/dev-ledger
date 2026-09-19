@@ -305,7 +305,7 @@ the command that sets one.
 Every cost-per figure carries reported cost and allocated cost side by side and never sums them. On a
 subscription the reported column reads zero and the allocated column carries the number. The units include
 `tasks` and `taskComplexity` from each change's task list, so cost per unit of declared work needs no
-story points.
+story points. The terminal render prints both columns on each cost-per line.
 
 ## Signals, not findings
 
