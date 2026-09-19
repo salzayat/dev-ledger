@@ -42,6 +42,7 @@ contract.
 | Spec cost classes (phase one addendum)              | `add-spec-cost-classes`                                       | Complete |
 | Timesheets (phase one addendum)                     | `add-timesheets`                                              | Complete |
 | Registry rollup and statements (phase one addendum) | `add-registry-rollup-and-statements`                          | Complete |
+| Zero figures (presentation)                         | `remove-zero-figures`                                         | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -216,6 +217,9 @@ the records and confirmed by a committed sheet, never priced.
 
 The registry rollup and statements row completes the multi-repository read the contract promised and
 writes the month as rows for finance or a client, each row scoped as a period or window fact.
+
+The zero figures row makes the page keep the rule its records keep: a structural zero reads as absence,
+and only a measured zero reads as a count.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

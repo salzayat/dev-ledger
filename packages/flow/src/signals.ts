@@ -445,6 +445,8 @@ export type WeeklyBucket = {
   withoutPoints: number;
   changes: number;
   costUsd: number;
+  /** Allocated subscription share of the changes merged that week, summed across currencies. */
+  allocated: number;
   sessions: number;
   cites: string[];
 };
@@ -1674,6 +1676,7 @@ export function computeSignals(
       const week = new Date(cursor).toISOString().slice(0, 10);
       weeklyMap.set(week, {
         week,
+        allocated: 0,
         tasks: 0,
         complexity: 0,
         unweightedTasks: 0,
@@ -1707,6 +1710,15 @@ export function computeSignals(
         bucket.costUsd =
           Math.round((bucket.costUsd + changeSpend.costUsd) * 1e6) / 1e6;
         bucket.sessions += changeSpend.sessions;
+      }
+      for (const aggregates of Object.values(allocation.currencies)) {
+        const share = aggregates.byChange[fact.change.id];
+        if (share) {
+          bucket.allocated =
+            Math.round(
+              (bucket.allocated + share.amount + share.overage) * 1e6,
+            ) / 1e6;
+        }
       }
     }
   }

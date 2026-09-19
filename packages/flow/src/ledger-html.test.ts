@@ -475,3 +475,70 @@ test('operator notes render on the records tab, dated and cited', () => {
   assert.match(html, /template history from before the hooks existed/);
   assert.match(html, /\.telemetry\/notes\/template-history\.json/);
 });
+
+test('a subscription-only repository shows no currency zero anywhere on the page', () => {
+  const fixture = makeFixtureRepo();
+  const seed = openPullRequest(fixture, 'seed', [
+    ['feat(seed): seed', { 'seed.txt': 's' }],
+  ]);
+  mergeSquash(fixture, seed, 'feat(seed): seed');
+  const period = execFileSync('git', ['log', '-1', '--format=%cI'], {
+    cwd: fixture.dir,
+    encoding: 'utf8',
+  })
+    .trim()
+    .slice(0, 7);
+  const pull = openPullRequest(fixture, 'sub', [
+    [
+      trailered('feat(sub): on a plan', {
+        Spec: 'add-sub',
+        Session: 's-sub',
+        Change: 'c-s',
+      }),
+      {
+        'sub.txt': 's',
+        '.telemetry/sessions/x/s-sub.json': sessionJson('s-sub', {
+          billingKind: 'subscription',
+          subscriptionId: 'plan-max',
+          costUsd: 0,
+          startedAt: `${period}-02T09:00:00Z`,
+          endedAt: `${period}-02T10:00:00Z`,
+          agentRunSeconds: 1200,
+        }),
+        [`.telemetry/subscriptions/${period}/plan-max.json`]: subscriptionJson(
+          'plan-max',
+          period,
+          200,
+        ),
+      },
+    ],
+  ]);
+  mergeSquash(
+    fixture,
+    pull,
+    'feat(sub): on a plan',
+    'Spec: add-sub\nSession: s-sub',
+  );
+  const registry = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [{ name: 'fixture', url: fixture.dir }],
+    }),
+  ).registry;
+  const state = mkdtempSync(join(tmpdir(), 'dev-ledger-nozero-'));
+  syncAll(state, registry);
+  const projection = buildProjection(state, registry);
+  const html = renderLedgerHtml(projection);
+  assert.doesNotMatch(html, /\$0\.00\b/);
+  assert.doesNotMatch(html, /0\.0 h confirmed/);
+  assert.match(html, /none reported/);
+  assert.match(html, /allocated across 1 week/);
+  assert.match(
+    html,
+    /none confirmed by a timesheet yet|No operator hours recorded yet/,
+  );
+  assert.equal(
+    projection.repositories.fixture.signals!.trends.weekly[0].allocated,
+    200,
+  );
+});
