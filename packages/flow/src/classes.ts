@@ -12,6 +12,8 @@ export type ClassesRecord = {
   valid: boolean;
   errors: string[];
   classes: Record<string, string>;
+  /** The repository's declared default class, or null when none is declared. */
+  default: string | null;
 };
 
 export function collectClasses(
@@ -19,25 +21,31 @@ export function collectClasses(
   branch: string,
   config: TelemetryConfig,
 ): ClassesRecord {
+  const empty = { path: CLASSES_PATH, classes: {}, default: null };
   const text = readBlob(dir, branch, CLASSES_PATH);
   if (text === null) {
-    return { path: CLASSES_PATH, valid: true, errors: [], classes: {} };
+    return { ...empty, valid: true, errors: [] };
   }
   try {
-    const parsed = JSON.parse(text) as { classes?: Record<string, string> };
-    const errors = validateClassesFile(parsed, config);
-    return {
-      path: CLASSES_PATH,
-      valid: errors.length === 0,
-      errors,
-      classes: errors.length === 0 ? (parsed.classes ?? {}) : {},
+    const parsed = JSON.parse(text) as {
+      classes?: Record<string, string>;
+      default?: string;
     };
+    const errors = validateClassesFile(parsed, config);
+    return errors.length === 0
+      ? {
+          path: CLASSES_PATH,
+          valid: true,
+          errors,
+          classes: parsed.classes ?? {},
+          default: parsed.default ?? null,
+        }
+      : { ...empty, valid: false, errors };
   } catch (error) {
     return {
-      path: CLASSES_PATH,
+      ...empty,
       valid: false,
       errors: [`classes file is not valid JSON: ${(error as Error).message}`],
-      classes: {},
     };
   }
 }

@@ -46,6 +46,8 @@ contract.
 | Ledger redesign (presentation)                      | `redesign-ledger-presentation`                                | Complete |
 | Capture install (phase one addendum)                | `add-capture-install`                                         | Complete |
 | Transcript token window (defect)                    | `fix-transcript-token-window`                                 | Complete |
+| Default cost class (phase one addendum)             | `add-default-cost-class`                                      | Complete |
+| Default cost class (phase one addendum)             | `add-default-cost-class`                                      | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -231,6 +233,12 @@ The capture install row makes the ledger adoptable: capture installs into any re
 checkout, so a team measures its own repositories rather than only this one.
 
 The transcript token window row applies the session window hours already used to the token sum.
+
+The default cost class row lets a repository declare its class once, so new specs and work citing no spec
+stop reading unclassified.
+
+The default cost class row lets a repository declare its class once, so new specs and work citing no spec
+stop reading unclassified.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
