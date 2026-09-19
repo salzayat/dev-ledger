@@ -322,6 +322,14 @@ than one repository. `telemetry export --period YYYY-MM` writes the month as row
 are period facts, classes, specs, and velocity are window facts, and each row says which and names its
 trust class, so a spreadsheet never adds the two kinds by accident.
 
+## A zero is a measurement, never an absence
+
+Missing figures are counted, never read as zero, and the page holds itself to the same rule. A reported
+cost on a subscription is fixed at zero by the contract, so it reads "none reported" and the tokens lead;
+the spend chart leads with the allocated share and says so. Hours nobody has confirmed, exclusions that did
+not happen, and units no change recorded read as absence in words. The one zero the page prints as a
+count is a measurement: none, as in no escapes after the release.
+
 ## Signals, not findings
 
 A signal is a read that crossed a threshold declared in `registry.json`, with the changes behind it. It

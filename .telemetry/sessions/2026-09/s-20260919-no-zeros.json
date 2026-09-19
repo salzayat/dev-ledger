@@ -1,0 +1,29 @@
+{
+  "agentRunSeconds": 1800,
+  "billingKind": "subscription",
+  "branch": "ledger/no-zero-figures",
+  "cacheReadTokens": 305837700,
+  "cacheWriteTokens": 2965238,
+  "cachedTokens": 308802938,
+  "commits": [
+    "a303780d9450840f40af8e1adc1f48aa0bdc92fc"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T01:48:49.236Z",
+  "figuresSource": "summed from 550 messages in the session transcript",
+  "inputTokens": 15532,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "passed"
+  },
+  "model": "claude-fable-5-1",
+  "operatorId": "op-1",
+  "outputTokens": 979552,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-no-zeros",
+  "spec": "remove-zero-figures",
+  "startedAt": "2026-09-19T01:40:37.013Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 492
+}

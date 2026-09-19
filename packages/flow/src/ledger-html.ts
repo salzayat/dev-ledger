@@ -104,11 +104,31 @@ function sessionRef(id: string, links: Links): string {
     : href(links, `blob/${links.branch}/${path}`, id);
 }
 
-/** A spend cell: the figure when the records carry one, and otherwise what the records actually say. */
+/** A reported cost: the figure when one was reported, "none" when every contributing session was on a subscription. */
+function reportedCost(costUsd: number, sessions: number): string {
+  if (sessions === 0) {
+    return '<span class="dim">none</span>';
+  }
+  return costUsd > 0
+    ? `$${costUsd.toFixed(2)}`
+    : '<span class="dim">none reported</span>';
+}
+
+/** A spend cell: the tokens the records carry, the reported cost when there is one, never a zero. */
 function spendCell(spend: Spend | undefined, absent: string): string {
-  return spend && spend.sessions > 0
-    ? `$${spend.costUsd.toFixed(2)} <span class="dim">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')} tok</span>`
-    : `<span class="dim">${escapeHtml(absent)}</span>`;
+  if (!spend || spend.sessions === 0) {
+    return `<span class="dim">${escapeHtml(absent)}</span>`;
+  }
+  const tokens = `<span class="dim">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')} tok</span>`;
+  return spend.costUsd > 0 ? `$${spend.costUsd.toFixed(2)} ${tokens}` : tokens;
+}
+
+/** Excluded counts, without the zeros: an exclusion that did not happen is not a figure. */
+function nonZero(parts: [number, string][]): string {
+  const kept = parts
+    .filter(([n]) => n > 0)
+    .map(([n, label]) => `${n} ${label}`);
+  return kept.length ? kept.join(', ') : 'none';
 }
 
 /**
@@ -134,6 +154,14 @@ function money(amount: number, currency: string): string {
   return currency === 'USD'
     ? `$${amount.toFixed(2)}`
     : `${amount.toFixed(2)} ${currency}`;
+}
+
+/** Money that may be far below a cent per unit: shown to four places when two would round to nothing. */
+function preciseMoney(amount: number, currency: string): string {
+  const digits = amount > 0 && amount < 0.01 ? 4 : 2;
+  return currency === 'USD'
+    ? `$${amount.toFixed(digits)}`
+    : `${amount.toFixed(digits)} ${currency}`;
 }
 
 /** The allocated share beside a reported figure, marked when its period has not closed. */
@@ -221,7 +249,7 @@ function allocationPanel(allocation: Allocation, links: Links): string {
   const rows = allocation.periods
     .map(
       (period) =>
-        `<tr><td class="mono">${escapeHtml(period.period)}</td><td><code>${escapeHtml(period.planId)}</code></td><td class="num">${escapeHtml(money(period.amount, period.currency))}</td><td class="num">${escapeHtml(money(period.overageAmount, period.currency))}</td><td class="num">${period.allocated}</td><td class="num">${period.excludedNoAgentSeconds}</td><td>${period.unallocated ? '<span class="warn">unallocated</span>' : period.provisional ? '<span class="dim">provisional</span>' : 'closed'}</td><td>${cites('records', period.cites, links)}</td></tr>`,
+        `<tr><td class="mono">${escapeHtml(period.period)}</td><td><code>${escapeHtml(period.planId)}</code></td><td class="num">${escapeHtml(money(period.amount, period.currency))}</td><td class="num">${period.overageAmount > 0 ? escapeHtml(money(period.overageAmount, period.currency)) : '<span class="dim">none</span>'}</td><td class="num">${period.allocated}</td><td class="num">${period.excludedNoAgentSeconds}</td><td>${period.unallocated ? '<span class="warn">unallocated</span>' : period.provisional ? '<span class="dim">provisional</span>' : 'closed'}</td><td>${cites('records', period.cites, links)}</td></tr>`,
     )
     .join('');
   const excluded = allocation.excluded;
@@ -322,7 +350,7 @@ function hoursPanel(hours: RepositorySignals['hours'], links: Links): string {
     .join('');
   return panel(
     'Hours',
-    `${figure(`${hours.measured.toFixed(1)} h`, `measured; ${hours.confirmed.toFixed(1)} h confirmed by timesheets`)}<div class="scroll"><table><thead><tr><th>operator</th><th>month</th><th class="num">measured</th><th class="num">confirmed</th><th>timesheet</th></tr></thead><tbody>${rows}</tbody></table></div>${specs}`,
+    `${figure(`${hours.measured.toFixed(1)} h`, hours.confirmed > 0 ? `measured; ${hours.confirmed.toFixed(1)} h confirmed by timesheets` : 'measured; none confirmed by a timesheet yet')}<div class="scroll"><table><thead><tr><th>operator</th><th>month</th><th class="num">measured</th><th class="num">confirmed</th><th>timesheet</th></tr></thead><tbody>${rows}</tbody></table></div>${specs}`,
     `${trustBadges(hours.trust)} ${escapeHtml(hours.note)}`,
   );
 }
@@ -564,7 +592,8 @@ function spendRow(
   links: Links,
   allocated: string,
 ): string {
-  return `<tr><td>${escapeHtml(label)}</td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num nowrap">${allocated.trim() || '<span class="dim">none</span>'}</td><td class="num">${(spend.inputTokens + spend.outputTokens).toLocaleString('en-US')}</td><td class="num">${spend.cachedTokens.toLocaleString('en-US')}</td><td class="num">${spend.sessions}</td><td>${cites('records', spend.cites, links)}</td></tr>`;
+  const blank = '<span class="dim">–</span>';
+  return `<tr><td>${escapeHtml(label)}</td><td class="num">${spend.costUsd > 0 ? meter(spend.costUsd, largest) : ''}${reportedCost(spend.costUsd, spend.sessions)}</td><td class="num nowrap">${allocated.trim() || '<span class="dim">none</span>'}</td><td class="num">${spend.sessions > 0 ? (spend.inputTokens + spend.outputTokens).toLocaleString('en-US') : blank}</td><td class="num">${spend.sessions > 0 ? spend.cachedTokens.toLocaleString('en-US') : blank}</td><td class="num">${spend.sessions > 0 ? spend.sessions : blank}</td><td>${cites('records', spend.cites, links)}</td></tr>`;
 }
 
 function spendTable(
@@ -968,15 +997,29 @@ function spendOverTime(trends: RepositorySignals['trends']): string {
       trustBadges(['reported']),
     );
   }
-  const total = weeks.reduce((sum, week) => sum + week.costUsd, 0);
-  const peak = Math.max(...weeks.map((week) => week.costUsd));
+  const reported = weeks.reduce((sum, week) => sum + week.costUsd, 0);
+  const allocated = weeks.reduce((sum, week) => sum + week.allocated, 0);
+  // Reported cost leads when there is any; on a subscription there is none, so the allocated share leads
+  // and the badge says so. Neither is ever drawn as a zero.
+  const useAllocated = reported === 0 && allocated > 0;
+  const pick = (week: WeeklyBucket) =>
+    useAllocated ? week.allocated : week.costUsd;
+  const total = useAllocated ? allocated : reported;
+  if (total === 0) {
+    return panel(
+      'Spend over time',
+      '<p class="empty">No cost reported or allocated yet.</p>',
+      trustBadges(['reported', 'allocated']),
+    );
+  }
+  const peak = Math.max(...weeks.map(pick));
   return panel(
     'Spend over time',
-    `${figure(`$${total.toFixed(2)}`, `across ${count(weeks.length, 'week')}; busiest week $${peak.toFixed(2)}`)}${columnChart(
-      weeks.map((week) => ({ label: week.week.slice(5), value: week.costUsd })),
-      'session cost per week',
+    `${figure(`$${total.toFixed(2)}`, `${useAllocated ? 'allocated' : 'reported'} across ${count(weeks.length, 'week')}; busiest week $${peak.toFixed(2)}`)}${columnChart(
+      weeks.map((week) => ({ label: week.week.slice(5), value: pick(week) })),
+      `${useAllocated ? 'allocated' : 'reported'} cost per week`,
     )}<p class="help">${escapeHtml(trends.note)}.</p>`,
-    trustBadges(['reported']),
+    trustBadges([useAllocated ? 'allocated' : 'reported']),
   );
 }
 
@@ -992,7 +1035,7 @@ function costClassPanel(
   const rows = entries
     .map(
       ([name, spend]) =>
-        `<tr><td><code>${escapeHtml(name)}</code></td><td class="num">${meter(spend.costUsd, largest)}$${spend.costUsd.toFixed(2)}</td><td class="num">${spend.allocated > 0 ? escapeHtml(money(spend.allocated, spend.currency ?? 'USD')) : '<span class="dim">none</span>'}</td><td class="num">${spend.hours > 0 ? spend.hours.toFixed(1) + ' h' : '<span class="dim">none</span>'}</td><td class="num">${spend.sessions}</td><td class="num">${spend.missingFigures}</td><td class="dim">${escapeHtml(
+        `<tr><td><code>${escapeHtml(name)}</code></td><td class="num">${spend.costUsd > 0 ? meter(spend.costUsd, largest) : ''}${reportedCost(spend.costUsd, spend.sessions)}</td><td class="num">${spend.allocated > 0 ? escapeHtml(money(spend.allocated, spend.currency ?? 'USD')) : '<span class="dim">none</span>'}</td><td class="num">${spend.hours > 0 ? spend.hours.toFixed(1) + ' h' : '<span class="dim">none</span>'}</td><td class="num">${spend.sessions}</td><td class="num">${spend.missingFigures}</td><td class="dim">${escapeHtml(
           Object.entries(spend.sources)
             .map(([source, n]) => `${n} ${source}`)
             .join(', '),
@@ -1039,7 +1082,11 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
     ['allocated', allocatedTotal(signals.allocation), 'allocated'],
     [
       'reported spend',
-      `$${signals.spend.total.costUsd.toFixed(2)}`,
+      signals.spend.total.costUsd > 0
+        ? `$${signals.spend.total.costUsd.toFixed(2)}`
+        : signals.spend.total.sessions > 0
+          ? 'subscription'
+          : 'none',
       'reported',
     ],
     ['out-of-band', `${outOfBand.length}`, 'observed'],
@@ -1087,11 +1134,17 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
       return `<tr><td>${pullRef(entry.number, links)}</td><td class="num">${escapeHtml(seconds(entry.age))}</td><td class="num">${entry.commits}</td><td class="num nowrap">${spendCell(perPull?.spend, absent)}${allocatedCell(signals.allocation, (aggregates) => aggregates.perUnmergedPullRequest[String(entry.number)])}</td><td class="num nowrap">${hoursCell(perPull?.spend)}</td><td class="num">${perPull?.spend.sessions ?? 0}</td><td class="mono">${escapeHtml(dateOnly(entry.oldestCommitAt))}</td><td>${records}</td></tr>`;
     })
     .join('');
-  const excludedLine = `${excluded.undeclared} undeclared, ${excluded.unreported} unreported, ${excluded.humanOnly} human-only, ${excluded.invalidSession} invalid, ${excluded.missingFigures} with figures missing`;
+  const excludedLine = nonZero([
+    [excluded.undeclared, 'undeclared'],
+    [excluded.unreported, 'unreported'],
+    [excluded.humanOnly, 'human-only'],
+    [excluded.invalidSession, 'invalid'],
+    [excluded.missingFigures, 'with figures missing'],
+  ]);
   const effortRows = Object.values(signals.spend.perEffortUnit)
     .map(
       (unit) =>
-        `<tr><td>${escapeHtml(unit.unit)}</td><td class="num">${unit.allocatedPerUnit === null ? '<span class="dim">none</span>' : escapeHtml(money(unit.allocatedPerUnit, unit.currency ?? 'USD'))}</td><td class="num">${unit.costPerUnit === null ? 'n/a' : '$' + unit.costPerUnit.toFixed(4)}</td><td class="num">${unit.changes}</td><td class="num">${unit.excluded}</td><td>${cites('changes', unit.cites, links)}</td></tr>`,
+        `<tr><td>${escapeHtml(unit.unit)}</td><td class="num">${unit.allocatedPerUnit === null ? '<span class="dim">none</span>' : escapeHtml(preciseMoney(unit.allocatedPerUnit, unit.currency ?? 'USD'))}</td><td class="num">${unit.costPerUnit === null || unit.costPerUnit === 0 ? '<span class="dim">none</span>' : '$' + unit.costPerUnit.toFixed(4)}</td><td class="num">${unit.changes > 0 ? unit.changes : '<span class="dim">none</span>'}</td><td class="num">${unit.excluded}</td><td>${cites('changes', unit.cites, links)}</td></tr>`,
     )
     .join('');
   const checks = Object.entries(signals.localChecks)
@@ -1099,7 +1152,10 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
     .join(', ');
   const recentDiffs = [...changes].slice(-24);
   const unmergedExcluded = signals.spend.unmergedPullRequests.excluded;
-  const excludedUnmerged = `${unmergedExcluded.missingFigures} with figures missing, ${unmergedExcluded.invalidSession} unreadable`;
+  const excludedUnmerged = nonZero([
+    [unmergedExcluded.missingFigures, 'with figures missing'],
+    [unmergedExcluded.invalidSession, 'unreadable'],
+  ]);
   const tab = (name: string) => `${label}-${name}`;
   return `${open}${heading}
 <p class="asof">Measured as of ${escapeHtml(dateOnly(repository.asOf))}, the newest commit the mirror holds. Merge times are the merging party's clock.</p>
@@ -1119,7 +1175,14 @@ ${meteredRatePanel(signals.meteredRates, links)}
 ${costClassPanel(signals.costClasses, signals.coverage, links)}
 ${panel(
   'Spend',
-  `${figure(`$${signals.spend.total.costUsd.toFixed(2)}`, `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens over ${signals.spend.total.sessions} sessions with figures`)}${cites('records', signals.spend.total.cites, links)}`,
+  `${figure(
+    signals.spend.total.costUsd > 0
+      ? `$${signals.spend.total.costUsd.toFixed(2)}`
+      : `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens`,
+    signals.spend.total.costUsd > 0
+      ? `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens over ${signals.spend.total.sessions} sessions with figures`
+      : `over ${signals.spend.total.sessions} sessions with figures; no reported cost, every session is on a subscription`,
+  )}${cites('records', signals.spend.total.cites, links)}`,
   `${trustBadges(signals.spend.trust)} excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
 )}
 </div>
@@ -1141,8 +1204,10 @@ ${
     ? panel(
         'Spend on unmerged pull requests',
         `${figure(
-          `$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`,
-          `over ${count(signals.spend.unmergedPullRequests.sessions, 'session')} with figures, across ${count(Object.keys(signals.spend.perUnmergedPullRequest).length, 'pull request')}`,
+          signals.spend.unmergedPullRequests.costUsd > 0
+            ? `$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`
+            : `${(signals.spend.unmergedPullRequests.inputTokens + signals.spend.unmergedPullRequests.outputTokens).toLocaleString('en-US')} tokens`,
+          `over ${count(signals.spend.unmergedPullRequests.sessions, 'session')} with figures, across ${count(Object.keys(signals.spend.perUnmergedPullRequest).length, 'pull request')}${signals.spend.unmergedPullRequests.costUsd > 0 ? '' : '; no reported cost'}`,
         )}${cites('records', signals.spend.unmergedPullRequests.cites, links)}`,
         `${trustBadges(['reported'])} excluded: ${escapeHtml(excludedUnmerged)} (counted, never zeroed)`,
       )
@@ -1161,7 +1226,7 @@ ${panel(
       ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th class="num">spend</th><th class="num">man hours</th><th class="num">sessions</th><th>oldest commit</th><th>records</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
       : '<p class="empty">Nothing waiting.</p>'
   }`,
-  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report. ${escapeHtml(`${signals.abandonment.count} older than ${seconds(signals.abandonment.afterSeconds)}, carrying ${signals.abandonment.tokens.toLocaleString('en-US')} tokens${signals.abandonment.withoutFigures ? ` and ${signals.abandonment.withoutFigures} records without figures` : ''}`)}`,
+  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report. ${escapeHtml(signals.abandonment.count === 0 ? `none older than ${seconds(signals.abandonment.afterSeconds)}` : `${signals.abandonment.count} older than ${seconds(signals.abandonment.afterSeconds)}, carrying ${signals.abandonment.tokens.toLocaleString('en-US')} tokens${signals.abandonment.withoutFigures ? ` and ${signals.abandonment.withoutFigures} records without figures` : ''}`)}`,
 )}
 ${panel(
   'Population',
@@ -1213,7 +1278,7 @@ ${panel(
 )}
 ${panel(
   'Escapes',
-  `${figure(String(signals.escapes.changes.length), `reverts or fixes after ${escapeHtml(signals.escapes.release ?? 'no release')} touching released files`)}${cites(
+  `${figure(signals.escapes.changes.length === 0 ? 'none' : String(signals.escapes.changes.length), `reverts or fixes after ${escapeHtml(signals.escapes.release ?? 'no release')} touching released files`)}${cites(
     'changes',
     signals.escapes.changes.map((entry) => entry.change),
     links,
