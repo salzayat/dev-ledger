@@ -362,11 +362,12 @@ test('views need no script and no form, come in two levels, and separate DORA fr
     'metrics-throughput',
     'economics-spend',
     'economics-effort',
+    'economics-shipped',
     'records-changes',
     'records-queue',
     'records-notes',
   ];
-  assert.equal(tabIds.length, views.length, 'eight sub-views per repository');
+  assert.equal(tabIds.length, views.length, 'nine sub-views per repository');
   for (const name of views) {
     assert.ok(
       tabIds.some((id) => id.endsWith(`-${name}`)),
@@ -392,11 +393,11 @@ test('views need no script and no form, come in two levels, and separate DORA fr
   // The parent marks itself current from its children's targets, and the sub-row shows on the same rule.
   assert.match(
     html,
-    /body:has\(#fixture-heading-economics-spend:target, #fixture-heading-economics-effort:target\) nav\.tabs a\.top\[href="#fixture-heading-economics-spend"\]/,
+    /body:has\(#fixture-heading-economics-spend:target, #fixture-heading-economics-effort:target, #fixture-heading-economics-shipped:target\) nav\.tabs a\.top\[href="#fixture-heading-economics-spend"\]/,
   );
   assert.match(
     html,
-    /body:has\(#fixture-heading-economics-spend:target, #fixture-heading-economics-effort:target\) nav\.tabs \.row\.sub-economics/,
+    /body:has\(#fixture-heading-economics-spend:target, #fixture-heading-economics-effort:target, #fixture-heading-economics-shipped:target\) nav\.tabs \.row\.sub-economics/,
   );
 
   // DORA and flow are different sub-views, not two groups in one scroll.
@@ -415,6 +416,8 @@ test('views need no script and no form, come in two levels, and separate DORA fr
   assert.doesNotMatch(section('metrics-flow'), /Lead time to release/);
   assert.match(section('metrics-throughput'), /Merge frequency/);
   assert.match(section('economics-effort'), /Cost per unit of effort/);
+  assert.match(section('economics-shipped'), /Shipped, pending, discarded/);
+  assert.match(section('economics-shipped'), /What each release kept/);
   assert.match(section('records-queue'), /Unmerged queue/);
 
   // One view renders without a fragment, chosen by CSS rather than by a script, and is last in the document.

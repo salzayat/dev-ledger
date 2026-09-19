@@ -39,6 +39,7 @@ import {
   type ChangeFacts,
   type RepositorySignals,
 } from './signals.ts';
+import { computeSurvival } from './survival.ts';
 import { mirrorPath, refTips } from './sync.ts';
 import { timingFor } from './timing.ts';
 
@@ -247,6 +248,12 @@ export function buildRepositoryProjection(
     changes,
     previousTagTargets,
   );
+  const survival = computeSurvival(
+    dir,
+    releaseView.releases,
+    changes,
+    entry.reworkIgnore,
+  );
   const releaseDates = new Map(
     [
       ...readCommits(
@@ -333,6 +340,14 @@ export function buildRepositoryProjection(
       tag: release.tag,
       changes: release.changes,
       at: releaseDates.get(release.commit) ?? null,
+      survival: Object.fromEntries(
+        release.changes
+          .filter((id) => survival.get(id)?.tag === release.tag)
+          .map((id) => {
+            const { added, surviving } = survival.get(id)!;
+            return [id, { added, surviving }];
+          }),
+      ),
     })),
     subscriptions,
     entry.thresholds,
@@ -346,6 +361,7 @@ export function buildRepositoryProjection(
     classes.classes,
     timesheets,
     classes.default,
+    classes.release,
   );
   return {
     name: entry.name,

@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG, parseConfig } from './config.ts';
 import {
   buildSessionFile,
   attributeTranscriptTime,
+  computeAgentRunSeconds,
   computeOperatorActiveSeconds,
   sessionFilePath,
   validateSessionFile,
@@ -1212,6 +1213,57 @@ test('session end attributes only the transcript events inside the session windo
     `inside the window only: ${record.operatorActiveSeconds}`,
   );
   assert.ok(record.operatorActiveSeconds > 0);
+  assert.equal(
+    record.agentRunSeconds,
+    300,
+    'the agent ran from the prompt at 09:00 to its record at 09:05',
+  );
+});
+
+test('agent run seconds cover every turn, the last and a single one included, with waits capped', () => {
+  const event = (minute: number, kind: 'prompt' | 'agent') => ({
+    timestamp: new Date(Date.UTC(2026, 8, 1, 9, minute)).toISOString(),
+    kind,
+  });
+  // One prompt, then twenty minutes of work: the case a hook-ended session is.
+  assert.equal(
+    computeAgentRunSeconds(
+      [event(0, 'prompt'), event(10, 'agent'), event(20, 'agent')],
+      900,
+    ),
+    20 * 60,
+  );
+  // The final turn counts; the operator's reading time before the second prompt does not.
+  assert.equal(
+    computeAgentRunSeconds(
+      [
+        event(0, 'prompt'),
+        event(5, 'agent'),
+        event(15, 'prompt'),
+        event(18, 'agent'),
+      ],
+      900,
+    ),
+    8 * 60,
+  );
+  // Work already under way when the window opens starts at its first record.
+  assert.equal(
+    computeAgentRunSeconds([event(2, 'agent'), event(6, 'agent')], 900),
+    4 * 60,
+  );
+  // A wait on a permission longer than the idle cap counts as the cap.
+  assert.equal(
+    computeAgentRunSeconds(
+      [event(0, 'prompt'), event(1, 'agent'), event(50, 'agent')],
+      600,
+    ),
+    60 + 600,
+  );
+  assert.equal(
+    computeAgentRunSeconds([event(0, 'prompt')], 900),
+    undefined,
+    'no agent record is no measurement, not zero',
+  );
 });
 
 test("class set declares a spec's cost class once, validated against the vocabulary", () => {
@@ -1399,5 +1451,49 @@ test('class set --default declares the repository default, validated against the
   assert.throws(
     () => run(['class', 'set', '--default', 'marketing', '--no-commit']),
     /default must be one of rd, production/,
+  );
+});
+
+test('class set --release declares the release rule, validated against the vocabulary', () => {
+  const cli = fileURLToPath(new URL('./cli.ts', import.meta.url));
+  const dir = summaryRepo();
+  writeFileSync(
+    join(dir, 'telemetry.config.json'),
+    JSON.stringify({
+      schemaVersion: 1,
+      costAllocation: {
+        enabled: true,
+        idleCapSeconds: 900,
+        operators: [],
+        costClasses: ['rd', 'production'],
+      },
+    }),
+  );
+  const run = (args: string[]) =>
+    execFileSync(
+      process.execPath,
+      ['--experimental-strip-types', cli, ...args],
+      { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
+    );
+  run(['class', 'set', '--release', 'production', 'rd', '--no-commit']);
+  const file = JSON.parse(
+    readFileSync(join(dir, '.telemetry/classes.json'), 'utf8'),
+  );
+  assert.deepEqual(file.release, { shipped: 'production', discarded: 'rd' });
+  assert.throws(
+    () =>
+      run([
+        'class',
+        'set',
+        '--release',
+        'production',
+        'marketing',
+        '--no-commit',
+      ]),
+    /release must name/,
+  );
+  assert.throws(
+    () => run(['class', 'set', '--release', 'production', '--no-commit']),
+    /requires a shipped class and a discarded class/,
   );
 });

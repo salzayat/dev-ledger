@@ -11,6 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { DEFAULT_CONFIG, parseConfig, type TelemetryConfig } from './config.ts';
 import {
   attributeTranscriptTime,
+  computeAgentRunSeconds,
   SESSIONS_PATH,
   buildSessionFile,
   sessionFilePath,
@@ -274,6 +275,30 @@ function readTranscriptFigures(
     return null;
   }
   return sumTranscriptUsage(readFileSync(absolute, 'utf8'), window);
+}
+
+/** Agent run seconds from the transcript's records inside the session's own window. */
+function readTranscriptRunSeconds(
+  root: string,
+  path: string,
+  idleCapSeconds: number,
+  window: { from?: string; to?: string },
+): number | undefined {
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute)) {
+    return undefined;
+  }
+  const fromMs = window.from
+    ? Date.parse(window.from)
+    : Number.NEGATIVE_INFINITY;
+  const toMs = window.to ? Date.parse(window.to) : Number.POSITIVE_INFINITY;
+  return computeAgentRunSeconds(
+    transcriptEvents(readFileSync(absolute, 'utf8')).filter((event) => {
+      const at = Date.parse(event.timestamp);
+      return at >= fromMs && at <= toMs;
+    }),
+    idleCapSeconds,
+  );
 }
 
 /**
@@ -549,6 +574,16 @@ export function captureMain(argv: string[]): number {
               input.figuresSource = transcriptFiguresSource(figures);
             }
           }
+          // Run seconds are what subscription spend is allocated by, so they fill whether or not operator
+          // time is configured; a harness that stated its own figure keeps it.
+          if (input.agentRunSeconds === undefined) {
+            input.agentRunSeconds = readTranscriptRunSeconds(
+              root,
+              transcript,
+              config.costAllocation.idleCapSeconds,
+              { from: input.startedAt, to: input.endedAt },
+            );
+          }
           // Operator seconds come from the same file and fill the same way: a payload that stated its own
           // figure keeps it, because the harness knew something the transcript cannot show.
           if (
@@ -783,13 +818,21 @@ export function captureMain(argv: string[]): number {
     case 'class': {
       if (args[0] !== 'set') {
         fail(
-          'usage: telemetry class set <spec> <class> | telemetry class set --default <class> [--no-commit]',
+          'usage: telemetry class set <spec> <class> | --default <class> | --release <shipped-class> <discarded-class> [--no-commit]',
         );
       }
       const isDefault = args[1] === '--default';
-      const spec = isDefault ? null : args[1];
+      const isRelease = args[1] === '--release';
+      const spec = isDefault || isRelease ? null : args[1];
       const cls = args[2];
-      if (!cls || (!isDefault && !spec)) {
+      const discardedClass =
+        isRelease && args[3] && !args[3].startsWith('--') ? args[3] : undefined;
+      if (isRelease && !discardedClass) {
+        fail(
+          'class set --release requires a shipped class and a discarded class',
+        );
+      }
+      if (!cls || (!isDefault && !isRelease && !spec)) {
         fail('class set requires a spec and a class, or --default and a class');
       }
       const config = loadConfig(root);
@@ -800,7 +843,11 @@ export function captureMain(argv: string[]): number {
             classes: Record<string, string>;
           })
         : { schemaVersion: 1, classes: {} };
-      if (isDefault) {
+      if (isRelease) {
+        (
+          current as { release?: { shipped: string; discarded: string } }
+        ).release = { shipped: cls, discarded: discardedClass! };
+      } else if (isDefault) {
         (current as { default?: string }).default = cls;
       } else {
         current.classes[spec!] = cls;
@@ -817,7 +864,7 @@ export function captureMain(argv: string[]): number {
           'commit',
           '--quiet',
           '-m',
-          `chore(telemetry): class ${spec ?? 'default'} ${cls}`,
+          `chore(telemetry): class ${spec ?? (isRelease ? 'release' : 'default')} ${cls}`,
           '--',
           CLASSES_PATH,
         ]);

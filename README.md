@@ -80,7 +80,8 @@ sub-views: **Metrics** (Flow: wait and cycle time, flow efficiency, rework, esca
 iterations, spec lead time; DORA: the four keys approximated to the release tag; Throughput: velocity as the
 relative complexity of tasks completed per week, merge frequency, batch size, work mix), **Economics**
 (Spend: reported and allocated spend by period, cost class, spec, provider, and model, and the plan's cost
-per token; Effort: hours, operators, cost per unit of effort, spend on unmerged pull requests), and
+per token; Effort: hours, operators, cost per unit of effort, spend on unmerged pull requests; Shipped: spend
+and hours on work that shipped, waits for a release, or was discarded, and what each release kept), and
 **Records** (Changes, Queue, Notes). Every panel leads with its figure; its methodology and excluded count
 fold beneath it, and its citations follow.
 

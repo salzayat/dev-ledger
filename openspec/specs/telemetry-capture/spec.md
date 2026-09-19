@@ -302,7 +302,11 @@ recorded alongside each other with the algorithm's identifier, so a reader can c
 whole span to the operator instead would charge an unattended agent run to a person; over this repository's
 own transcripts that reads about 1.75 times the man hours actually worked. A transcript with
 fewer than two prompts SHALL leave the figure absent rather than recording zero. Nothing but timestamps
-SHALL be read for this figure. A transcript SHALL only fill figures the payload omits, and SHALL NOT override a
+SHALL be read for this figure. Agent run seconds SHALL be derived from the same timestamps: each turn
+runs from its prompt, or from the first record in the window for work already under way, to the last agent
+record before the next prompt, the final turn included, and a gap between two records of one turn longer than
+the idle cap SHALL count as the cap. One prompt, or none, SHALL suffice; a window with no agent record SHALL
+leave the figure absent. Run seconds SHALL fill whether or not cost allocation is enabled. A transcript SHALL only fill figures the payload omits, and SHALL NOT override a
 figure the harness stated. When the transcript supplied any figure, the record's `figuresSource` SHALL name
 the transcript as the source; when the payload stated every figure, its own source SHALL stand.
 
@@ -339,6 +343,18 @@ the transcript as the source; when the payload stated every figure, its own sour
 - WHEN operator active seconds are derived
 - THEN only the 17 prompts MUST contribute events
 - AND an unattended agent turn between two prompts MUST contribute no more than the idle cap
+
+#### Scenario: A session opened mid-turn records its run
+
+- GIVEN a session window holding no prompt and agent records spanning thirteen minutes
+- WHEN the session is recorded with that transcript and no stated run seconds
+- THEN `agentRunSeconds` MUST be thirteen minutes, not zero
+
+#### Scenario: The final turn counts and a long wait is capped
+
+- GIVEN a prompt, agent records one minute and fifty minutes after it, and an idle cap of ten minutes
+- WHEN agent run seconds are derived
+- THEN they MUST be eleven minutes
 
 #### Scenario: A transcript with one prompt records no operator time
 
@@ -574,7 +590,8 @@ identifier and SHALL print how to configure one.
 
 An operator MAY declare a cost class per spec in a committed file under `.telemetry/`, written by
 `telemetry class set <spec> <class>`, and MAY declare a default class for the
-repository's other work with `telemetry class set --default <class>`, each validated against the configured class vocabulary and spec pattern,
+repository's other work with `telemetry class set --default <class>`, and a release rule with
+`telemetry class set --release <shipped-class> <discarded-class>`, each validated against the configured class vocabulary and spec pattern,
 and rejecting the forbidden keys. `telemetry validate` SHALL cover it.
 
 #### Scenario: A class outside the vocabulary is refused
@@ -587,6 +604,12 @@ and rejecting the forbidden keys. `telemetry validate` SHALL cover it.
 
 - GIVEN a vocabulary of `rd` and `production`
 - WHEN `class set --default marketing` runs
+- THEN it MUST fail naming the vocabulary
+
+#### Scenario: A release rule outside the vocabulary is refused
+
+- GIVEN a vocabulary of `rd` and `production`
+- WHEN `class set --release production marketing` runs
 - THEN it MUST fail naming the vocabulary
 
 ### Requirement: A period's hours are confirmed by a timesheet

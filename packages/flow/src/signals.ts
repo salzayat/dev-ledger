@@ -227,6 +227,7 @@ export type RepositorySignals = {
   checkCompliance: CheckCompliance;
   meteredRates: MeteredRate[];
   costClasses: CostClassSpend;
+  shipping: Shipping;
   coverage: Coverage;
   allocation: Allocation;
   operators: Operators;
@@ -451,6 +452,36 @@ export type WeeklyBucket = {
   cites: string[];
 };
 
+/** Where a piece of work ended: in a release tag, merged and waiting for one, or in none. */
+export type ShipState = 'shipped' | 'pending' | 'discarded';
+
+type Accrued = Spend & {
+  missingFigures: number;
+  /** Allocated subscription share of these sessions, in `currency`. */
+  allocated: number;
+  currency: string | null;
+  /** Operator hours recorded on these sessions. */
+  hours: number;
+};
+
+export type Shipping = {
+  states: Record<
+    ShipState,
+    Accrued & { changes: string[]; pullRequests: number[] }
+  >;
+  /** Per release, oldest first: the changes it first carried and how much of their work is in the tag. */
+  releases: {
+    tag: string;
+    at: string | null;
+    shipped: number;
+    discarded: number;
+    added: number;
+    surviving: number;
+  }[];
+  trust: string[];
+  note: string;
+};
+
 export type CostClassSpend = Record<
   string,
   Spend & {
@@ -477,6 +508,8 @@ export type ReleaseSummary = {
   tag: string;
   changes: string[];
   at: string | null;
+  /** Lines each change this release first carried added, and how many blame at the tag still gives it. */
+  survival?: Record<string, { added: number; surviving: number }>;
 };
 
 export type ChangeFacts = {
@@ -669,7 +702,7 @@ function periodEnd(period: string): number {
  * A path glob, supporting `*` within a segment and `**` across segments. Small on purpose: the ignore list
  * names lockfiles and generated directories, and a dependency for that would be a dependency to audit.
  */
-function matchesGlob(path: string, glob: string): boolean {
+export function matchesGlob(path: string, glob: string): boolean {
   const pattern = glob
     .split('')
     .map((character) => {
@@ -1211,6 +1244,7 @@ export function computeSignals(
   specClasses: Record<string, string> = {},
   timesheets: TimesheetRecord[] = [],
   defaultClass: string | null = null,
+  releaseRule: { shipped: string; discarded: string } | null = null,
 ): RepositorySignals {
   // Changes merged before the instrumentation existed are excluded with that reason, not measured as
   // gaps; a pull request an operator declared closed leaves the queue, because git cannot see closed.
@@ -1777,6 +1811,23 @@ export function computeSignals(
 
   // Spend by cost class: the session's own class, then the change's trailer, never a default.
   const costClasses: CostClassSpend = {};
+  const accrue = (entry: Accrued, record: SessionRecord): void => {
+    const file = record.file!;
+    if (typeof file.operatorActiveSeconds === 'number') {
+      entry.hours += file.operatorActiveSeconds / 3600;
+    }
+    const share = allocation.bySession[record.sessionId];
+    if (share) {
+      entry.allocated =
+        Math.round((entry.allocated + share.amount + share.overage) * 1e6) /
+        1e6;
+      entry.currency ??= share.currency;
+    }
+    if (!add(entry, record)) {
+      entry.missingFigures += 1;
+      entry.cites.push(record.path);
+    }
+  };
   const classSpend = (name: string) =>
     (costClasses[name] ??= {
       ...emptySpend(),
@@ -1786,7 +1837,88 @@ export function computeSignals(
       hours: 0,
       sources: {},
     });
+  // A change is shipped when a release tag carries it and the tag still holds some of its lines, discarded
+  // when a tag carries it but none of its lines survive to the tag, and pending while no tag carries it. A
+  // pull request that never merged is pending until the registry declares it closed, then discarded.
+  const releasedIds = new Set(releases.flatMap((release) => release.changes));
+  const survivalOf = new Map<string, { added: number; surviving: number }>();
+  for (const release of releases) {
+    for (const [id, lines] of Object.entries(release.survival ?? {})) {
+      survivalOf.set(id, lines);
+    }
+  }
+  const changeState = (id: string): ShipState => {
+    if (!releasedIds.has(id)) {
+      return 'pending';
+    }
+    const lines = survivalOf.get(id);
+    return lines && lines.added > 0 && lines.surviving === 0
+      ? 'discarded'
+      : 'shipped';
+  };
+  const emptyState = () => ({
+    ...emptySpend(),
+    missingFigures: 0,
+    allocated: 0,
+    currency: null,
+    hours: 0,
+    changes: [] as string[],
+    pullRequests: [] as number[],
+  });
+  const shipping: Shipping = {
+    states: {
+      shipped: emptyState(),
+      pending: emptyState(),
+      discarded: emptyState(),
+    },
+    releases: releases.map((release) => {
+      const lines = Object.entries(release.survival ?? {});
+      return {
+        tag: release.tag,
+        at: release.at,
+        shipped: lines.filter(([id]) => changeState(id) === 'shipped').length,
+        discarded: lines.filter(([id]) => changeState(id) === 'discarded')
+          .length,
+        added: lines.reduce((sum, [, entry]) => sum + entry.added, 0),
+        surviving: lines.reduce((sum, [, entry]) => sum + entry.surviving, 0),
+      };
+    }),
+    trust: ['observed', 'declared'],
+    note: 'shipped: a release tag carries the change and blame at that tag still gives it lines; discarded: a tag carries it but none of its added lines survive to the tag, or a pull request the registry declares closed; pending: merged since the last tag, or an open pull request. Lines exclude the rework ignore list.',
+  };
+  const classify = (
+    record: SessionRecord,
+    trailerClass: string | null,
+    specName: string | null,
+    state: ShipState,
+  ): void => {
+    const file = record.file!;
+    const declared = specName ? specClasses[specName] : undefined;
+    // Pending work has not ended yet; it resolves when the next tag is cut, so it is its own row.
+    const ruled = releaseRule
+      ? state === 'pending'
+        ? 'pending'
+        : releaseRule[state]
+      : undefined;
+    const [name, source] = file.costClass
+      ? [file.costClass, 'session']
+      : trailerClass
+        ? [trailerClass, 'trailer']
+        : declared
+          ? [declared, 'spec']
+          : ruled
+            ? [ruled, state]
+            : defaultClass
+              ? [defaultClass, 'default']
+              : ['unclassified', 'none'];
+    const entry = classSpend(name);
+    entry.sources[source] = (entry.sources[source] ?? 0) + 1;
+    accrue(entry, record);
+    accrue(shipping.states[state], record);
+  };
   for (const fact of facts) {
+    const state = changeState(fact.change.id);
+    shipping.states[state].changes.push(fact.change.id);
     const trailerClass =
       typeof fact.change.trailers['Cost-Class'] === 'string'
         ? fact.change.trailers['Cost-Class']
@@ -1800,38 +1932,23 @@ export function computeSignals(
         typeof fact.change.trailers.Spec === 'string'
           ? fact.change.trailers.Spec
           : (record.file.spec ?? null);
-      const declared = specName ? specClasses[specName] : undefined;
-      const name =
-        record.file.costClass ??
-        trailerClass ??
-        declared ??
-        defaultClass ??
-        'unclassified';
-      const source = record.file.costClass
-        ? 'session'
-        : trailerClass
-          ? 'trailer'
-          : declared
-            ? 'spec'
-            : defaultClass
-              ? 'default'
-              : 'none';
-      const entry = classSpend(name);
-      entry.sources[source] = (entry.sources[source] ?? 0) + 1;
-      if (typeof record.file.operatorActiveSeconds === 'number') {
-        entry.hours += record.file.operatorActiveSeconds / 3600;
-      }
-      const share = allocation.bySession[id];
-      if (share) {
-        entry.allocated =
-          Math.round((entry.allocated + share.amount + share.overage) * 1e6) /
-          1e6;
-        entry.currency ??= share.currency;
-      }
-      if (!add(entry, record)) {
-        entry.missingFigures += 1;
-        entry.cites.push(record.path);
-      }
+      classify(record, trailerClass, specName, state);
+    }
+  }
+  for (const entry of allUnmerged) {
+    shipping.states[
+      closed.has(entry.number) ? 'discarded' : 'pending'
+    ].pullRequests.push(entry.number);
+  }
+  for (const record of sessions.values()) {
+    const number = record.attribution.unmergedPullRequest;
+    if (number !== null && record.file) {
+      classify(
+        record,
+        null,
+        record.file.spec ?? null,
+        closed.has(number) ? 'discarded' : 'pending',
+      );
     }
   }
   const coverage: Coverage = {
@@ -2217,6 +2334,7 @@ export function computeSignals(
     checkCompliance,
     meteredRates,
     costClasses,
+    shipping,
     operators,
     coverage,
     allocation,

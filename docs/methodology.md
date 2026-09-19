@@ -213,7 +213,7 @@ throughput, and a per-person velocity is the one figure this methodology was bui
 ## Views, and why they carry no script
 
 The Ledger groups its panels into three views, Metrics, Economics, and Records, each holding sub-views:
-Metrics holds Flow, DORA, and Throughput; Economics holds Spend and Effort; Records holds Changes, Queue, and
+Metrics holds Flow, DORA, and Throughput; Economics holds Spend, Effort, and Shipped; Records holds Changes, Queue, and
 Notes. Each sub-view is a fragment on the page selected with CSS, and a view marks itself current when any of
 its sub-views is the target. The page carries no script element, loads no external resource, and contains no
 form control, so views could not be built from either of the usual techniques. The fragment approach has a
@@ -410,10 +410,30 @@ collector replaces the tag with a deployment record without changing the shape o
 
 A class is a property of the work, and the work is named by its spec, so a class is declared once per spec
 with `telemetry class set <spec> <class>` and inherited by every change and session citing it. A session's
-then the spec's declaration, then the repository's declared default (`class set --default rd`); anything
-else is `unclassified`. Nothing is inferred: the default is a committed declaration shown as its own source. The panel shows reported cost, the allocated share, and operator hours
+own class wins, then a `Cost-Class:` trailer, then the spec's declaration, then the repository's release
+rule, then its declared default; anything else is `unclassified`.
+
+The release rule, `class set --release production rd`, classifies by where the work ended: shipped work
+takes the first class and discarded work the second. Pending work, merged since the last tag or on a pull
+request still open, is its own `pending` row until the next tag resolves it. Nothing is inferred: the rule
+and the default are committed declarations, each shown as its own source. The panel shows reported cost, the allocated share, and operator hours
 per class, because planning and tax credits count dollars and hours, and says how many records resolved
 by each source.
+
+## Shipped, pending, discarded
+
+Every measured change and every unmerged pull request ends in one of three states, decided by release tags.
+A change a tag carries is shipped when blame at that tag still gives it at least one line it added. It is
+discarded when none of its added lines survive to the tag, which is what happens to an attempt a later
+change rewrote before the release. A change no tag carries yet is pending. An unmerged pull request is
+pending until the registry declares it closed, then discarded, because git cannot see closed.
+
+Survival is measured once, at the first tag carrying the change, so a later rewrite does not undo a release.
+Lines are counted outside the rework ignore list, so lockfiles, generated records, and the documentation
+the registry excludes do not decide the state; a change that added no counted lines is shipped. A session is
+counted whole under its change's state. Economics › Shipped reports spend, allocated share, and hours per
+state, and for each release the changes it first carried, how many shipped and were discarded, and how many
+of their added lines are still in the tag.
 
 ## Trends
 

@@ -6,6 +6,7 @@ import type {
   Coverage,
   Distribution,
   RepositorySignals,
+  Shipping,
   Spend,
   Operators,
   WeeklyBucket,
@@ -1147,8 +1148,48 @@ function costClassPanel(
   return panel(
     'Spend by cost class',
     `${table}<p class="help">Coverage: ${escapeHtml(coverageLine)}.</p>`,
-    `${trustBadges(['reported', 'allocated'])} the session's own class, then the change's Cost-Class trailer, then the spec's declared class, then the repository's declared default; nothing is inferred. Declare with telemetry class set`,
+    `${trustBadges(['reported', 'allocated'])} the session's own class, then the change's Cost-Class trailer, then the spec's declared class, then the release rule (shipped work takes one class, discarded work another, and work still pending waits for the next tag), then the repository's declared default; nothing is inferred. Declare with telemetry class set`,
   );
+}
+
+function shippingPanels(shipping: Shipping, links: Links): string[] {
+  const states = (['shipped', 'pending', 'discarded'] as const).map(
+    (name) => [name, shipping.states[name]] as const,
+  );
+  const stateRows = states
+    .map(
+      ([name, entry]) =>
+        `<tr><td><code>${name}</code></td><td class="num">${entry.changes.length}</td><td class="num">${entry.pullRequests.length}</td><td class="num">${reportedCost(entry.costUsd, entry.sessions)}</td><td class="num">${entry.allocated > 0 ? escapeHtml(money(entry.allocated, entry.currency ?? 'USD')) : '<span class="dim">none</span>'}</td><td class="num">${entry.hours > 0 ? entry.hours.toFixed(1) + ' h' : '<span class="dim">none</span>'}</td><td class="num">${entry.missingFigures}</td><td>${cites(
+          'changes',
+          [
+            ...entry.changes,
+            ...entry.pullRequests.map((number) => `pull/${number}`),
+          ],
+          links,
+        )}</td></tr>`,
+    )
+    .join('');
+  const releaseRows = [...shipping.releases]
+    .reverse()
+    .map(
+      (release) =>
+        `<tr><td><code>${escapeHtml(release.tag)}</code></td><td class="dim">${release.at ? escapeHtml(release.at.slice(0, 10)) : ''}</td><td class="num">${release.shipped}</td><td class="num">${release.discarded}</td><td class="num">${release.added}</td><td class="num">${release.added > 0 ? meter(release.surviving, release.added) : ''}${release.surviving} (${release.added > 0 ? Math.round((release.surviving / release.added) * 100) : 0}%)</td></tr>`,
+    )
+    .join('');
+  return [
+    panel(
+      'Shipped, pending, discarded',
+      `<div class="scroll"><table><thead><tr><th>state</th><th class="num">changes</th><th class="num">pull requests</th><th class="num">reported</th><th class="num">allocated</th><th class="num">hours</th><th class="num">no figures</th><th>cites</th></tr></thead><tbody>${stateRows}</tbody></table></div><p class="help">${escapeHtml(shipping.note)}.</p>`,
+      `${trustBadges(['observed', 'reported', 'allocated'])} shipped and discarded come from release tags and blame at each tag; a closed pull request is declared in the registry, because git cannot see closed`,
+    ),
+    panel(
+      'What each release kept',
+      releaseRows
+        ? `<div class="scroll"><table><thead><tr><th>tag</th><th>cut</th><th class="num">shipped</th><th class="num">discarded</th><th class="num">lines added</th><th class="num">lines in the tag</th></tr></thead><tbody>${releaseRows}</tbody></table></div><p class="help">Every change the tag first carried, including changes merged before measurement began; a change is discarded when none of the lines it added are in the tag.</p>`
+        : '<p class="empty">No release tag yet; every merged change is pending.</p>',
+      `${trustBadges(['observed'])} blame at the tag`,
+    ),
+  ];
 }
 
 export function renderRepositoryHtml(repository: RepositoryProjection): string {
@@ -1258,7 +1299,11 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
             ? ''
             : `; ${link('metrics-flow', percent(signals.flowEfficiency.p50))} of that time someone was working`
         }.`;
-  const lede = `<p class="lede">${timing} ${spendSentence}</p>`;
+  const lastRelease = signals.shipping.releases.at(-1);
+  const shippingSentence = lastRelease
+    ? `Since ${escapeHtml(lastRelease.tag)}, ${link('economics-shipped', count(signals.shipping.states.pending.changes.length, 'merged change'))} ${signals.shipping.states.pending.changes.length === 1 ? 'waits' : 'wait'} for a release, and ${link('economics-shipped', count(signals.shipping.states.discarded.changes.length + signals.shipping.states.discarded.pullRequests.length, 'piece'))} of work ended in no tag.`
+    : `No release tag yet, so ${link('economics-shipped', count(signals.shipping.states.pending.changes.length, 'merged change'))} ${signals.shipping.states.pending.changes.length === 1 ? 'waits' : 'wait'} for one.`;
+  const lede = `<p class="lede">${timing} ${spendSentence} ${shippingSentence}</p>`;
   const kpi = (
     name: string,
     labelText: string,
@@ -1406,7 +1451,7 @@ ${kpis}
 <nav class="tabs" aria-label="Sections of ${escapeHtml(repository.name)}">
 <div class="row top"><a class="top" href="#${view('metrics-flow')}">Metrics</a><a class="top" href="#${view('economics-spend')}">Economics</a><a class="top" href="#${view('records-changes')}">Records</a></div>
 <div class="row sub sub-metrics"><a class="sub" href="#${view('metrics-flow')}">Flow</a><a class="sub" href="#${view('metrics-dora')}">DORA</a><a class="sub" href="#${view('metrics-throughput')}">Throughput</a></div>
-<div class="row sub sub-economics"><a class="sub" href="#${view('economics-spend')}">Spend</a><a class="sub" href="#${view('economics-effort')}">Effort</a></div>
+<div class="row sub sub-economics"><a class="sub" href="#${view('economics-spend')}">Spend</a><a class="sub" href="#${view('economics-effort')}">Effort</a><a class="sub" href="#${view('economics-shipped')}">Shipped</a></div>
 <div class="row sub sub-records"><a class="sub" href="#${view('records-changes')}">Changes <span class="n">${changes.length}</span></a><a class="sub" href="#${view('records-queue')}">Queue <span class="n">${signals.queue.count}</span></a><a class="sub" href="#${view('records-notes')}">Notes <span class="n">${(repository.notes as NoteRow[]).filter((note) => note.file !== null).length}</span></a></div>
 </nav>
 <div class="tabbed">
@@ -1505,6 +1550,14 @@ ${group(
     ),
     unmergedSpend,
   ],
+)}
+</section>
+<section class="tab" id="${view('economics-shipped')}" aria-label="Economics: shipped">
+${group(
+  'What shipped, what waits, what was dropped',
+  'Release tags decide it: work a tag holds shipped, work merged since the last tag waits, and work no tag will hold was discarded.',
+  1,
+  shippingPanels(signals.shipping, links),
 )}
 </section>
 <section class="tab" id="${view('records-changes')}" aria-label="Records: changes">
@@ -1632,7 +1685,7 @@ ${group(
  */
 const VIEWS: Record<string, string[]> = {
   metrics: ['metrics-flow', 'metrics-dora', 'metrics-throughput'],
-  economics: ['economics-spend', 'economics-effort'],
+  economics: ['economics-spend', 'economics-effort', 'economics-shipped'],
   records: ['records-changes', 'records-queue', 'records-notes'],
 };
 
