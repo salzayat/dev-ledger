@@ -1,0 +1,28 @@
+{
+  "agentRunSeconds": 0,
+  "billingKind": "subscription",
+  "branch": "flow/ship-states",
+  "cacheReadTokens": 8469977,
+  "cacheWriteTokens": 74399,
+  "cachedTokens": 8544376,
+  "commits": [
+    "d7ed0b261686b43202bac5ba7edcdcf15922d9d0"
+  ],
+  "costUsd": 0,
+  "endedAt": "2026-09-19T05:07:47.140Z",
+  "figuresSource": "summed from 62 messages in the session transcript",
+  "inputTokens": 124,
+  "localCheck": {
+    "command": "npm run check",
+    "outcome": "not-run"
+  },
+  "model": "claude-opus-5",
+  "operatorId": "op-1",
+  "outputTokens": 38951,
+  "provider": "anthropic",
+  "schemaVersion": 1,
+  "sessionId": "s-20260919-ship-states",
+  "startedAt": "2026-09-19T04:54:37.042Z",
+  "subscriptionId": "claude-max",
+  "wallClockSeconds": 790
+}
