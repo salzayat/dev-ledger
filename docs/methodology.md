@@ -273,7 +273,8 @@ The projection is not read: the pull request does not exist yet when its descrip
 Nothing here asks a provider what a session cost. A figure is either stated by the harness or summed from
 the session's own transcript on this machine, and either way it is `reported`, never `observed`. Cost is
 not derived: on a subscription the contract fixes `costUsd` at zero, so a subscription session reports real
-token counts and no dollar figure, and that is the honest reading rather than a price guess.
+token counts and no dollar figure, and that is the honest reading rather than a price guess. A transcript kept across many sessions is
+summed only between the session's start and end, the same window its hours use.
 
 ## Subscription cost is a period record
 

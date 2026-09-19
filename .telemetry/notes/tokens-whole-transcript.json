@@ -1,0 +1,8 @@
+{
+  "at": "2026-09-19T02:00:00Z",
+  "figure": "spend",
+  "noteId": "tokens-whole-transcript",
+  "period": "2026-09",
+  "schemaVersion": 1,
+  "text": "Records summed from a transcript before 2026-09-19 counted the whole transcript, so their token counts and the per-million-token rate are inflated. Allocated dollars are unaffected; they follow agent run seconds."
+}

@@ -628,6 +628,8 @@ const transcriptLine = (
 ) =>
   JSON.stringify({
     type: 'assistant',
+    // Inside the window the session-end tests' payloads declare, 09:00 to 10:00.
+    timestamp: '2026-09-01T09:30:00Z',
     message: { ...(id === null ? {} : { id }), usage, ...extra },
   });
 
@@ -1330,4 +1332,38 @@ test('validate reads the plan declarations with their own schema', () => {
     { cwd: dir, encoding: 'utf8', env: gitEnvironment() },
   );
   assert.match(out, /1 records valid/);
+});
+
+test('token figures count only the transcript records inside the session window', () => {
+  const at = (t: string, id: string, output: number) =>
+    JSON.stringify({
+      type: 'assistant',
+      timestamp: t,
+      message: { id, usage: { input_tokens: 1, output_tokens: output } },
+    });
+  const text = [
+    at('2026-09-01T06:00:00Z', 'm-early', 1000),
+    at('2026-09-01T09:05:00Z', 'm-in', 40),
+    at('2026-09-01T09:10:00Z', 'm-in-2', 2),
+    JSON.stringify({
+      type: 'assistant',
+      message: {
+        id: 'm-undated',
+        usage: { input_tokens: 1, output_tokens: 500 },
+      },
+    }),
+    at('2026-09-01T12:00:00Z', 'm-late', 1000),
+  ].join('\n');
+  const all = sumTranscriptUsage(text)!;
+  assert.equal(all.outputTokens, 2542, 'without a window every record counts');
+  const windowed = sumTranscriptUsage(text, {
+    from: '2026-09-01T09:00:00Z',
+    to: '2026-09-01T09:30:00Z',
+  })!;
+  assert.equal(windowed.outputTokens, 42);
+  assert.equal(windowed.messages, 2);
+  assert.equal(
+    sumTranscriptUsage(text, { from: '2027-01-01T00:00:00Z' }),
+    null,
+  );
 });
