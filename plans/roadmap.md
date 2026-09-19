@@ -48,6 +48,7 @@ contract.
 | Transcript token window (defect)                    | `fix-transcript-token-window`                                 | Complete |
 | Default cost class (phase one addendum)             | `add-default-cost-class`                                      | Complete |
 | Release cost class (phase one addendum)             | `add-release-cost-class`                                      | Complete |
+| Ship states (phase one addendum)                    | `add-ship-states`                                             | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -239,6 +240,9 @@ stop reading unclassified.
 
 The release cost class row makes work a release tag carries production and every other effort R&D, so the
 class follows what shipped.
+
+The ship states row places every change and pull request as shipped, pending, or discarded by release tags
+and blame at each tag, and the release rule classifies by that state.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for

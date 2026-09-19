@@ -11,8 +11,9 @@ export type ClassesFile = {
   classes: Record<string, string>;
   /** The class for this repository's work that no session, trailer, or spec declares. Optional. */
   default?: string;
-  /** Release rule: a change carried by a release tag takes `released`; any other work takes `unreleased`. */
-  release?: { released: string; unreleased: string };
+  /** Release rule: work a release tag ships takes `shipped`; work no tag will carry takes `discarded`. Work merged
+   * since the last tag stays pending until the next one. */
+  release?: { shipped: string; discarded: string };
 };
 
 const FORBIDDEN_KEYS =
@@ -59,11 +60,11 @@ export function validateClassesFile(
     if (
       typeof rule !== 'object' ||
       rule === null ||
-      !known.includes(rule.released as string) ||
-      !known.includes(rule.unreleased as string)
+      !known.includes(rule.shipped as string) ||
+      !known.includes(rule.discarded as string)
     ) {
       errors.push(
-        `release must name a released and an unreleased class from ${known.join(', ')}`,
+        `release must name a shipped and a discarded class from ${known.join(', ')}`,
       );
     }
   }

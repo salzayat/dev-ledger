@@ -88,9 +88,8 @@ Token figures summed from a transcript count only records timestamped inside the
 
 `.telemetry/classes.json`, written by `telemetry class set`: `schemaVersion` and `classes`, a map from spec
 name to a class in the configured vocabulary. Inherited by every record citing the spec. An optional `default` holds the
-class for the repository's other work, set with `telemetry class set --default <class>`. An optional `release` holds `released` and `unreleased` classes: the first for a
-change a release tag carries, the second for merged work no tag carries and for unmerged pull requests, set
-with `telemetry class set --release <released-class> <unreleased-class>`.
+class for the repository's other work, set with `telemetry class set --default <class>`. An optional `release` holds `shipped` and `discarded` classes for work in those states; pending work reads
+as `pending` until the next tag. Set with `telemetry class set --release <shipped-class> <discarded-class>`.
 
 ## Timesheet (schema version 1)
 

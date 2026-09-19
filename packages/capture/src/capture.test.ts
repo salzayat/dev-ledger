@@ -1427,7 +1427,7 @@ test('class set --release declares the release rule, validated against the vocab
   const file = JSON.parse(
     readFileSync(join(dir, '.telemetry/classes.json'), 'utf8'),
   );
-  assert.deepEqual(file.release, { released: 'production', unreleased: 'rd' });
+  assert.deepEqual(file.release, { shipped: 'production', discarded: 'rd' });
   assert.throws(
     () =>
       run([
@@ -1442,6 +1442,6 @@ test('class set --release declares the release rule, validated against the vocab
   );
   assert.throws(
     () => run(['class', 'set', '--release', 'production', '--no-commit']),
-    /requires a released class and an unreleased class/,
+    /requires a shipped class and a discarded class/,
   );
 });

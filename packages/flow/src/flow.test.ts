@@ -2378,7 +2378,7 @@ test('the declared default classifies work no session, trailer, or spec declares
   assert.equal(built.repo.classes.default, 'rd');
 });
 
-test('the release rule makes tagged work production and every other effort, merged or not, R&D', () => {
+test('work a tag ships is shipped, work overwritten before the tag or closed unmerged is discarded, and the rest is pending', () => {
   const fixture = makeFixtureRepo();
   const seed = openPullRequest(fixture, 'seed', [
     [
@@ -2397,7 +2397,7 @@ test('the release rule makes tagged work production and every other effort, merg
         '.telemetry/classes.json': JSON.stringify({
           schemaVersion: 1,
           classes: { 'add-x': 'rd' },
-          release: { released: 'production', unreleased: 'rd' },
+          release: { shipped: 'production', discarded: 'rd' },
         }),
       },
     ],
@@ -2405,68 +2405,112 @@ test('the release rule makes tagged work production and every other effort, merg
   mergeSquash(fixture, seed, 'feat(seed): seed');
   const record = (id: string, spec?: string) =>
     sessionJson(id, spec ? { spec } : {});
-  const shipped = openPullRequest(fixture, 'shipped', [
-    [
-      trailered('feat(a): shipped', { Session: 's-shipped', Change: 'c-a' }),
-      {
-        'a.txt': 'a',
-        '.telemetry/sessions/x/s-shipped.json': record('s-shipped'),
-      },
-    ],
-  ]);
-  mergeSquash(fixture, shipped, 'feat(a): shipped', 'Session: s-shipped');
-  const declared = openPullRequest(fixture, 'declared', [
-    [
-      trailered('feat(x): declared', { Session: 's-declared', Change: 'c-x' }),
-      {
-        'x.txt': 'x',
-        '.telemetry/sessions/x/s-declared.json': record('s-declared', 'add-x'),
-      },
-    ],
-  ]);
-  mergeSquash(fixture, declared, 'feat(x): declared', 'Session: s-declared');
+  const merged = (
+    branch: string,
+    subject: string,
+    session: string,
+    change: string,
+    files: Record<string, string>,
+  ) => {
+    const pull = openPullRequest(fixture, branch, [
+      [
+        trailered(subject, { Session: session, Change: change }),
+        {
+          ...files,
+          [`.telemetry/sessions/x/${session}.json`]: record(
+            session,
+            branch === 'declared' ? 'add-x' : undefined,
+          ),
+        },
+      ],
+    ]);
+    mergeSquash(fixture, pull, subject, `Session: ${session}`);
+  };
+  merged('shipped', 'feat(a): shipped', 's-shipped', 'c-a', {
+    'a.txt': 'one\ntwo\n',
+  });
+  merged('tried', 'feat(b): tried', 's-tried', 'c-b', {
+    'b.txt': 'first attempt\nstill first\n',
+  });
+  merged('replaced', 'feat(b): replaced', 's-replaced', 'c-r', {
+    'b.txt': 'second attempt\n',
+  });
+  merged('declared', 'feat(x): declared', 's-declared', 'c-x', {
+    'x.txt': 'x\n',
+  });
   tag(fixture, 'v1.0.0');
-  const later = openPullRequest(fixture, 'later', [
+  merged('later', 'feat(d): merged, not tagged', 's-later', 'c-d', {
+    'd.txt': 'd\n',
+  });
+  openPullRequest(fixture, 'open', [
     [
-      trailered('feat(b): merged, not tagged', {
-        Session: 's-later',
-        Change: 'c-b',
-      }),
-      { 'b.txt': 'b', '.telemetry/sessions/x/s-later.json': record('s-later') },
+      trailered('feat(e): still open', { Session: 's-open', Change: 'c-e' }),
+      { 'e.txt': 'e', '.telemetry/sessions/x/s-open.json': record('s-open') },
     ],
   ]);
-  mergeSquash(
-    fixture,
-    later,
-    'feat(b): merged, not tagged',
-    'Session: s-later',
-  );
-  openPullRequest(fixture, 'abandoned', [
+  const closed = openPullRequest(fixture, 'closed', [
     [
-      trailered('feat(c): never merged', { Session: 's-open', Change: 'c-c' }),
-      { 'c.txt': 'c', '.telemetry/sessions/x/s-open.json': record('s-open') },
+      trailered('feat(f): closed', { Session: 's-closed', Change: 'c-f' }),
+      {
+        'f.txt': 'f',
+        '.telemetry/sessions/x/s-closed.json': record('s-closed'),
+      },
     ],
   ]);
-  const { repo } = build(registryFor(fixture.dir));
-  const classes = repo.signals!.costClasses;
+  const registry = parseRegistry(
+    JSON.stringify({
+      schemaVersion: 1,
+      repositories: [
+        {
+          name: 'fixture',
+          url: fixture.dir,
+          releaseTagPattern: 'v*',
+          closedPullRequests: [closed.number],
+        },
+      ],
+    }),
+  ).registry;
+  const { repo } = build(registry);
+  const shipping = repo.signals!.shipping;
+  const subjects = (ids: string[]) =>
+    ids
+      .map((id) => String(change(repo, id).subject).replace(/ \(#\d+\)$/, ''))
+      .sort();
   assert.deepEqual(
-    classes.production.sources,
-    { released: 1 },
-    'the tagged change',
+    subjects(shipping.states.discarded.changes),
+    ['feat(b): tried'],
+    'a tag reaches the first attempt, but none of its lines are in the tag',
   );
-  assert.equal(
-    classes.rd.sources.unreleased,
-    2,
-    'the untagged merge and the unmerged pull request',
+  assert.deepEqual(subjects(shipping.states.pending.changes), [
+    'feat(d): merged, not tagged',
+  ]);
+  assert.ok(
+    subjects(shipping.states.shipped.changes).includes('feat(b): replaced'),
   );
-  assert.equal(
-    classes.rd.sources.spec,
-    1,
-    'a spec declaration wins over the rule, even on tagged work',
+  assert.deepEqual(shipping.states.discarded.pullRequests, [closed.number]);
+  assert.equal(shipping.states.pending.pullRequests.length, 1);
+  const release = shipping.releases[0];
+  assert.equal(release.tag, 'v1.0.0');
+  assert.equal(release.discarded, 1);
+  assert.ok(
+    release.surviving < release.added,
+    'the overwritten attempt counts as added and not surviving',
+  );
+  const classes = repo.signals!.costClasses;
+  assert.deepEqual(classes.production.sources, { shipped: 2 });
+  assert.deepEqual(
+    classes.rd.sources,
+    { discarded: 2, spec: 1 },
+    'the overwritten attempt, the closed pull request, and a spec declaration that wins over the rule',
+  );
+  assert.deepEqual(
+    classes.pending.sources,
+    { pending: 2 },
+    'the untagged merge and the open pull request wait for the next tag',
   );
   assert.equal(classes.unclassified, undefined);
   assert.deepEqual(repo.classes.release, {
-    released: 'production',
-    unreleased: 'rd',
+    shipped: 'production',
+    discarded: 'rd',
   });
 });

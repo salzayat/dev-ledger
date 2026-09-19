@@ -1,5 +1,5 @@
 {
   "classes": {},
-  "release": { "released": "production", "unreleased": "rd" },
+  "release": { "shipped": "production", "discarded": "rd" },
   "schemaVersion": 1
 }

@@ -15,7 +15,7 @@ export type ClassesRecord = {
   /** The repository's declared default class, or null when none is declared. */
   default: string | null;
   /** The declared release rule, or null when none is declared. */
-  release: { released: string; unreleased: string } | null;
+  release: { shipped: string; discarded: string } | null;
 };
 
 export function collectClasses(
@@ -37,7 +37,7 @@ export function collectClasses(
     const parsed = JSON.parse(text) as {
       classes?: Record<string, string>;
       default?: string;
-      release?: { released: string; unreleased: string };
+      release?: { shipped: string; discarded: string };
     };
     const errors = validateClassesFile(parsed, config);
     return errors.length === 0
