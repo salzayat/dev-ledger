@@ -73,8 +73,9 @@ resource. Reviews, checks, and platform timestamps are not observed; git does no
 
 ## The published Ledger
 
-The `Ledger` workflow builds the page on every pull request, as a run artifact and a job summary, and
-deploys it to GitHub Pages from `main` while the repository is public. It fetches over HTTPS with the
+The `Ledger` workflow builds the page on every pull request that touches more than prose, as a run
+artifact and a job summary, and deploys it to GitHub Pages from `main` while the repository is public,
+skipping the deploy when the projection has not changed. The mirror is cached between runs. It fetches over HTTPS with the
 run's own token and uses no other credential. Nothing generated is committed.
 
 ## Commands

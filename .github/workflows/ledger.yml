@@ -2,6 +2,14 @@ name: Ledger
 
 on:
   pull_request:
+    # A page is a function of commits, records, and the code that reads them. Prose alone cannot move it, so
+    # a pull request that changes only prose does not build one; every push to main still does.
+    paths-ignore:
+      - 'docs/**'
+      - 'plans/**'
+      - 'openspec/**'
+      - '.agent/**'
+      - '**/*.md'
   push:
     branches: [main]
 
@@ -18,6 +26,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      changed: ${{ steps.rebuild.outputs.changed }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,6 +40,23 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Restore the mirror
+        # The bare mirror carries over between runs, so sync is an incremental fetch of the refs that moved.
+        # The projection is a function of the ref tips, so a warm mirror cannot produce a different page.
+        uses: actions/cache@v4
+        with:
+          path: .telemetry/mirrors
+          key: ledger-mirror-${{ github.sha }}
+          restore-keys: |
+            ledger-mirror-
+      - name: Restore the last deployed hash
+        if: github.event_name == 'push'
+        uses: actions/cache@v4
+        with:
+          path: .telemetry/deployed.sha256
+          key: ledger-deployed-${{ github.sha }}
+          restore-keys: |
+            ledger-deployed-
       - name: Sync this repository over HTTPS
         # The registry records an SSH URL for an operator's own git access. Continuous integration has no
         # key and needs none: it fetches the same public repository over HTTPS with the token the platform
@@ -40,13 +67,19 @@ jobs:
           ./scripts/telemetry.sh sync \
             --entry dev-ledger \
             --fetch-url "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-      - name: Refuse undeclared work
-        if: github.event_name == 'pull_request'
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: ./scripts/check-declared.sh "origin/${{ github.base_ref }}" HEAD
       - name: Rebuild the projection
-        run: ./scripts/telemetry.sh rebuild
+        id: rebuild
+        # A deploy is skipped when the projection's bytes are the ones already published.
+        run: |
+          hash=$(./scripts/telemetry.sh rebuild | sed -n 's/^sha256 //p')
+          previous=$(cat .telemetry/deployed.sha256 2>/dev/null || true)
+          if [ "$hash" = "$previous" ]; then
+            printf '%s\n' "changed=false" >>"$GITHUB_OUTPUT"
+            printf '%s\n' "projection $hash is already deployed"
+          else
+            printf '%s\n' "changed=true" >>"$GITHUB_OUTPUT"
+            printf '%s\n' "$hash" >.telemetry/deployed.sha256
+          fi
       - name: Render The Ledger
         run: |
           mkdir -p site
@@ -66,7 +99,7 @@ jobs:
           path: site/index.html
           if-no-files-found: error
       - name: Upload the Pages artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.private == false
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.private == false && steps.rebuild.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
@@ -75,7 +108,7 @@ jobs:
     needs: build
     # Never from a pull request, and never while the repository is private: a Pages site is public on every
     # plan that offers one for a private repository, so the gate lives here rather than in someone's memory.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.private == false
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.private == false && needs.build.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

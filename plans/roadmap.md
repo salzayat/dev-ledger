@@ -43,6 +43,7 @@ contract.
 | Timesheets (phase one addendum)                     | `add-timesheets`                                              | Complete |
 | Registry rollup and statements (phase one addendum) | `add-registry-rollup-and-statements`                          | Complete |
 | Zero figures (presentation)                         | `remove-zero-figures`                                         | Complete |
+| Lighter ledger workflow (CI governance)             | `lighten-ledger-workflow`                                     | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -220,6 +221,9 @@ writes the month as rows for finance or a client, each row scoped as a period or
 
 The zero figures row makes the page keep the rule its records keep: a structural zero reads as absence,
 and only a measured zero reads as a count.
+
+The lighter ledger workflow row caches the mirror, skips prose-only pull request builds and unchanged
+deploys, and moves the declared-work gate to the check workflow so it still runs on every pull request.
 
 Roadmap changes are ordered left to right within a milestone and top to bottom across milestones. A later
 change may be selected only after every earlier governing change is archived and verified. Use `Pending` for
