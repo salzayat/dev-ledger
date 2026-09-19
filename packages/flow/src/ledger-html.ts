@@ -388,7 +388,7 @@ function registrySection(projection: Projection | null): string {
         )}</td></tr>`,
     )
     .join('');
-  return `<section class="repository" aria-label="All repositories"><h2>All repositories <span class="branch">${escapeHtml(rollup.repositories.join(', '))}</span></h2>
+  return `<section class="repository" aria-label="All repositories"><h2 class="repo">All repositories <span class="branch">${escapeHtml(rollup.repositories.join(', '))}</span></h2>
 <p class="meta">${escapeHtml(rollup.note)}</p>
 <div class="grid wide">
 ${panel('Spend by spec, across the registry', `<div class="scroll"><table><thead><tr><th>spec</th><th class="num">reported</th><th class="num">allocated</th><th class="num">hours</th><th class="num">tokens</th><th>repositories</th></tr></thead><tbody>${specRows}</tbody></table></div>`, trustBadges(['reported', 'allocated']))}
@@ -425,13 +425,50 @@ function excludedNote(excluded: Record<string, number>): string {
   return parts.length ? `excluded: ${parts.join(', ')}` : 'excluded: none';
 }
 
+/**
+ * One panel: title and trust classes, then the figure and whatever chart or table carries it, then a folded
+ * "How it's measured" holding the methodology note, the excluded count, and the help text, then the
+ * citations. Call sites pass the meta as badges followed by prose, so the split happens here rather than at
+ * thirty call sites. Only a citation block that closes the body moves after the fold; one inside a table
+ * row stays in its row.
+ */
 export function panel(
   title: string,
   body: string,
   meta = '',
   extraClass = '',
 ): string {
-  return `<section class="panel${extraClass ? ' ' + extraClass : ''}"><h3>${escapeHtml(title)}</h3>${meta ? `<p class="meta">${meta}</p>` : ''}${body}</section>`;
+  const badges = /^((?:<span class="badge[^"]*">[^<]*<\/span>\s*)+)/.exec(meta);
+  const trust = badges ? badges[1].trim() : '';
+  const note = (badges ? meta.slice(badges[0].length) : meta).trim();
+  const folded: string[] = [];
+  let content = body.replace(
+    /<p class="(?:help|meta)">[\s\S]*?<\/p>/g,
+    (paragraph) => {
+      folded.push(paragraph);
+      return '';
+    },
+  );
+  const trailing: string[] = [];
+  const tail =
+    /(?:<details class="cites">(?:(?!<\/details>)[\s\S])*<\/details>|<p class="cites-empty">[^<]*<\/p>)\s*$/;
+  for (;;) {
+    const match = tail.exec(content);
+    if (!match) {
+      break;
+    }
+    trailing.unshift(match[0].trim());
+    content = content.slice(0, match.index);
+  }
+  const how =
+    note || folded.length
+      ? `<details class="how"><summary>How it's measured</summary>${note ? `<p class="meta">${note}</p>` : ''}${folded.join('')}</details>`
+      : '';
+  const foot =
+    how || trailing.length
+      ? `<div class="foot">${how}${trailing.join('')}</div>`
+      : '';
+  return `<section class="panel${extraClass ? ' ' + extraClass : ''}"><div class="head"><h3>${escapeHtml(title)}</h3>${trust ? `<span class="trust">${trust}</span>` : ''}</div>${content}${foot}</section>`;
 }
 
 function figure(value: string, unit: string): string {
@@ -697,12 +734,20 @@ function workMixPanel(signals: RepositorySignals, links: Links): string {
   );
 }
 
-/** Flow efficiency, iterations, spec lead time, and check compliance as one group of small reads. */
-function efficiencyPanels(signals: RepositorySignals, links: Links): string {
+/** Flow efficiency, iterations, spec lead time, and check compliance: four small reads, returned apart. */
+function efficiencyPanels(
+  signals: RepositorySignals,
+  links: Links,
+): {
+  efficiency: string;
+  iterations: string;
+  specLeadTime: string;
+  compliance: string;
+} {
   const percent = (value: number | null) =>
     value === null ? 'n/a' : `${Math.round(value * 100)}%`;
   const compliance = signals.checkCompliance;
-  return `${panel(
+  const efficiency = panel(
     'Flow efficiency',
     `${figure(percent(signals.flowEfficiency.p50), `typical share of cycle time someone was working; ${count(signals.flowEfficiency.count, 'change')} measured`)}<p class="help">Active seconds are the agent's run time plus the operator's active time, counted only where the session window overlaps the cycle window; ${escapeHtml(seconds(signals.flowEfficiency.outsideSeconds))} of active time fell outside any change's window and is reported here rather than hidden${
       Object.keys(signals.flowEfficiency.outsideBySpec).length
@@ -716,22 +761,23 @@ function efficiencyPanels(signals: RepositorySignals, links: Links): string {
         : ''
     }.</p>${cites('changes', signals.flowEfficiency.cites, links)}`,
     `${trustBadges(signals.flowEfficiency.trust)} ${escapeHtml(excludedNote(signals.flowEfficiency.excluded))}`,
-  )}
-${panel(
-  'Iterations',
-  `${figure(String(signals.iterations.sessionsPerChange.p50 ?? 'n/a'), `typical sessions per change; ${signals.iterations.commitsPerChange.p50 ?? 'n/a'} commits per change`)}`,
-  `${trustBadges(['observed', 'reported'])} over ${count(signals.iterations.sessionsPerChange.count, 'change')}`,
-)}
-${panel(
-  'Spec lead time',
-  `${figure(escapeHtml(seconds(signals.specLeadTime.p50)), `typical, from a spec's first commit to the merge that archived it; ${count(signals.specLeadTime.count, 'spec')} measured`)}${cites('specs', signals.specLeadTime.cites, links)}`,
-  `${trustBadges(signals.specLeadTime.trust)} ${escapeHtml(excludedNote(signals.specLeadTime.excluded))}`,
-)}
-${panel(
-  'Check compliance',
-  `${figure(percent(compliance.recordedShare), `of ${count(compliance.changes, 'change')} recorded a local check; ${percent(compliance.passRate)} of those passed`)}<p class="help">The share matters more than the rate: a high pass rate over a tenth of the changes says very little.</p>`,
-  trustBadges(compliance.trust),
-)}`;
+  );
+  const iterations = panel(
+    'Iterations',
+    `${figure(String(signals.iterations.sessionsPerChange.p50 ?? 'n/a'), `typical sessions per change; ${signals.iterations.commitsPerChange.p50 ?? 'n/a'} commits per change`)}`,
+    `${trustBadges(['observed', 'reported'])} over ${count(signals.iterations.sessionsPerChange.count, 'change')}`,
+  );
+  const specLeadTime = panel(
+    'Spec lead time',
+    `${figure(escapeHtml(seconds(signals.specLeadTime.p50)), `typical, from a spec's first commit to the merge that archived it; ${count(signals.specLeadTime.count, 'spec')} measured`)}${cites('specs', signals.specLeadTime.cites, links)}`,
+    `${trustBadges(signals.specLeadTime.trust)} ${escapeHtml(excludedNote(signals.specLeadTime.excluded))}`,
+  );
+  const compliancePanel = panel(
+    'Check compliance',
+    `${figure(percent(compliance.recordedShare), `of ${count(compliance.changes, 'change')} recorded a local check; ${percent(compliance.passRate)} of those passed`)}<p class="help">The share matters more than the rate: a high pass rate over a tenth of the changes says very little.</p>`,
+    trustBadges(compliance.trust),
+  );
+  return { efficiency, iterations, specLeadTime, compliance: compliancePanel };
 }
 
 /**
@@ -871,25 +917,31 @@ function changesTable(
       const gaps = change.gaps
         .map((gap) => `<span class="gap">${escapeHtml(gap.type)}</span>`)
         .join(' ');
-      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject">${href(links, `commit/${change.id}`, change.id.slice(0, 10))} <span class="cite-title">${escapeHtml(change.subject)}</span></td><td>${pullRef(change.association.pullRequest, links)} <span class="dim">${escapeHtml(change.association.method ?? '')}</span></td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num nowrap"><span class="added">+${change.insertions}</span> <span class="removed">−${change.deletions}</span></td><td class="num nowrap">${spend}</td><td class="num nowrap">${hoursCell(byChange[change.id])}</td><td>${sessions}</td><td>${gaps || '<span class="dim">none</span>'}</td></tr>`;
+      const more = `<span class="added">+${change.insertions}</span> <span class="removed">−${change.deletions}</span> over ${count(change.files, 'file')} · sessions ${sessions} · gaps ${gaps || '<span class="dim">none</span>'}`;
+      return `<tr><td class="mono">${escapeHtml(dateOnly(change.mergeTime))}</td><td class="subject">${href(links, `commit/${change.id}`, change.id.slice(0, 10))} <span class="cite-title">${escapeHtml(change.subject)}</span></td><td>${pullRef(change.association.pullRequest, links)} <span class="dim">${escapeHtml(change.association.method ?? '')}</span></td><td class="num">${escapeHtml(seconds(change.timing.waitTimeSeconds))}</td><td class="num">${escapeHtml(seconds(change.timing.cycleTimeSeconds))}</td><td class="num nowrap">${spend}</td><td class="num nowrap">${hoursCell(byChange[change.id])}</td><td><details class="more"><summary>more</summary><p class="more-body">${more}</p></details></td></tr>`;
     })
     .join('');
   return panel(
     'Recent changes',
-    `<div class="scroll tall"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">lines</th><th class="num">spend</th><th class="num">man hours</th><th>sessions</th><th>gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
-    `${trustBadges(['observed', 'reported'])} the newest ${recent.length} of ${changes.length} changes on the default branch; wait and cycle come from the pull head ref, sessions and spend from the harness`,
+    `<div class="scroll tall"><table class="changes"><thead><tr><th>merged</th><th>change</th><th>pull request</th><th class="num">wait</th><th class="num">cycle</th><th class="num">spend</th><th class="num">man hours</th><th>lines, sessions, gaps</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+    `${trustBadges(['observed', 'reported'])} the newest ${recent.length} of ${changes.length} changes on the default branch; wait and cycle come from the pull head ref, sessions and spend from the harness; lines, sessions, and gaps disclose per row`,
     'span-all',
   );
 }
 
-/** One column per day between the first and last merge, or per week when that is more than 60 columns. */
-function mergeActivity(changes: ChangeRow[]): string {
+/** One bucket per day between the first and last merge, or per week when that is more than 60 columns. */
+function mergeBuckets(changes: ChangeRow[]): {
+  buckets: { label: string; value: number }[];
+  period: string;
+  first: string;
+  last: string;
+} | null {
   const days = changes
     .map((change) => dateOnly(change.mergeTime))
     .filter((day) => day !== 'unknown')
     .sort();
   if (days.length === 0) {
-    return '';
+    return null;
   }
   const start = Date.parse(`${days[0]}T00:00:00Z`);
   const end = Date.parse(`${days[days.length - 1]}T00:00:00Z`);
@@ -908,11 +960,51 @@ function mergeActivity(changes: ChangeRow[]): string {
     );
     buckets[Math.floor(offset / perBucket)].value += 1;
   }
-  const period = perBucket === 1 ? 'day' : 'week';
-  const peak = Math.max(...buckets.map((bucket) => bucket.value));
-  return `${columnChart(buckets, 'changes merged over the measured window')}<p class="help">${escapeHtml(
-    `One column per ${period} from ${days[0]} to ${days[days.length - 1]}; busiest ${period}, ${count(peak, 'change')}.`,
+  return {
+    buckets,
+    period: perBucket === 1 ? 'day' : 'week',
+    first: days[0],
+    last: days[days.length - 1],
+  };
+}
+
+function mergeActivity(changes: ChangeRow[]): string {
+  const merged = mergeBuckets(changes);
+  if (!merged) {
+    return '';
+  }
+  const peak = Math.max(...merged.buckets.map((bucket) => bucket.value));
+  return `${columnChart(merged.buckets, 'changes merged over the measured window')}<p class="help">${escapeHtml(
+    `One column per ${merged.period} from ${merged.first} to ${merged.last}; busiest ${merged.period}, ${count(peak, 'change')}.`,
   )}</p>`;
+}
+
+/** A trend beside a headline figure: columns in a small box, the last one emphasised. */
+function spark(values: (number | null)[], caption: string): string {
+  const width = 120;
+  const height = 28;
+  const present = values.filter((value): value is number => value !== null);
+  if (present.length === 0) {
+    return '';
+  }
+  const scale = Math.max(1, ...present);
+  const step = width / Math.max(1, values.length);
+  const barWidth = Math.max(1.5, Math.min(8, step - 1.5));
+  const columns = values
+    .map((value, index) => {
+      if (value === null) {
+        return '';
+      }
+      const length = Math.max(
+        value > 0 ? 2 : 0,
+        Math.round((value / scale) * height),
+      );
+      const x = index * step + (step - barWidth) / 2;
+      const last = index === values.length - 1;
+      return `<rect x="${x.toFixed(1)}" y="${height - length}" width="${barWidth.toFixed(1)}" height="${length}" rx="1" class="${last ? 'bar' : 'bar-soft'}"></rect>`;
+    })
+    .join('');
+  return `<svg class="spark" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="${escapeHtml(caption)}">${columns}</svg>`;
 }
 
 function topFiles(pairs: { files: string[] }[], limit = 6): string {
@@ -935,57 +1027,63 @@ function topFiles(pairs: { files: string[] }[], limit = 6): string {
     .join('')}</ul>`;
 }
 
-/** The four DORA reads as cards, each with its approximation note and its citations. */
-function doraStrip(signals: RepositorySignals, links: Links): string {
+/** The four DORA reads as panels, each with its approximation note and its citations. */
+function doraPanels(signals: RepositorySignals, links: Links): string[] {
   const dora = signals.dora;
   const cards: {
     label: string;
     value: string;
+    unit: string;
     note: string;
     cites: string;
     excluded?: string;
   }[] = [
     {
-      label: 'releases / week',
+      label: 'Deployment frequency',
       value:
         dora.deploymentFrequency.perWeek === null
           ? 'n/a'
           : String(dora.deploymentFrequency.perWeek),
-      note: `${count(dora.deploymentFrequency.releases, 'release')} over ${dora.deploymentFrequency.days ?? 'n/a'} days. ${dora.deploymentFrequency.note}.`,
+      unit: `releases / week; ${count(dora.deploymentFrequency.releases, 'release')} over ${dora.deploymentFrequency.days ?? 'n/a'} days`,
+      note: `${dora.deploymentFrequency.note}.`,
       cites: dora.deploymentFrequency.tags.length
         ? `<details class="cites"><summary>tags: ${dora.deploymentFrequency.tags.length}</summary><ul>${dora.deploymentFrequency.tags.map((tag) => `<li><code>${escapeHtml(tag)}</code></li>`).join('')}</ul></details>`
         : '<p class="cites-empty">cites: none</p>',
     },
     {
-      label: 'lead time to release',
+      label: 'Lead time to release',
       value: seconds(dora.leadTimeToRelease.p50),
-      note: `typical, over ${count(dora.leadTimeToRelease.count, 'released change')}; of that, ${seconds(dora.leadTimeToRelease.mergeToTag.p50)} typical from merge to tag. ${dora.leadTimeToRelease.note}.`,
+      unit: `lead time to release, typical, over ${count(dora.leadTimeToRelease.count, 'released change')}`,
+      note: `Of that, ${seconds(dora.leadTimeToRelease.mergeToTag.p50)} typical from merge to tag. ${dora.leadTimeToRelease.note}.`,
       cites: cites('changes', dora.leadTimeToRelease.cites, links),
       excluded: excludedNote(dora.leadTimeToRelease.excluded),
     },
     {
-      label: 'escapes / release',
+      label: 'Change failure rate',
       value:
         dora.changeFailureRate.perRelease === null
           ? 'n/a'
           : String(dora.changeFailureRate.perRelease),
-      note: `${count(dora.changeFailureRate.escapes, 'escape')} over ${count(dora.changeFailureRate.releases, 'release')}. ${dora.changeFailureRate.note}.`,
+      unit: `escapes / release; ${count(dora.changeFailureRate.escapes, 'escape')} over ${count(dora.changeFailureRate.releases, 'release')}`,
+      note: `${dora.changeFailureRate.note}.`,
       cites: cites('escapes', dora.changeFailureRate.cites, links),
     },
     {
-      label: 'time to fix',
+      label: 'Time to fix',
       value: seconds(dora.timeToFix.p50),
-      note: `typical, over ${count(dora.timeToFix.count, 'escape')}. ${dora.timeToFix.note}.`,
+      unit: `time to fix, typical, over ${count(dora.timeToFix.count, 'escape')}`,
+      note: `${dora.timeToFix.note}.`,
       cites: cites('fixes', dora.timeToFix.cites, links),
       excluded: excludedNote(dora.timeToFix.excluded),
     },
   ];
-  return `<section class="panel dora" aria-label="DORA keys approximated to the release tag"><h3>DORA keys, approximated to the release tag</h3><p class="meta">${trustBadges(['observed'])} the four keys most teams report, computed from release tags because deployments are not observed here</p><div class="dora-grid">${cards
-    .map(
-      (card) =>
-        `<div class="stat dora-card"><dt class="stat-label">${escapeHtml(card.label)}</dt><dd class="stat-value">${escapeHtml(card.value)}</dd><p class="help">${escapeHtml(card.note)}${card.excluded ? ' ' + escapeHtml(card.excluded) : ''}</p>${card.cites}</div>`,
-    )
-    .join('')}</div></section>`;
+  return cards.map((card) =>
+    panel(
+      card.label,
+      `${figure(escapeHtml(card.value), escapeHtml(card.unit))}<p class="help">${escapeHtml(card.note)}</p>${card.cites}`,
+      `${trustBadges(['observed'])} computed from release tags because deployments are not observed here${card.excluded ? '; ' + escapeHtml(card.excluded) : ''}`,
+    ),
+  );
 }
 
 function spendOverTime(trends: RepositorySignals['trends']): string {
@@ -1060,7 +1158,7 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
       ? ''
       : ` <a class="ref home" href="${escapeHtml(repository.webUrl)}">${escapeHtml(repository.webUrl.replace(/^https:\/\//, ''))}</a>`;
   const label = `${escapeHtml(repository.name)}-heading`;
-  const heading = `<h2 id="${escapeHtml(repository.name)}"><span id="${label}">${escapeHtml(repository.name)}</span> <span class="branch">${escapeHtml(repository.defaultBranch)}</span>${home}</h2>`;
+  const heading = `<h2 class="repo" id="${escapeHtml(repository.name)}"><span id="${label}">${escapeHtml(repository.name)}</span> <span class="branch">${escapeHtml(repository.defaultBranch)}</span>${home}</h2>`;
   const open = `<section class="repository" aria-labelledby="${label}">`;
   if (!repository.reachable) {
     return `${open}${heading}<p class="warn">Unreachable: ${escapeHtml(repository.reason ?? 'unknown reason')}</p></section>`;
@@ -1074,32 +1172,10 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
     (change) => change.association.classification === 'out-of-band',
   );
   const excluded = signals.spend.excluded;
-  const summary = [
-    ['typical wait', seconds(signals.waitTime.p50), 'observed'],
-    ['typical cycle', seconds(signals.cycleTime.p50), 'observed'],
-    ['queue', `${signals.queue.count}`, 'observed'],
-    ['merges / day', `${signals.mergeFrequency.perDay ?? 'n/a'}`, 'observed'],
-    ['allocated', allocatedTotal(signals.allocation), 'allocated'],
-    [
-      'reported spend',
-      signals.spend.total.costUsd > 0
-        ? `$${signals.spend.total.costUsd.toFixed(2)}`
-        : signals.spend.total.sessions > 0
-          ? 'subscription'
-          : 'none',
-      'reported',
-    ],
-    ['out-of-band', `${outOfBand.length}`, 'observed'],
-  ]
-    .map(
-      ([label, value, trust]) =>
-        `<div class="stat"><dt class="stat-label">${escapeHtml(label)} ${trustBadges([trust])}</dt><dd class="stat-value">${escapeHtml(value)}</dd></div>`,
-    )
-    .join('');
   const signalPanels = signals.signals
     .map(
       (signal) =>
-        `<section class="panel signal"><h3>Signal: ${escapeHtml(signal.signal)}</h3><p class="meta">observed ${escapeHtml(seconds(signal.observed))} over the registry threshold of ${escapeHtml(seconds(signal.threshold))}</p>${cites('changes', signal.cites, links)}</section>`,
+        `<section class="panel signal"><div class="head"><h3>Signal: ${escapeHtml(signal.signal)}</h3></div><p class="figure">${escapeHtml(seconds(signal.observed))}<span class="unit">observed, over the registry threshold of ${escapeHtml(seconds(signal.threshold))}</span></p><div class="foot">${cites('changes', signal.cites, links)}</div></section>`,
     )
     .join('');
   const queueEntries = [...signals.queue.pullRequests]
@@ -1156,159 +1232,430 @@ export function renderRepositoryHtml(repository: RepositoryProjection): string {
     [unmergedExcluded.missingFigures, 'with figures missing'],
     [unmergedExcluded.invalidSession, 'unreadable'],
   ]);
-  const tab = (name: string) => `${label}-${name}`;
+  const view = (name: string) => `${label}-${name}`;
+  const reads = efficiencyPanels(signals, links);
+
+  // --- Headline: one sentence in words, then five figures with a trend beside each. Every figure is the
+  // value its panel shows and links to the sub-view holding that panel; nothing here is computed anew.
+  const percent = (value: number | null) =>
+    value === null ? 'n/a' : `${Math.round(value * 100)}%`;
+  const link = (name: string, text: string) =>
+    `<a href="#${view(name)}"><strong>${escapeHtml(text)}</strong></a>`;
+  const reported = signals.spend.total.costUsd;
+  const allocated = allocatedTotal(signals.allocation);
+  const hasAllocated = /\d/.test(allocated);
+  const spendSentence =
+    reported > 0
+      ? `Reported spend is ${link('economics-spend', `$${reported.toFixed(2)}`)}${hasAllocated ? ` beside ${link('economics-spend', allocated)} allocated from the plan` : ''}.`
+      : hasAllocated
+        ? `The plan has cost ${link('economics-spend', allocated)} so far, all of it allocated.`
+        : 'No spend is reported or allocated yet.';
+  const timing =
+    signals.waitTime.p50 === null || signals.cycleTime.p50 === null
+      ? `Over ${count(changes.length, 'change')} on ${escapeHtml(repository.defaultBranch)}, wait and cycle are not yet measured.`
+      : `Over the last ${count(signals.cycleTime.count, 'change')}, finished work waits ${link('metrics-flow', seconds(signals.waitTime.p50))} before merge and a change takes ${link('metrics-flow', seconds(signals.cycleTime.p50))} end to end${
+          signals.flowEfficiency.p50 === null
+            ? ''
+            : `; ${link('metrics-flow', percent(signals.flowEfficiency.p50))} of that time someone was working`
+        }.`;
+  const lede = `<p class="lede">${timing} ${spendSentence}</p>`;
+  const kpi = (
+    name: string,
+    labelText: string,
+    value: string,
+    trust: string,
+    trend: string,
+    sub: string,
+  ) =>
+    `<a class="kpi" href="#${view(name)}"><span class="kpi-label">${escapeHtml(labelText)} ${trustBadges([trust])}</span><span class="kpi-value">${escapeHtml(value.replace(/ \(provisional\)/g, ''))}${value.includes('(provisional)') ? '<small>provisional</small>' : ''}</span>${trend}<span class="kpi-sub">${sub}</span></a>`;
+  const distributionTrend = (
+    distribution: RepositorySignals['waitTime'],
+    caption: string,
+  ) => spark([distribution.p50, distribution.p90, distribution.max], caption);
+  const distributionSub = (distribution: RepositorySignals['waitTime']) =>
+    distribution.count === 0
+      ? 'nothing timed yet'
+      : `9 in 10 under ${escapeHtml(seconds(distribution.p90))} · slowest ${escapeHtml(seconds(distribution.max))}`;
+  const merged = mergeBuckets(changes);
+  const spendWeeks = signals.trends.weekly;
+  const spendTrend = spendWeeks.length
+    ? spark(
+        spendWeeks.map((week) =>
+          reported > 0 ? week.costUsd : week.allocated,
+        ),
+        `${reported > 0 ? 'reported' : 'allocated'} spend per week`,
+      )
+    : '';
+  const kpis = `<div class="kpis">${[
+    kpi(
+      'metrics-flow',
+      'typical wait',
+      seconds(signals.waitTime.p50),
+      'observed',
+      distributionTrend(
+        signals.waitTime,
+        'typical, nine in ten, and slowest wait',
+      ),
+      distributionSub(signals.waitTime),
+    ),
+    kpi(
+      'metrics-flow',
+      'typical cycle',
+      seconds(signals.cycleTime.p50),
+      'observed',
+      distributionTrend(
+        signals.cycleTime,
+        'typical, nine in ten, and slowest cycle',
+      ),
+      distributionSub(signals.cycleTime),
+    ),
+    kpi(
+      'records-queue',
+      'waiting to merge',
+      String(signals.queue.count),
+      'observed',
+      spark(
+        queueEntries.slice(0, 8).map((entry) => entry.age),
+        'age of each unmerged pull request',
+      ),
+      signals.queue.count === 0
+        ? 'nothing waiting'
+        : `oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`,
+    ),
+    kpi(
+      'metrics-throughput',
+      'merged per day',
+      String(signals.mergeFrequency.perDay ?? 'n/a'),
+      'observed',
+      merged
+        ? spark(
+            merged.buckets.map((bucket) => bucket.value),
+            'changes merged over the measured window',
+          )
+        : '',
+      `${count(signals.mergeFrequency.changes, 'change')} over ${signals.mergeFrequency.days ?? 'n/a'} days`,
+    ),
+    kpi(
+      'economics-spend',
+      reported > 0 ? 'reported spend' : 'allocated spend',
+      reported > 0
+        ? `$${reported.toFixed(2)}`
+        : hasAllocated
+          ? allocated
+          : signals.spend.total.sessions > 0
+            ? 'none reported'
+            : 'none',
+      reported > 0 ? 'reported' : 'allocated',
+      spendTrend,
+      [
+        reported > 0
+          ? ''
+          : signals.spend.total.sessions > 0
+            ? 'no reported spend'
+            : '',
+        `${count(signals.spend.total.sessions, 'session')} with figures`,
+        excluded.undeclared > 0
+          ? `<span class="warn">${count(excluded.undeclared, 'change')} undeclared</span>`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    ),
+  ].join('')}</div>`;
+
+  // --- Groups: each answers one question; the column count says how the panels relate.
+  const group = (
+    question: string,
+    subtitle: string,
+    columns: number,
+    panels: string[],
+  ) =>
+    `<div class="group"><div class="group-head"><h2 class="question">${escapeHtml(question)}</h2>${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}</div><div class="grid c${columns}">${panels.filter(Boolean).join('\n')}</div></div>`;
+
+  const spendTotal = panel(
+    'Spend',
+    `${figure(
+      reported > 0
+        ? `$${reported.toFixed(2)}`
+        : `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens`,
+      reported > 0
+        ? `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens over ${signals.spend.total.sessions} sessions with figures`
+        : `over ${signals.spend.total.sessions} sessions with figures; no reported cost, every session is on a subscription`,
+    )}${cites('records', signals.spend.total.cites, links)}`,
+    `${trustBadges(signals.spend.trust)} excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
+  );
+  const unmergedSpend =
+    Object.keys(signals.spend.perUnmergedPullRequest).length > 0
+      ? panel(
+          'Spend on unmerged pull requests',
+          `${figure(
+            signals.spend.unmergedPullRequests.costUsd > 0
+              ? `$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`
+              : `${(signals.spend.unmergedPullRequests.inputTokens + signals.spend.unmergedPullRequests.outputTokens).toLocaleString('en-US')} tokens`,
+            `over ${count(signals.spend.unmergedPullRequests.sessions, 'session')} with figures, across ${count(Object.keys(signals.spend.perUnmergedPullRequest).length, 'pull request')}${signals.spend.unmergedPullRequests.costUsd > 0 ? '' : '; no reported cost'}`,
+          )}${cites('records', signals.spend.unmergedPullRequests.cites, links)}`,
+          `${trustBadges(['reported'])} excluded: ${escapeHtml(excludedUnmerged)} (counted, never zeroed)`,
+        )
+      : '';
+  const notes = notesPanel(repository.notes as NoteRow[], links);
+
   return `${open}${heading}
 <p class="asof">Measured as of ${escapeHtml(dateOnly(repository.asOf))}, the newest commit the mirror holds. Merge times are the merging party's clock.</p>
-<dl class="stats">${summary}</dl>
+${lede}
+${kpis}
 <nav class="tabs" aria-label="Sections of ${escapeHtml(repository.name)}">
-<a href="#${tab('flow')}">Flow</a><a href="#${tab('dora')}">DORA</a><a href="#${tab('spend')}">Spend</a><a href="#${tab('records')}">Records</a>
+<div class="row top"><a class="top" href="#${view('metrics-flow')}">Metrics</a><a class="top" href="#${view('economics-spend')}">Economics</a><a class="top" href="#${view('records-changes')}">Records</a></div>
+<div class="row sub sub-metrics"><a class="sub" href="#${view('metrics-flow')}">Flow</a><a class="sub" href="#${view('metrics-dora')}">DORA</a><a class="sub" href="#${view('metrics-throughput')}">Throughput</a></div>
+<div class="row sub sub-economics"><a class="sub" href="#${view('economics-spend')}">Spend</a><a class="sub" href="#${view('economics-effort')}">Effort</a></div>
+<div class="row sub sub-records"><a class="sub" href="#${view('records-changes')}">Changes <span class="n">${changes.length}</span></a><a class="sub" href="#${view('records-queue')}">Queue <span class="n">${signals.queue.count}</span></a><a class="sub" href="#${view('records-notes')}">Notes <span class="n">${(repository.notes as NoteRow[]).filter((note) => note.file !== null).length}</span></a></div>
 </nav>
 <div class="tabbed">
-<section class="tab" id="${tab('dora')}" aria-label="DORA keys">
-${doraStrip(signals, links)}
+<section class="tab" id="${view('metrics-dora')}" aria-label="Metrics: DORA">
+${group('The four keys, approximated to the release tag', 'Deployments are not observed; a release tag stands in for one on every card.', 4, doraPanels(signals, links))}
 </section>
-<section class="tab" id="${tab('spend')}" aria-label="Spend">
-<div class="grid">
-${spendOverTime(signals.trends)}
-${allocationPanel(signals.allocation, links)}
-${meteredRatePanel(signals.meteredRates, links)}
-${costClassPanel(signals.costClasses, signals.coverage, links)}
-${panel(
-  'Spend',
-  `${figure(
-    signals.spend.total.costUsd > 0
-      ? `$${signals.spend.total.costUsd.toFixed(2)}`
-      : `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens`,
-    signals.spend.total.costUsd > 0
-      ? `${(signals.spend.total.inputTokens + signals.spend.total.outputTokens).toLocaleString('en-US')} tokens over ${signals.spend.total.sessions} sessions with figures`
-      : `over ${signals.spend.total.sessions} sessions with figures; no reported cost, every session is on a subscription`,
-  )}${cites('records', signals.spend.total.cites, links)}`,
-  `${trustBadges(signals.spend.trust)} excluded: ${escapeHtml(excludedLine)} (counted, never zeroed)`,
+<section class="tab" id="${view('metrics-throughput')}" aria-label="Metrics: throughput">
+${group(
+  'How much ships, and how big?',
+  'Throughput and batch size over the measured window, and what kind of work it was.',
+  4,
+  [
+    panel(
+      'Merge frequency',
+      `${figure(String(signals.mergeFrequency.perDay ?? 'n/a'), `merges per day over ${signals.mergeFrequency.days ?? 'n/a'} days, ${count(signals.mergeFrequency.changes, 'change')}`)}${mergeActivity(changes)}`,
+      trustBadges(signals.mergeFrequency.trust),
+    ),
+    panel(
+      'Velocity',
+      `${figure(
+        signals.velocity.complexityPerWeek === null
+          ? 'n/a'
+          : String(signals.velocity.complexityPerWeek),
+        `complexity per week over ${count(signals.velocity.weeks, 'week')}: ${signals.velocity.tasksPerWeek ?? 'n/a'} tasks, ${signals.velocity.changesPerWeek ?? 'n/a'} changes${signals.velocity.pointsPerWeek ? `, ${signals.velocity.pointsPerWeek} story points` : ''}`,
+      )}${velocityChart(signals.trends.weekly)}<p class="help">${escapeHtml(signals.velocity.note)}${signals.velocity.unweightedTasks > 0 ? ` ${signals.velocity.unweightedTasks} of ${signals.velocity.tasks} completed tasks declared no weight and count one each.` : ''}${signals.velocity.excludedWithoutPoints > 0 && signals.velocity.storyPoints > 0 ? ` ${signals.velocity.excludedWithoutPoints} of ${signals.velocity.changes} changes recorded no points and are excluded from the points figure.` : ''}</p>`,
+      `${trustBadges(signals.velocity.trust)} per repository and per week, never keyed to a person`,
+    ),
+    panel(
+      'Batch size',
+      `${figure(String(signals.batchSize.medianLines ?? 'n/a'), `median lines changed; ${signals.batchSize.medianFiles ?? 'n/a'} files and ${signals.batchSize.medianCommits ?? 'n/a'} commits per change`)}${diffChart(recentDiffs, 'lines added and removed per recent change')}<p class="help"><span class="added">added</span> above the line, <span class="removed">removed</span> below it: ${escapeHtml(`one column per change, oldest first, over the newest ${recentDiffs.length}; largest ${Math.max(0, ...recentDiffs.map((change) => Math.max(change.insertions, change.deletions))).toLocaleString('en-US')} lines.`)}</p>${cites('changes', signals.batchSize.cites, links)}`,
+      `${trustBadges(['observed'])} over ${count(signals.batchSize.count, 'change')}`,
+    ),
+    workMixPanel(signals, links),
+  ],
 )}
-</div>
-<div class="grid wide">
-${spendTable('Spend by spec', signals.spend.bySpec, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.bySpec)}
-${spendTable('Spend by provider', signals.spend.byProvider, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byProvider)}
-${spendTable('Spend by model', signals.spend.byModel, excluded.missingFigures, links, signals.allocation, (aggregates) => aggregates.byModel)}
-${operatorPanel(signals.operators, links)}
-${hoursPanel(signals.hours, links)}
-${panel(
-  'Cost per unit of effort',
-  effortRows
-    ? `<div class="scroll"><table><thead><tr><th>unit</th><th class="num">allocated per unit</th><th class="num">reported per unit</th><th class="num">changes</th><th class="num">excluded</th><th>cites</th></tr></thead><tbody>${effortRows}</tbody></table></div>`
-    : '<p class="empty">No effort units enabled.</p>',
-  `${trustBadges(['allocated', 'reported'])} allocated is the subscription share per unit, reported is metered cost per unit; tasks and their complexity come from each change's task list; excluded changes lack the unit or a complete session record`,
-)}
-${
-  Object.keys(signals.spend.perUnmergedPullRequest).length > 0
-    ? panel(
-        'Spend on unmerged pull requests',
-        `${figure(
-          signals.spend.unmergedPullRequests.costUsd > 0
-            ? `$${signals.spend.unmergedPullRequests.costUsd.toFixed(2)}`
-            : `${(signals.spend.unmergedPullRequests.inputTokens + signals.spend.unmergedPullRequests.outputTokens).toLocaleString('en-US')} tokens`,
-          `over ${count(signals.spend.unmergedPullRequests.sessions, 'session')} with figures, across ${count(Object.keys(signals.spend.perUnmergedPullRequest).length, 'pull request')}${signals.spend.unmergedPullRequests.costUsd > 0 ? '' : '; no reported cost'}`,
-        )}${cites('records', signals.spend.unmergedPullRequests.cites, links)}`,
-        `${trustBadges(['reported'])} excluded: ${escapeHtml(excludedUnmerged)} (counted, never zeroed)`,
-      )
-    : ''
-}
-</div>
 </section>
-<section class="tab" id="${tab('records')}" aria-label="Records">
-${notesPanel(repository.notes as NoteRow[], links)}
-${changesTable(changes, signals.spend.byChange, links, signals.allocation)}
-<div class="grid">
-${panel(
-  'Unmerged queue',
-  `${figure(String(signals.queue.count), `pull requests, oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`)}${queueChart}${
-    queueRows
-      ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th class="num">spend</th><th class="num">man hours</th><th class="num">sessions</th><th>oldest commit</th><th>records</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
-      : '<p class="empty">Nothing waiting.</p>'
-  }`,
-  `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report. ${escapeHtml(signals.abandonment.count === 0 ? `none older than ${seconds(signals.abandonment.afterSeconds)}` : `${signals.abandonment.count} older than ${seconds(signals.abandonment.afterSeconds)}, carrying ${signals.abandonment.tokens.toLocaleString('en-US')} tokens${signals.abandonment.withoutFigures ? ` and ${signals.abandonment.withoutFigures} records without figures` : ''}`)}`,
+<section class="tab" id="${view('economics-spend')}" aria-label="Economics: spend">
+${group(
+  'What the work cost',
+  "Agents in the plan's currency, humans in hours, never summed.",
+  3,
+  [
+    spendOverTime(signals.trends),
+    allocationPanel(signals.allocation, links),
+    spendTotal,
+  ],
 )}
-${panel(
-  'Population',
-  `${figure(String(outOfBand.length), `out-of-band changes of ${changes.length}; ${signals.boundary.preInstrumentation} before ${escapeHtml(signals.boundary.measuredFrom ? dateOnly(signals.boundary.measuredFrom) : 'measurement')} excluded${signals.boundary.declaredClosed.length ? `; declared closed: ${signals.boundary.declaredClosed.map((n) => `#${n}`).join(', ')}` : ''}; ${repository.unreleased.length} unreleased${repository.movedTags.length ? `; moved tags: ${escapeHtml((repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', '))}` : ''}`)}${cites(
-    'out-of-band',
-    outOfBand.map((change) => change.id),
-    links,
-  )}`,
-  trustBadges(['observed']),
+${group(
+  'Where it went',
+  'By cost class, spec, provider, and model; reported cost beside the allocated share.',
+  2,
+  [
+    costClassPanel(signals.costClasses, signals.coverage, links),
+    meteredRatePanel(signals.meteredRates, links),
+    spendTable(
+      'Spend by spec',
+      signals.spend.bySpec,
+      excluded.missingFigures,
+      links,
+      signals.allocation,
+      (aggregates) => aggregates.bySpec,
+    ),
+    spendTable(
+      'Spend by provider',
+      signals.spend.byProvider,
+      excluded.missingFigures,
+      links,
+      signals.allocation,
+      (aggregates) => aggregates.byProvider,
+    ),
+    spendTable(
+      'Spend by model',
+      signals.spend.byModel,
+      excluded.missingFigures,
+      links,
+      signals.allocation,
+      (aggregates) => aggregates.byModel,
+    ),
+  ],
 )}
-${panel('Local checks', figure(checks || 'none', checks ? 'session records with a check outcome' : 'no session recorded a check outcome yet'), `${trustBadges(['reported'])} from session records`)}
-</div>
 </section>
-<section class="tab tab--default" id="${tab('flow')}" aria-label="Flow">
-${signalPanels}
-<div class="grid">
-${workMixPanel(signals, links)}
-${efficiencyPanels(signals, links)}
-${panel(
-  'Velocity',
-  `${figure(
-    signals.velocity.complexityPerWeek === null
-      ? 'n/a'
-      : String(signals.velocity.complexityPerWeek),
-    `complexity per week over ${count(signals.velocity.weeks, 'week')}: ${signals.velocity.tasksPerWeek ?? 'n/a'} tasks, ${signals.velocity.changesPerWeek ?? 'n/a'} changes${signals.velocity.pointsPerWeek ? `, ${signals.velocity.pointsPerWeek} story points` : ''}`,
-  )}${velocityChart(signals.trends.weekly)}<p class="help">${escapeHtml(signals.velocity.note)}${signals.velocity.unweightedTasks > 0 ? ` ${signals.velocity.unweightedTasks} of ${signals.velocity.tasks} completed tasks declared no weight and count one each.` : ''}${signals.velocity.excludedWithoutPoints > 0 && signals.velocity.storyPoints > 0 ? ` ${signals.velocity.excludedWithoutPoints} of ${signals.velocity.changes} changes recorded no points and are excluded from the points figure.` : ''}</p>`,
-  `${trustBadges(signals.velocity.trust)} per repository and per week, never keyed to a person`,
+<section class="tab" id="${view('economics-effort')}" aria-label="Economics: effort">
+${group(
+  'Who did the work, and what did a unit cost?',
+  'Agents carry currency and tokens, humans carry hours; there is no total across them because no record holds a rate.',
+  2,
+  [
+    operatorPanel(signals.operators, links),
+    hoursPanel(signals.hours, links),
+    panel(
+      'Cost per unit of effort',
+      effortRows
+        ? `<div class="scroll"><table><thead><tr><th>unit</th><th class="num">allocated per unit</th><th class="num">reported per unit</th><th class="num">changes</th><th class="num">excluded</th><th>cites</th></tr></thead><tbody>${effortRows}</tbody></table></div>`
+        : '<p class="empty">No effort units enabled.</p>',
+      `${trustBadges(['allocated', 'reported'])} allocated is the subscription share per unit, reported is metered cost per unit; tasks and their complexity come from each change's task list; excluded changes lack the unit or a complete session record`,
+    ),
+    unmergedSpend,
+  ],
 )}
-${panel(
-  'Merge frequency',
-  `${figure(String(signals.mergeFrequency.perDay ?? 'n/a'), `merges per day over ${signals.mergeFrequency.days ?? 'n/a'} days, ${count(signals.mergeFrequency.changes, 'change')}`)}${mergeActivity(changes)}`,
-  trustBadges(signals.mergeFrequency.trust),
+</section>
+<section class="tab" id="${view('records-changes')}" aria-label="Records: changes">
+${group(
+  'Recent changes',
+  'The newest changes on the default branch, each with what it cost and who worked it.',
+  1,
+  [changesTable(changes, signals.spend.byChange, links, signals.allocation)],
 )}
-${distributionPanel('Wait time', signals.waitTime, 'From the last commit on the pull request to the merge: how long finished work sat.', links)}
-${distributionPanel('Cycle time', signals.cycleTime, 'From the first commit on the pull request to the merge.', links)}
-${panel(
-  'Batch size',
-  `${figure(String(signals.batchSize.medianLines ?? 'n/a'), `median lines changed; ${signals.batchSize.medianFiles ?? 'n/a'} files and ${signals.batchSize.medianCommits ?? 'n/a'} commits per change`)}${diffChart(recentDiffs, 'lines added and removed per recent change')}<p class="help"><span class="added">added</span> above the line, <span class="removed">removed</span> below it: ${escapeHtml(`one column per change, oldest first, over the newest ${recentDiffs.length}; largest ${Math.max(0, ...recentDiffs.map((change) => Math.max(change.insertions, change.deletions))).toLocaleString('en-US')} lines.`)}</p>${cites('changes', signals.batchSize.cites, links)}`,
-  `${trustBadges(['observed'])} over ${count(signals.batchSize.count, 'change')}`,
+</section>
+<section class="tab" id="${view('records-queue')}" aria-label="Records: queue">
+${group(
+  'What is waiting, and what is counted',
+  'Open or closed is not observable from git; age is measured from the oldest commit not on the default branch.',
+  3,
+  [
+    panel(
+      'Unmerged queue',
+      `${figure(String(signals.queue.count), `pull requests, oldest ${escapeHtml(seconds(signals.queue.oldestAgeSeconds))}`)}${queueChart}${
+        queueRows
+          ? `<div class="scroll tall"><table><thead><tr><th>pull request</th><th class="num">age</th><th class="num">commits</th><th class="num">spend</th><th class="num">man hours</th><th class="num">sessions</th><th>oldest commit</th><th>records</th></tr></thead><tbody>${queueRows}</tbody></table></div>`
+          : '<p class="empty">Nothing waiting.</p>'
+      }`,
+      `${trustBadges([...signals.queue.trust, 'reported'])} ${escapeHtml(signals.queue.note)}; spend is what the pull request's own session records report. ${escapeHtml(signals.abandonment.count === 0 ? `none older than ${seconds(signals.abandonment.afterSeconds)}` : `${signals.abandonment.count} older than ${seconds(signals.abandonment.afterSeconds)}, carrying ${signals.abandonment.tokens.toLocaleString('en-US')} tokens${signals.abandonment.withoutFigures ? ` and ${signals.abandonment.withoutFigures} records without figures` : ''}`)}`,
+      'span-2',
+    ),
+    panel(
+      'Population',
+      `${figure(String(outOfBand.length), `out-of-band changes of ${changes.length}; ${signals.boundary.preInstrumentation} before ${escapeHtml(signals.boundary.measuredFrom ? dateOnly(signals.boundary.measuredFrom) : 'measurement')} excluded${signals.boundary.declaredClosed.length ? `; declared closed: ${signals.boundary.declaredClosed.map((n) => `#${n}`).join(', ')}` : ''}; ${repository.unreleased.length} unreleased${repository.movedTags.length ? `; moved tags: ${escapeHtml((repository.movedTags as { tag: string }[]).map((entry) => entry.tag).join(', '))}` : ''}`)}${cites(
+        'out-of-band',
+        outOfBand.map((change) => change.id),
+        links,
+      )}`,
+      trustBadges(['observed']),
+    ),
+    panel(
+      'Local checks',
+      figure(
+        checks || 'none',
+        checks
+          ? 'session records with a check outcome'
+          : 'no session recorded a check outcome yet',
+      ),
+      `${trustBadges(['reported'])} from session records`,
+    ),
+  ],
 )}
-${panel(
-  'Rework',
-  `${figure(String(signals.rework.pairs.length), `pairs of changes touching the same file within ${signals.rework.windowDays} days`)}${topFiles(signals.rework.pairs)}${cites(
-    'pairs',
-    signals.rework.pairs.map((pair) => `${pair.later}<-${pair.earlier}`),
-    links,
-  )}`,
-  `${trustBadges(['observed'])} most-touched files first`,
+</section>
+<section class="tab" id="${view('records-notes')}" aria-label="Records: notes">
+${group(
+  'Operator notes',
+  "An operator's dated explanation of a figure. A note explains a number and never changes one.",
+  1,
+  [
+    notes ||
+      panel(
+        'Notes',
+        '<p class="empty">No note recorded yet. Write one with <code>telemetry note add</code>; it is committed with the work and shown here beside the figure it explains.</p>',
+        trustBadges(['reported']),
+      ),
+  ],
 )}
-${panel(
-  'Escapes',
-  `${figure(signals.escapes.changes.length === 0 ? 'none' : String(signals.escapes.changes.length), `reverts or fixes after ${escapeHtml(signals.escapes.release ?? 'no release')} touching released files`)}${cites(
-    'changes',
-    signals.escapes.changes.map((entry) => entry.change),
-    links,
-  )}`,
-  trustBadges(['observed']),
+</section>
+<section class="tab tab--default" id="${view('metrics-flow')}" aria-label="Metrics: flow">
+${signalPanels ? group('Thresholds exceeded', 'A registry threshold the repository crossed, with the changes behind it.', 3, [signalPanels]) : ''}
+${group(
+  'Where does work wait?',
+  'From the pull head ref: how long finished work sat, how long a change took end to end, how much of that was someone working, and how long a spec took from first commit to archive.',
+  4,
+  [
+    distributionPanel(
+      'Wait time',
+      signals.waitTime,
+      'From the last commit on the pull request to the merge: how long finished work sat.',
+      links,
+    ),
+    distributionPanel(
+      'Cycle time',
+      signals.cycleTime,
+      'From the first commit on the pull request to the merge.',
+      links,
+    ),
+    reads.efficiency,
+    reads.specLeadTime,
+  ],
 )}
-</div>
+${group(
+  'Is the work holding?',
+  'Rework, escapes, whether changes were checked before they merged, and how many passes each took.',
+  4,
+  [
+    panel(
+      'Rework',
+      `${figure(String(signals.rework.pairs.length), `pairs of changes touching the same file within ${signals.rework.windowDays} days`)}${topFiles(signals.rework.pairs)}${cites(
+        'pairs',
+        signals.rework.pairs.map((pair) => `${pair.later}<-${pair.earlier}`),
+        links,
+      )}`,
+      `${trustBadges(['observed'])} most-touched files first`,
+    ),
+    panel(
+      'Escapes',
+      `${figure(signals.escapes.changes.length === 0 ? 'none' : String(signals.escapes.changes.length), `reverts or fixes after ${escapeHtml(signals.escapes.release ?? 'no release')} touching released files`)}${cites(
+        'changes',
+        signals.escapes.changes.map((entry) => entry.change),
+        links,
+      )}`,
+      trustBadges(['observed']),
+    ),
+    reads.compliance,
+    reads.iterations,
+  ],
+)}
 </section>
 </div>
 </section>`;
 }
 
 /**
- * The nav cannot know which tab is showing without a script, so the rules that mark it are generated per
- * repository: `:has` lets the page react to the section the URL names. A browser without `:has` simply shows
- * no active mark, which costs a cue and breaks nothing.
+ * The nav cannot know which view is showing without a script, so the rules that mark it are generated per
+ * repository: `:has` lets the page react to the section the URL names. A view is on when any of its
+ * sub-views is targeted, and its row of sub-links shows under the same condition; Metrics › Flow is on when
+ * nothing is targeted. A browser without `:has` shows every sub-row and no active mark, which costs a cue and
+ * breaks nothing: every link still opens its view.
  */
+const VIEWS: Record<string, string[]> = {
+  metrics: ['metrics-flow', 'metrics-dora', 'metrics-throughput'],
+  economics: ['economics-spend', 'economics-effort'],
+  records: ['records-changes', 'records-queue', 'records-notes'],
+};
+
 function tabNavRules(labels: string[]): string {
+  const on = 'color: var(--ink); border-bottom-color: var(--ink);';
+  const subOn =
+    'background: var(--panel); color: var(--ink); border-color: var(--line);';
   return labels
     .flatMap((label) =>
-      ['flow', 'dora', 'spend', 'records'].map((name) => {
-        const id = `${label}-${name}`;
-        const on = `body:has(#${id}:target) nav.tabs a[href="#${id}"]`;
-        const off =
-          name === 'flow'
-            ? `body:not(:has(.tab:target)) nav.tabs a[href="#${id}"]`
-            : null;
-        const rule =
-          'background: var(--panel); border-color: var(--line); color: var(--ink);';
-        return off ? `${on}, ${off} { ${rule} }` : `${on} { ${rule} }`;
+      Object.entries(VIEWS).flatMap(([parent, children]) => {
+        const ids = children.map((name) => `${label}-${name}`);
+        const any = `body:has(${ids.map((id) => `#${id}:target`).join(', ')})`;
+        const none =
+          parent === 'metrics' ? `, body:not(:has(.tab:target))` : '';
+        const first = ids[0];
+        return [
+          `${any} nav.tabs a.top[href="#${first}"]${none ? `${none} nav.tabs a.top[href="#${first}"]` : ''} { ${on} }`,
+          `${any} nav.tabs .row.sub-${parent}${none ? `${none} nav.tabs .row.sub-${parent}` : ''} { display: flex; }`,
+          ...ids.map(
+            (id, index) =>
+              `body:has(#${id}:target) nav.tabs a.sub[href="#${id}"]${index === 0 && none ? `${none} nav.tabs a.sub[href="#${id}"]` : ''} { ${subOn} }`,
+          ),
+        ];
       }),
     )
     .join('\n');
@@ -1317,23 +1664,23 @@ function tabNavRules(labels: string[]): string {
 const STYLE = `
 :root {
   color-scheme: light dark;
-  --bg: #f4f5f3; --bg-accent: #e9ece7; --panel: #ffffff; --ink: #16181a; --muted: #5f6368;
-  --line: #e0e2dd; --line-strong: #cbcec8; --accent: #2f6f9f; --accent-soft: #d8e6f1;
-  --observed: #2f6f9f; --reported: #92611d; --allocated: #6b4c9a; --signal: #b23a3a; --added: #2f7d4f; --removed: #a2453f;
-  --gap: #fdf0df; --gap-ink: #7a4a10;
-  --shadow: 0 1px 2px rgba(16, 20, 24, 0.05), 0 10px 24px -16px rgba(16, 20, 24, 0.24);
+  --bg: #f5f6f7; --panel: #ffffff; --ink: #14171c; --ink-2: #3d4652; --muted: #6b7480;
+  --line: #e3e6ea; --line-strong: #ccd2d9;
+  --accent: #23485f; --accent-soft: #dde8ef; --bar: #35607a; --bar-soft: #b9cfdd;
+  --observed: #2c6b9a; --reported: #9a6414; --allocated: #6a4a9c; --signal: #b23b3b;
+  --added: #2f7d4f; --removed: #a2453f; --gap: #fdf0df; --gap-ink: #7a4a10;
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 36px;
-  --radius: 12px;
-  --gutter: clamp(16px, 4vw, 34px);
-  --title: clamp(22px, 1.1vw + 19px, 28px);
+  --radius: 10px;
+  --gutter: clamp(16px, 4vw, 40px);
   --figure: clamp(23px, 0.9vw + 20px, 28px);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #111312; --bg-accent: #1a1d1b; --panel: #1d201e; --ink: #ecece7; --muted: #a2a49d;
-    --line: #2e322f; --line-strong: #3d423e; --accent: #7fb3d9; --accent-soft: #24384b;
-    --observed: #7fb3d9; --reported: #d9b37f; --allocated: #b89ad9; --signal: #e58a8a; --added: #7fc79b; --removed: #e08d87;
-    --gap: #3a2a12; --gap-ink: #e8c48a; --shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --bg: #121416; --panel: #191c1f; --ink: #e9ebee; --ink-2: #c3c9d1; --muted: #8e97a3;
+    --line: #262a2f; --line-strong: #363c44;
+    --accent: #8fbbd9; --accent-soft: #1f3040; --bar: #7fb0d1; --bar-soft: #2d4556;
+    --observed: #7fb3d9; --reported: #d9b37f; --allocated: #b89ad9; --signal: #e58a8a;
+    --added: #7fc79b; --removed: #e08d87; --gap: #3a2a12; --gap-ink: #e8c48a;
   }
 }
 * { box-sizing: border-box; }
@@ -1342,123 +1689,188 @@ body {
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
 }
-.wrap { max-width: 1320px; margin: 0 auto; padding-inline: var(--gutter); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: var(--gutter); }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 
-/* Tabs without a script and without a form control. Each tab is a fragment on this page and CSS selects the
-   one the URL names, so a tab is a URL: a link to the DORA tab opens the DORA tab, which is what makes a
-   figure citable. The default tab is last in the document so the sibling selector below can hide it once any
-   other tab is targeted, and the order property puts it back first on screen. */
-nav.tabs {
-  display: flex; gap: var(--s1); flex-wrap: wrap;
-  margin: var(--s4) 0 var(--s3); border-bottom: 1px solid var(--line);
+/* Top bar: the page, the repositories it holds, and the trust legend every figure refers to. */
+header.band { background: var(--panel); border-bottom: 1px solid var(--line); }
+header.band .wrap {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s4); flex-wrap: wrap;
+  padding-block: var(--s3);
 }
-nav.tabs a {
-  padding: var(--s2) var(--s4); border: 1px solid transparent; border-bottom: 0;
-  border-radius: var(--radius) var(--radius) 0 0; margin-bottom: -1px;
-  color: var(--muted); text-decoration: none; font-weight: 600; letter-spacing: -0.01em;
-}
-nav.tabs a:hover { color: var(--ink); background: var(--bg-accent); }
-nav.tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.tabbed { display: flex; flex-direction: column; }
-.tabbed > .tab { display: none; }
-.tabbed > .tab:target { display: block; }
-.tabbed > .tab--default { display: block; order: -1; }
-.tabbed > .tab:target ~ .tab--default { display: none; }
-@media (max-width: 560px) {
-  nav.tabs a { padding: var(--s2) var(--s3); }
-}
-header.band {
-  background: var(--bg-accent); border-bottom: 1px solid var(--line);
-  padding-block: var(--s5) var(--s4); margin-bottom: var(--s5);
-}
-h1 { font-size: var(--title); letter-spacing: -0.02em; margin: 0 0 var(--s1); text-wrap: balance; }
+.brand { display: flex; align-items: baseline; gap: var(--s4); flex-wrap: wrap; }
+h1 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
 h1 .dot { color: var(--accent); }
-h2 {
+.nav { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); }
+.nav a {
+  color: var(--ink-2); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 999px; padding: 2px 10px; font-size: 12px;
+}
+.nav a:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+.legend { display: flex; gap: var(--s4); font-size: 11px; color: var(--muted); flex-wrap: wrap; }
+.legend .badge { border: 0; padding: 0; font-size: 11px; }
+.warn { color: var(--signal); font-weight: 500; }
+.dim, .meta, .help, .asof, .empty, .cites-empty { color: var(--muted); font-size: 12px; }
+.asof, .help, .empty, .meta { text-wrap: pretty; }
+.meta, .help, .cites-empty { margin: 0; }
+
+/* Trust classes: a dot and a word, the same three colors everywhere. */
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.badge::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: currentColor; flex: none; }
+.badge-observed::before { background: var(--observed); }
+.badge-reported::before { background: var(--reported); }
+.badge-allocated::before { background: var(--allocated); }
+
+/* Repository heading and headline. */
+h2.repo {
   position: sticky; top: 0; z-index: 3; background: var(--bg);
   font-size: 19px; letter-spacing: -0.015em; margin: var(--s6) 0 var(--s1);
   border-top: 1px solid var(--line); padding-block: var(--s4) var(--s2);
   display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap;
 }
-main > .repository:first-child h2 { margin-top: 0; border-top: 0; padding-top: 0; }
-h3 {
-  font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--muted); font-weight: 600;
-}
+main > .repository:first-child h2.repo { margin-top: var(--s5); border-top: 0; padding-top: 0; }
 .branch {
   font-size: 11px; font-weight: 500; color: var(--muted); border: 1px solid var(--line-strong);
   border-radius: 999px; padding: 1px 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
-.asof, .meta, .cites-empty, .empty, .help, .dim { color: var(--muted); font-size: 12px; }
-.asof, .help, .empty { text-wrap: pretty; }
-.asof { margin: 0 0 var(--s4); max-width: 68ch; }
-.meta, .help, .cites-empty { margin: 0; }
-.warn { color: var(--signal); font-weight: 500; }
-.nav { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); margin-top: var(--s3); }
-.nav a {
-  color: var(--ink); text-decoration: none; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 999px; padding: 3px 12px; font-size: 12px;
+a.home { font-size: 12px; font-weight: 400; }
+.asof { margin: 0 0 var(--s3); max-width: 70ch; }
+.lede { margin: 0 0 var(--s4); font-size: 14px; color: var(--muted); max-width: 72ch; text-wrap: pretty; }
+.lede a { color: var(--ink); border-bottom: 1px solid var(--line-strong); }
+.lede a:hover { text-decoration: none; border-bottom-color: var(--accent); }
+.kpis {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16, 20, 24, 0.05), 0 10px 24px -16px rgba(16, 20, 24, 0.24);
 }
-.nav a:hover { border-color: var(--accent); color: var(--accent); }
-.stats {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
-  gap: var(--s2); margin: 0 0 var(--s4);
+.kpi {
+  padding: var(--s4) 18px 14px; border-right: 1px solid var(--line); min-width: 0;
+  display: flex; flex-direction: column; gap: 6px; color: inherit;
 }
-.stat {
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: var(--s3) var(--s4); box-shadow: var(--shadow); margin: 0;
-  display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: var(--s1);
+.kpi:hover { background: var(--bg); text-decoration: none; }
+.kpi:last-child { border-right: 0; }
+.kpi-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted);
+  display: flex; justify-content: space-between; gap: var(--s2); flex-wrap: wrap;
 }
-.stat-value {
-  font-size: var(--figure); font-weight: 600; letter-spacing: -0.025em;
-  font-variant-numeric: tabular-nums; line-height: 1.15; margin: 0;
+.kpi-label .badge { text-transform: none; letter-spacing: 0; }
+.kpi-value {
+  font-size: clamp(24px, 1.2vw + 18px, 32px); font-weight: 650; letter-spacing: -0.03em; line-height: 1.1;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
 }
-.stat-label {
-  font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
-  display: flex; align-items: center; gap: var(--s1); flex-wrap: wrap;
+.kpi-value small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.kpi-sub { font-size: 12px; color: var(--muted); }
+.spark { display: block; width: 100%; height: 28px; }
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi { border-bottom: 1px solid var(--line); }
+  .kpi:nth-child(3n) { border-right: 0; }
 }
+@media (max-width: 560px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi:nth-child(3n) { border-right: 1px solid var(--line); }
+  .kpi:nth-child(2n) { border-right: 0; }
+}
+
+/* Two levels of views, each a fragment on this page and selected by CSS: a view is a URL, so a link to
+   one opens it, which is what keeps a figure citable. The default view is last in the document so the
+   sibling selector can hide it once any other is targeted, and order puts it back first on screen. */
+nav.tabs {
+  position: sticky; top: 0; z-index: 4; background: var(--bg);
+  border-bottom: 1px solid var(--line); margin-top: var(--s3);
+  display: flex; flex-direction: column;
+}
+nav.tabs .row { display: flex; gap: var(--s1); overflow-x: auto; scrollbar-width: none; }
+nav.tabs a.top {
+  padding: 11px 12px 9px; color: var(--muted); font-weight: 600; font-size: 13px; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+nav.tabs a.top:hover { color: var(--ink); text-decoration: none; }
+nav.tabs .row.sub { display: none; border-top: 1px solid var(--line); padding: 6px 0; }
+nav.tabs a.sub {
+  font-size: 12px; color: var(--muted); padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid transparent;
+}
+nav.tabs a.sub:hover { color: var(--ink); text-decoration: none; }
+nav.tabs a.sub .n { color: var(--muted); font-weight: 400; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.tabbed { display: flex; flex-direction: column; }
+.tabbed > .tab { display: none; }
+.tabbed > .tab:target { display: block; }
+.tabbed > .tab--default { display: block; order: -1; }
+.tabbed > .tab:target ~ .tab--default { display: none; }
+@supports not selector(:has(a)) {
+  nav.tabs .row.sub { display: flex; }
+}
+
+/* Groups: each answers one question; the column count says how its panels relate. */
+.group { padding-block: var(--s5) var(--s2); }
+.group-head { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; margin-bottom: var(--s3); }
+h2.question { font-size: 16px; font-weight: 650; letter-spacing: -0.015em; margin: 0; }
+.group-head p { margin: 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
 .grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(310px, 100%), 1fr));
-  gap: var(--s3); margin-top: var(--s3); align-items: start;
+  display: grid; gap: 1px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden; align-items: stretch;
 }
-.grid.wide { grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); }
+.grid.c1 { grid-template-columns: 1fr; }
+.grid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid.wide { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--s3); }
+.panel.span-all { grid-column: 1 / -1; }
+.panel.span-2 { grid-column: span 2; }
+@media (max-width: 900px) {
+  .grid.c3, .grid.c4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 720px) {
-  .grid, .grid.wide { grid-template-columns: 1fr; }
-  h2 { position: static; }
+  .grid.c2, .grid.c3, .grid.c4, .grid.wide { grid-template-columns: 1fr; }
+  .panel.span-2 { grid-column: auto; }
+  h2.repo { position: static; }
 }
+
+/* Panel: title and trust, figure, chart or table, then the fold, then citations. */
 .panel {
-  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: var(--s4); min-width: 0; box-shadow: var(--shadow);
+  background: var(--panel); padding: var(--s4) 18px 14px; min-width: 0;
   display: flex; flex-direction: column; gap: var(--s2); container-type: inline-size;
+  box-shadow: 0 0 0 1px var(--line);
 }
-.panel.signal { border-color: var(--signal); border-left-width: 3px; margin-top: var(--s3); }
-.panel.dora { margin-bottom: var(--s3); }
-.dora-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: var(--s2); }
-.dora-card { box-shadow: none; display: block; }
-.dora-card .stat-value { margin: var(--s1) 0; }
-.dora-card .help { margin-top: var(--s1); }
-.panel.span-all { margin-top: var(--s3); }
-@container (max-width: 330px) {
-  .meter { display: none; }
-  .figure { font-size: 22px; }
-}
+.panel .head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s2); flex-wrap: wrap; }
+h3 { font-size: 12px; font-weight: 600; margin: 0; color: var(--ink-2); letter-spacing: 0.01em; }
+.trust { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.panel.signal { box-shadow: inset 3px 0 0 var(--signal), 0 0 0 1px var(--line); }
 .figure {
-  font-size: var(--figure); margin: 0; font-weight: 600; letter-spacing: -0.025em;
-  font-variant-numeric: tabular-nums; line-height: 1.15;
+  font-size: var(--figure); margin: 2px 0 0; font-weight: 650; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; line-height: 1.1;
 }
 .figure .unit {
   display: block; font-size: 12px; color: var(--muted); font-weight: 400; letter-spacing: 0;
   margin-top: var(--s1); line-height: 1.45; text-wrap: pretty;
 }
-.badge {
-  display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 500;
-  border: 1px solid currentColor; vertical-align: middle; text-transform: none; letter-spacing: 0;
-  white-space: nowrap;
+@container (max-width: 330px) {
+  .meter { display: none; }
+  .figure { font-size: 22px; }
 }
-.badge-observed { color: var(--observed); }
-.badge-reported { color: var(--reported); }
-.badge-allocated { color: var(--allocated); }
-.stat { min-width: 0; }
-.stat-value { overflow-wrap: anywhere; }
+.foot { display: flex; gap: var(--s4); flex-wrap: wrap; margin-top: auto; padding-top: var(--s1); }
+details { font-size: 12px; color: var(--muted); }
+details summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+details summary::-webkit-details-marker { display: none; }
+details summary::before { content: "\\25B8"; font-size: 10px; }
+details[open] summary::before { content: "\\25BE"; }
+details summary:hover { color: var(--ink); }
+details.how { max-width: 100%; }
+details.how p { margin: 6px 0 0; color: var(--ink-2); max-width: 64ch; }
+details.how p + p { margin-top: var(--s1); }
+details.cites ul {
+  margin: var(--s2) 0 0; padding-left: var(--s4); max-height: 200px; overflow: auto;
+  scrollbar-width: thin; overscroll-behavior: contain;
+  content-visibility: auto; contain-intrinsic-size: auto 200px;
+}
+details.cites li { margin-bottom: 3px; text-wrap: pretty; }
+details.more .more-body { margin: 4px 0 0; white-space: normal; color: var(--ink-2); }
+.cite-title { color: var(--ink); }
+.cite-join { color: var(--muted); padding: 0 6px; }
 .alloc { color: var(--allocated); font-size: 12px; white-space: nowrap; }
 .gap {
   display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px;
@@ -1466,55 +1878,46 @@ h3 {
 }
 .added { color: var(--added); }
 .removed { color: var(--removed); }
+
+/* Charts. */
 .chart { display: block; overflow: visible; }
-.bar { fill: var(--accent); }
+.bar { fill: var(--bar); }
+.bar-soft { fill: var(--bar-soft); }
 .bar-alt { fill: var(--removed); }
 line.gridline { stroke: var(--line); stroke-width: 1; }
 line.axis { stroke: var(--line-strong); stroke-width: 1; }
 text.tick { font-size: 10px; fill: var(--muted); }
 text.value { font-size: 11px; fill: var(--ink); font-weight: 500; }
 .meter {
-  display: inline-block; width: 44px; height: 6px; border-radius: 999px; background: var(--accent-soft);
+  display: inline-block; width: 44px; height: 5px; border-radius: 999px; background: var(--accent-soft);
   margin-right: var(--s2); vertical-align: middle; overflow: hidden; flex: none;
 }
-.meter-fill { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
-.scroll { overflow: auto; scrollbar-width: thin; overscroll-behavior: contain; }
-.scroll.tall { max-height: min(460px, 70vh); }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-thead th {
-  position: sticky; top: 0; z-index: 1; background: var(--panel);
-  text-align: left; font-weight: 600; color: var(--muted); text-transform: uppercase;
-  letter-spacing: 0.06em; font-size: 10px; box-shadow: inset 0 -1px 0 var(--line-strong);
-}
-th, td { padding: 6px var(--s2) 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
-thead th { border-bottom: 0; }
-tbody tr:last-child td { border-bottom: 0; }
-tbody tr:hover td { background: var(--bg-accent); }
-td.subject { white-space: normal; min-width: 240px; text-wrap: pretty; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-td.nowrap { white-space: nowrap; }
-td.mono, code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-a.ref { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
-a.ref:hover { border-bottom-color: var(--accent); }
-a.home { font-size: 12px; font-weight: 400; }
-a:focus-visible, summary:focus-visible {
-  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
-}
-.cite-title { color: var(--ink); }
-.cite-join { color: var(--muted); padding: 0 6px; }
-details.cites summary { cursor: pointer; color: var(--muted); font-size: 12px; }
-details.cites summary:hover { color: var(--accent); }
-details.cites ul {
-  margin: var(--s2) 0 0; padding-left: var(--s4); max-height: 200px; overflow: auto;
-  font-size: 12px; scrollbar-width: thin; overscroll-behavior: contain;
-  content-visibility: auto; contain-intrinsic-size: auto 200px;
-}
-details.cites li { margin-bottom: 3px; text-wrap: pretty; }
+.meter-fill { display: block; height: 100%; background: var(--bar); border-radius: 999px; }
 ul.list { margin: 0; padding-left: var(--s4); font-size: 12px; }
 ul.list.ranked { list-style: none; padding-left: 0; display: flex; flex-direction: column; gap: var(--s1); }
 ul.list.ranked li { display: flex; align-items: center; min-width: 0; }
 ul.list.ranked code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 ul.list.ranked .dim { white-space: nowrap; padding-left: var(--s1); }
+
+/* Tables. */
+.scroll { overflow: auto; scrollbar-width: thin; overscroll-behavior: contain; }
+.scroll.tall { max-height: min(460px, 70vh); }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+thead th {
+  position: sticky; top: 0; z-index: 1; background: var(--panel);
+  text-align: left; font-weight: 600; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.06em; font-size: 10.5px; box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+th, td { padding: 7px var(--s2) 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+thead th { border-bottom: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--bg); }
+td.subject { white-space: normal; min-width: 240px; text-wrap: pretty; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.nowrap { white-space: nowrap; }
+td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+a.ref { color: var(--accent); border-bottom: 1px solid var(--accent-soft); }
+a.ref:hover { text-decoration: none; border-bottom-color: var(--accent); }
 .repository { content-visibility: auto; contain-intrinsic-size: auto 1400px; }
 footer {
   margin-top: var(--s6); padding-top: var(--s4); border-top: 1px solid var(--line);
@@ -1522,15 +1925,16 @@ footer {
 }
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
-  a.ref, .nav a, details.cites summary { transition: color 120ms ease, border-color 120ms ease; }
+  a.ref, .nav a, details summary { transition: color 120ms ease, border-color 120ms ease; }
 }
 @media print {
   body { background: #fff; padding: 0; }
-  h2 { position: static; }
-  .panel, .stat { box-shadow: none; break-inside: avoid; }
+  h2.repo, nav.tabs { position: static; }
+  .kpis { box-shadow: none; }
+  .panel { break-inside: avoid; }
   .repository { content-visibility: visible; }
   .scroll, .scroll.tall, details.cites ul { max-height: none; overflow: visible; }
-  details.cites > ul { display: block; }
+  details > *:not(summary) { display: block; }
 }
 `;
 
@@ -1550,8 +1954,9 @@ export function renderLedgerHtml(projection: Projection | null): string {
     )
     .join('');
   const versions = projection
-    ? `projection schema ${projection.schemaVersion}, session schema ${projection.sessionSchemaVersion}, registry schema ${projection.registrySchemaVersion}`
-    : 'no projection';
+    ? `Projection schema ${projection.schemaVersion}, session schema ${projection.sessionSchemaVersion}, registry schema ${projection.registrySchemaVersion}.`
+    : 'No projection.';
+  const registered = `${count(repositories.length, 'repository', 'repositories')} registered${unreachable.length ? `, ${unreachable.length} unreachable (${escapeHtml(unreachable.map((repository) => repository.name).join(', '))})` : ''}`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -1562,13 +1967,12 @@ export function renderLedgerHtml(projection: Projection | null): string {
 </head>
 <body>
 <header class="band"><div class="wrap">
-<h1>The Ledger<span class="dot">.</span></h1>
-<p class="meta">${escapeHtml(versions)} · ${count(repositories.length, 'repository', 'repositories')} registered, ${unreachable.length} unreachable${unreachable.length ? ' (' + escapeHtml(unreachable.map((repository) => repository.name).join(', ')) + ')' : ''}</p>
-${nav ? `<nav class="nav">${nav}</nav>` : ''}
+<div class="brand"><h1>The Ledger<span class="dot">.</span></h1>${nav ? `<nav class="nav" aria-label="Repositories">${nav}</nav>` : ''}</div>
+<div class="legend" aria-label="Trust classes"><span class="badge badge-observed">observed from git</span><span class="badge badge-reported">reported by a harness or operator</span><span class="badge badge-allocated">allocated from a plan</span></div>
 </div></header>
 <main class="wrap">
 ${body}
-<footer>Every figure names the trust classes it was computed from and the changes or records behind it. Nothing here is resolved to a person: operators are a pseudonymous identifier or a provider and model. Reviews, checks, and platform timestamps are not observed; see docs/methodology.md.</footer>
+<footer>Every figure names the trust classes it was computed from and the changes or records behind it. Nothing here is resolved to a person: operators are a pseudonymous identifier or a provider and model. Reviews, checks, and platform timestamps are not observed; see docs/methodology.md. ${escapeHtml(versions)} ${registered}.</footer>
 </main>
 </body>
 </html>

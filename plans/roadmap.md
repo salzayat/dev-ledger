@@ -43,6 +43,7 @@ contract.
 | Timesheets (phase one addendum)                     | `add-timesheets`                                              | Complete |
 | Registry rollup and statements (phase one addendum) | `add-registry-rollup-and-statements`                          | Complete |
 | Zero figures (presentation)                         | `remove-zero-figures`                                         | Complete |
+| Ledger redesign (presentation)                      | `redesign-ledger-presentation`                                | Complete |
 | Change audit (phase two)                            | `add-change-audit`                                            | Blocked  |
 
 The repository evolution milestone comes first because it establishes the conventions used to plan and
@@ -177,7 +178,7 @@ loopback, writes only plan declarations and cost records, and never commits. It 
 The ledger presentation row renames the read surface and reorganises it. The Board was a status display in a
 repository that keeps an account, and The Ledger says what the page is in the repository's own vocabulary.
 The page had also outgrown one column, with the DORA strip sitting between flow figures that answer a
-different question, so the panels are grouped into four tabs — flow, DORA, spend, records — navigated by a
+different question, so the panels were grouped into four tabs — flow, DORA, spend, records — navigated by a
 fragment per tab and selected with CSS, because the page may carry no script element and no form control.
 The row also adds velocity, story points and changes merged per week, in the unit the configuration already
 enables, per repository and never per person.
@@ -226,3 +227,11 @@ change may be selected only after every earlier governing change is archived and
 work not started, `In progress` for an active change, `Blocked` when a named dependency is not ready, and
 `Complete` only for archived changes with recorded verification. Every row points to a governing change; it
 never duplicates that change's requirements or task checklist.
+
+The ledger redesign row follows the zero figures row and changes only the page. The figures were right and
+buried: every panel opened with its trust badges and a methodology sentence before its number, the flow tab
+was twelve equal cards with work mix first, and the first line under the title was three schema versions.
+The row puts the figure first with the methodology folded beneath it, groups panels under the question each
+answers, splits the four tabs into three views with sub-views so no view holds more than six panels, and
+opens each repository with a headline in words whose every figure links to its panel. Nothing in the
+projection changes; the page still carries no script element, no external resource, and no form control.
