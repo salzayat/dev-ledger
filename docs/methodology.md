@@ -210,17 +210,30 @@ It is per repository and per week. There is no velocity per operator and there w
 dimension exists to compare agent labour with human labour on the same change, not to rank people by
 throughput, and a per-person velocity is the one figure this methodology was built to avoid producing.
 
-## Tabs, and why they carry no script
+## Views, and why they carry no script
 
-The Ledger groups its panels into four tabs — flow, DORA, spend, and records — navigated by a fragment per
-tab and selected with CSS. The page carries no script element, loads no external resource, and contains no
-form control, so tabs could not be built from either of the usual techniques. The fragment approach has a
-property the others lack: a tab is a URL, so a link to the DORA tab opens the DORA tab, and a figure stays
-citable in a review.
+The Ledger groups its panels into three views, Metrics, Economics, and Records, each holding sub-views:
+Metrics holds Flow, DORA, and Throughput; Economics holds Spend and Effort; Records holds Changes, Queue, and
+Notes. Each sub-view is a fragment on the page selected with CSS, and a view marks itself current when any of
+its sub-views is the target. The page carries no script element, loads no external resource, and contains no
+form control, so views could not be built from either of the usual techniques. The fragment approach has a
+property the others lack: a sub-view is a URL, so a link to Economics › Effort opens Economics › Effort, and a
+figure stays citable in a review.
 
-DORA and flow are separate because they answer different questions. The four keys are approximations named
-as such on every card; the flow signals are computed directly. One scroll had been quietly inviting a reader
-to trust both equally.
+Within a sub-view the panels sit under the question they answer: where does work wait, how much ships and
+how big, is the work holding. A panel leads with its figure; the methodology note, the excluded count, and
+the help text fold beneath it under "How it's measured", closed until opened, and the citations follow. The
+fold hides nothing the panel showed before; it puts the number first and the reasoning one click beneath.
+
+Above the views, a headline states the typical wait, the typical cycle, the typical active share, and the
+period's spend in words, each figure a link to the sub-view holding its panel, and five figures with a trend
+beside each. The headline computes nothing: every value is the one its panel shows, formatted by the same
+helper, so a reader who doubts a number is one click from its trust class, its excluded count, and its
+citations.
+
+DORA and flow are separate sub-views because they answer different questions. The four keys are
+approximations named as such on every card; the flow signals are computed directly. One scroll had been
+quietly inviting a reader to trust both equally.
 
 ## A citation names its change and reaches the commit
 
